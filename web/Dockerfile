@@ -1,22 +1,27 @@
-FROM oven/bun:1.1.38
+# Stage 1: Build com Bun
+FROM oven/bun:1.1.38 AS build
 
 WORKDIR /app
 
-# Link para compatibilidade com Node
-RUN ln -s $(which bun) /usr/bin/node
-
-# Instalar dependências
 COPY package.json bun.lockb* ./
 RUN bun install
 
-# Copiar código
 COPY . .
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 
-# Build do frontend
 RUN bun run build
 
-# Expor porta
-EXPOSE 3000
+# Stage 2: Servir com Nginx
+FROM nginx:alpine
 
-# Servir arquivos estáticos do dist usando Bun HTTP
-CMD ["bun", "run", "-e", "import { serve } from 'bun'; serve({ port: 3000, fetch(req){ return new Response(Bun.file('dist' + new URL(req.url).pathname)); } });"]
+# Copia build estático
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Config Nginx customizada (opcional, SPA)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+# Mantém Nginx em foreground
+CMD ["nginx", "-g", "daemon off;"]
