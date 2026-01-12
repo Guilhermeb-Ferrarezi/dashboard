@@ -3,7 +3,7 @@ import { useState } from "react";
 import { login } from "./services/auth";
 import { getUserData } from "./services/user";
 
-export function App() {
+export default function App() {
   const [user, setUser] = useState<any>(null);
 
   const handleLogin = async () => {
