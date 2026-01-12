@@ -14,4 +14,6 @@ RUN bun run build
 # instalar serve globalmente
 RUN bun install -g serve
 
+EXPOSE 3000
+
 CMD ["serve", "-s", "dist"]
