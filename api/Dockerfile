@@ -1,5 +1,5 @@
 # Usa a imagem oficial do Bun
-FROM jarredsumner/bun:latest
+FROM bun:latest
 
 # Diretório de trabalho no container
 WORKDIR /app
