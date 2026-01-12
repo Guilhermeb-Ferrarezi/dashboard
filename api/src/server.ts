@@ -11,6 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 // ----------------------
 // Middleware Basic Auth
 // ----------------------
@@ -83,13 +84,14 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
+const BASE_URL = process.env.BASE_URL;
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB conectado com sucesso!");
     const PORT = Number(process.env.PORT) || 4000;
     app.listen(PORT, () => {
-      console.log(`Servidor rodando em http://localhost:${PORT}`);
+      console.log(`Servidor rodando em http://${BASE_URL}/${PORT}`);
     });
   })
   .catch((err) => {
