@@ -1,14 +1,15 @@
-# Usa a imagem oficial do Bun
-FROM bun:latest
+# Usa a imagem oficial do Bun do Oven
+FROM oven/bun:1.1.38
 
-# Diretório de trabalho no container
-WORKDIR /app
 
-# Copia os arquivos de projeto
-COPY . .
+# Copia package.json e bun.lockb para instalar dependências
+COPY package.json bun.lock* ./
 
-# Instala dependências
+# Instala dependências via Bun
 RUN bun install
+
+# Copia todo o projeto
+COPY . .
 
 # Expõe a porta do servidor
 EXPOSE 4000
