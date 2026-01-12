@@ -23,5 +23,5 @@ RUN bun install -g serve
 # Expor a porta que o servidor vai usar
 EXPOSE 3000
 
-# Comando final para rodar o servidor em produção
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["bun", "expo-static", "dist", "-p", "3000"]
+
