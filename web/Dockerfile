@@ -2,16 +2,16 @@ FROM oven/bun:1.1.38
 
 WORKDIR /app
 
+# Criar link simbólico do Bun para node (compatível na maioria dos casos)
+RUN ln -s $(which bun) /usr/bin/node
+
 COPY package.json bun.lockb* ./
 RUN bun install
 
 COPY . .
-
-# Build do frontend (Vite)
 RUN bun run build
 
-# Serve o build com Bun Serve
+# instalar serve globalmente
 RUN bun install -g serve
 
-EXPOSE 3000
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["serve", "-s", "dist"]
