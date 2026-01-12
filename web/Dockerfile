@@ -1,27 +1,22 @@
-# Imagem oficial do Bun
 FROM oven/bun:1.1.38
 
-# Diretório de trabalho dentro do container
 WORKDIR /app
 
-# Criar link simbólico para compatibilidade com pacotes que chamam node
+# Link para compatibilidade com Node
 RUN ln -s $(which bun) /usr/bin/node
 
-# Copiar dependências e instalar
+# Instalar dependências
 COPY package.json bun.lockb* ./
 RUN bun install
 
-# Copiar todo o projeto
+# Copiar código
 COPY . .
 
-# Build do frontend (Vite)
+# Build do frontend
 RUN bun run build
 
-# Instalar serve globalmente para servir os arquivos estáticos
-RUN bun install -g serve
-
-# Expor a porta que o servidor vai usar
+# Expor porta
 EXPOSE 3000
 
-CMD ["bun", "expo-static", "dist", "-p", "3000"]
-
+# Servir arquivos estáticos do dist usando Bun HTTP
+CMD ["bun", "run", "-e", "import { serve } from 'bun'; serve({ port: 3000, fetch(req){ return new Response(Bun.file('dist' + new URL(req.url).pathname)); } });"]
