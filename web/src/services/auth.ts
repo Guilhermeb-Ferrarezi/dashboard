@@ -4,8 +4,8 @@ interface LoginData {
 }
 
 export async function login({ email, password }: LoginData) {
-  const basicUser = import.meta.env.REACT_APP_BASIC_USER || "admin";
-  const basicPass = import.meta.env.REACT_APP_BASIC_PASS || "admin123";
+  const basicUser = import.meta.env.REACT_APP_BASIC_USER
+  const basicPass = import.meta.env.REACT_APP_BASIC_PASS
 
   const basicAuth = btoa(`${basicUser}:${basicPass}`);
 

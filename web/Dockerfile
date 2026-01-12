@@ -7,12 +7,11 @@ RUN bun install
 
 COPY . .
 
-# Build do frontend (React ou Vite)
+# Build do frontend (Vite)
 RUN bun run build
 
 # Serve o build com Bun Serve
 RUN bun install -g serve
 
 EXPOSE 3000
-
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["serve", "-s", "dist", "-l", "3000"]
