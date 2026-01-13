@@ -8,13 +8,12 @@ export async function register(req: Request, res: Response) {
   if (!username || !password) return res.status(400).json({ message: "Missing fields" });
 
   const hashed = await bcrypt.hash(password, 10);
-
   try {
     const user = new User({ username, password: hashed, role: role || "user" });
     await user.save();
-    return res.status(201).json({ message: "User created" });
+    res.status(201).json({ message: "User created" });
   } catch {
-    return res.status(400).json({ message: "Username already exists" });
+    res.status(400).json({ message: "Username already exists" });
   }
 }
 
@@ -34,5 +33,5 @@ export async function login(req: Request, res: Response) {
     { expiresIn: "1h" }
   );
 
-  return res.json({ token });
+  res.json({ token });
 }

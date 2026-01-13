@@ -15,7 +15,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
 
-import { getUserFromToken, getUserRole, getAdminArea, getUserArea } from "../services/auth";
+import { getUserFromToken, getAdminArea, getUserArea } from "../services/auth";
 
 /* =========================
    COMPONENTE PRINCIPAL
@@ -23,13 +23,14 @@ import { getUserFromToken, getUserRole, getAdminArea, getUserArea } from "../ser
 export default function Dashboard() {
   const [message, setMessage] = useState<string>("Carregando...");
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [username, setUsername] = useState<string>("Usuário");
 
   useEffect(() => {
-    // Pega o cargo do token
-    const role = getUserRole();
+    const user = getUserFromToken();
+    const role = user?.role ?? null;
     setUserRole(role);
+    setUsername(user?.username ?? "Usuário");
 
-    // Busca dados de acordo com o cargo
     async function fetchData() {
       try {
         if (role === "admin") {
@@ -73,7 +74,7 @@ export default function Dashboard() {
         <header className="header">
           <div>
             <span className="subtitle">{userRole ? userRole.toUpperCase() : "Visitante"}</span>
-            <h2>{getUserFromToken()?.username || "Usuário"}</h2>
+            <h2>{username}</h2>
           </div>
 
           <input className="search" placeholder="Buscar função..." />

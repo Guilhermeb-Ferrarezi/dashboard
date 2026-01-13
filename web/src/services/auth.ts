@@ -45,20 +45,19 @@ export async function register(username: string, password: string, role: "user" 
   return data;
 }
 
-/* TOKEN & USUÁRIO */
+/* TOKEN */
 export function getToken() { return localStorage.getItem("token"); }
 export function logout() { localStorage.removeItem("token"); }
-export function getUserFromToken(): DecodedToken | null {
+export function getUserFromToken() {
   const token = getToken();
   if (!token) return null;
   try { return jwtDecode<DecodedToken>(token); } catch { return null; }
 }
-export function getUserRole() { return getUserFromToken()?.role ?? null; }
-export function isAuthenticated() { return !!getToken(); }
 
 /* ROTAS PROTEGIDAS */
 export async function getUserArea() {
-  const token = getToken(); if (!token) throw new Error("Missing token");
+  const token = getToken();
+  if (!token) throw new Error("Missing token");
   const res = await fetch(`${import.meta.env.VITE_API_URL}/user`, {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
@@ -67,7 +66,8 @@ export async function getUserArea() {
 }
 
 export async function getAdminArea() {
-  const token = getToken(); if (!token) throw new Error("Missing token");
+  const token = getToken();
+  if (!token) throw new Error("Missing token");
   const res = await fetch(`${import.meta.env.VITE_API_URL}/admin`, {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
