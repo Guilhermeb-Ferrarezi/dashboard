@@ -11,6 +11,7 @@ import {
   Trophy,
   Moon,
   CalendarDays,
+  IdCard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
@@ -60,7 +61,7 @@ export default function Dashboard() {
 
         <nav className="menu">
           <MenuItem icon={Home} label="Dashboard" active />
-          <MenuItem icon={Zap} label="Atalhos" />
+          <MenuItem icon={IdCard} label="Criar usuário" active />
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
           <MenuItem icon={Briefcase} label="Estágios / Vagas" />
