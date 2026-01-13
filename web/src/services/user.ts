@@ -5,7 +5,7 @@ export async function getUserData() {
   const token = getToken();
   if (!token) throw new Error("Não autenticado");
 
-  return apiFetch("/api/user/me", {
+  return apiFetch("/user/me", {
     headers: {
       Authorization: `Bearer ${token}`,
     },

@@ -21,7 +21,7 @@ export async function login(username: string, password: string) {
 
   const basicAuth = btoa(`${basicUser}:${basicPass}`);
 
-  const data = await apiFetch("/api/auth/login", {
+  const data = await apiFetch("/auth/login", {
     method: "POST",
     headers: {
       Authorization: `Basic ${basicAuth}`,

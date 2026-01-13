@@ -4,7 +4,7 @@ export async function register(
   username: string,
   password: string
 ) {
-  return apiFetch("/api/auth/register", {
+  return apiFetch("/auth/register", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
