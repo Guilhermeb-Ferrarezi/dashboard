@@ -62,7 +62,7 @@ export default function Dashboard() {
 
         <nav className="menu">
           <MenuItem icon={Home} label="Dashboard" active/>
-          <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/Register")}/>
+          <MenuItem icon={IdCard} label="Criar usuário" active />
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
           <MenuItem icon={Briefcase} label="Estágios / Vagas" />
