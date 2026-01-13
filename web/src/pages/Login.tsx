@@ -62,7 +62,7 @@ export default function Login() {
             </div>
             <div>
               <div className="st-title">Santos Tech</div>
-              <div className="st-subtitle">Login / Criar Conta</div>
+              <div className="st-subtitle">Login</div>
             </div>
           </div>
 
