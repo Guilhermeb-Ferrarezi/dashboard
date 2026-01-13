@@ -82,8 +82,8 @@ export default function Dashboard() {
 
         <section className="cards">
           <DashboardCard
-            title="Área do usuário"
-            description={message}
+            title="Dashboard"
+            description={"Dashboard Jovem Tech RP"}
             icon={<Zap />}
             color="red"
             onClick={() => {window.location.href = "https://banco-de-talentos.santos-tech.com/dashboard";}}
