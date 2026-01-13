@@ -17,6 +17,9 @@ export async function register(req: Request, res: Response) {
     res.status(400).json({ message: "Username already exists" });
   }
 }
+export function api(req: Request, res: Response) {
+  res.status(200).send("Auth service is healthy");
+}
 
 export async function login(req: Request, res: Response) {
   const { username, password } = req.body;
