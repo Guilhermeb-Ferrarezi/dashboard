@@ -43,7 +43,7 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
 // --- Rotas ---
 app.use("/auth", authRoutes);
 
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.json({ message: "Backend rodando!" });
 });
 
