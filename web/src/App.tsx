@@ -1,9 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-
+import Register from "./pages/Register";
 import type { JSX } from "react/jsx-runtime";
 
 /* =========================
@@ -11,11 +9,7 @@ import type { JSX } from "react/jsx-runtime";
 ========================= */
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("token");
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (!token) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -23,24 +17,19 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
    APP
 ========================= */
 export default function App() {
-  const [loading, setLoading] = useState(true);
-
-  // só pra evitar flash antes de checar token
-  useEffect(() => {
-    setLoading(false);
-  }, []);
-
-  if (loading) return null;
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* LOGIN */}
+        {/* LOGIN (TELA INICIAL) */}
+        <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
+
+        {/* CRIAR CONTA */}
+        <Route path="/register" element={<Register />} />
 
         {/* DASHBOARD PROTEGIDO */}
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />

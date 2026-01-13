@@ -1,17 +1,17 @@
 import { apiFetch } from "./api";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
 interface DecodedToken {
   id: string;
   username: string;
-  role: "usuario" | "admin";
+  role: "user" | "admin";
   exp: number;
 }
 
 /* =====================
    LOGIN
 ===================== */
-export async function login(password: string) {
+export async function login(username: string, password: string) {
   const basicUser = import.meta.env.VITE_BASIC_USER;
   const basicPass = import.meta.env.VITE_BASIC_PASS;
 
@@ -27,7 +27,7 @@ export async function login(password: string) {
       Authorization: `Basic ${basicAuth}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
 
   localStorage.setItem("token", data.token);
@@ -35,7 +35,7 @@ export async function login(password: string) {
 }
 
 /* =====================
-   HELPERS DE AUTH
+   HELPERS
 ===================== */
 export function getToken() {
   return localStorage.getItem("token");
