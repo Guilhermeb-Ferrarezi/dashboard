@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { startMatrixRain } from "../utils/matrixrain";
 import { login} from "../services/auth";
 import "../styles/login-matrix.css";
-import logo from "../assets/Logo.png"
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -59,7 +58,7 @@ export default function Login() {
         <div className={`st-card ${exiting ? "st-exit" : ""}`}>
           <div className="st-brand">
             <div className="st-logo" aria-label="Logo Santos Tech">
-              <img src={logo} alt="Santos Tech" />
+              <img src="/public/assets/logo.png" alt="Santos Tech" />
             </div>
             <div>
               <div className="st-title">Santos Tech</div>

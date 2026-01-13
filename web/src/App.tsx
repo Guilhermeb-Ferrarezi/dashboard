@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import type { JSX } from "react/jsx-runtime";
 
 /* =========================
@@ -24,8 +23,6 @@ export default function App() {
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
 
-        {/* CRIAR CONTA */}
-        <Route path="/register" element={<Register />} />
 
         {/* DASHBOARD PROTEGIDO */}
         <Route
