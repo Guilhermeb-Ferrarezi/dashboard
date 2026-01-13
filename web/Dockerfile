@@ -25,7 +25,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expor porta 80
-EXPOSE 75
+EXPOSE 80
 
 # Manter Nginx rodando em foreground
 CMD ["nginx", "-g", "daemon off;"]
