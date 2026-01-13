@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import authRoutes from "./routes/auth.routes";
+import { allowRoles } from "./middlewares/role.middleware";
 
 dotenv.config();
 
@@ -47,6 +48,28 @@ app.use("/api/auth", authRoutes);
 app.get("/api/user/me", verifyJWT, (req, res) => {
   res.json({ ok: true, user: (req as any).user });
 });
+
+// apenas ADMIN
+app.get(
+  "/api/admin",
+  verifyJWT,
+  allowRoles("admin"),
+  (req, res) => {
+    res.json({ message: "Área admin" });
+  }
+);
+
+// ADMIN e USUÁRIO
+app.get(
+  "/api/user",
+  verifyJWT,
+  allowRoles("usuario", "admin"),
+  (req, res) => {
+    res.json({ message: "Área usuário" });
+  }
+);
+
+
 
 app.get("/api", (req, res) => {
   res.json({ message: "Backend rodando!" });
