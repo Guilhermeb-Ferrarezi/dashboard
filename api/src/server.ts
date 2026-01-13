@@ -41,21 +41,21 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
 }
 
 // --- Rotas ---
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 
-app.get("/user/me", verifyJWT, (req, res) => {
+app.get("/api/user/me", verifyJWT, (req, res) => {
   res.json({ user: (req as any).user });
 });
 
-app.get("/admin", verifyJWT, requireRole("admin"), (req, res) => {
+app.get("/api/admin", verifyJWT, requireRole("admin"), (req, res) => {
   res.json({ message: "Área ADMIN" });
 });
 
-app.get("/user", verifyJWT, requireRole("user"), (req, res) => {
+app.get("/api/user", verifyJWT, requireRole("user"), (req, res) => {
   res.json({ message: "Área USER" });
 });
 
-app.get("/", (req, res) => {
+app.get("/api", (req, res) => {
   res.json({ message: "Backend rodando!" });
 });
 
