@@ -17,9 +17,11 @@ export default function App() {
   };
   return (
     <div>
-      <h1>Frontend / Backend Teste</h1>
-      <button onClick={handleLogin}>Login & Buscar Dados</button>
-      {user && <pre>{JSON.stringify(user, null, 2)}</pre>}
+      <div className="btn-teste">
+          <h1>Frontend / Backend Teste</h1>
+          <button onClick={handleLogin}>Login & Buscar Dados</button>
+          {user && <pre>{JSON.stringify(user, null, 2)}</pre>}
+        </div>
       <Dashboard />
     </div>
   )

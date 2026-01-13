@@ -8,3 +8,12 @@ body,
   background: #050508;
   overflow: hidden;
 }
+.btn-teste{
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #008CBA;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}

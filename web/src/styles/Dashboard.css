@@ -21,8 +21,8 @@
 /* BACKGROUND MATRIX / NEON */
 .dashboard-bg {
     position: fixed;
-    inset: 0;
-    z-index: 0;
+    /* inset: 0;
+    z-index: 0; */
     background:
         radial-gradient(circle at 20% 20%, rgba(255, 0, 80, 0.35), transparent 40%),
         radial-gradient(circle at 80% 30%, rgba(0, 140, 255, 0.35), transparent 40%),
@@ -194,3 +194,4 @@
 .card.purple .card-icon {
     background: rgba(180, 80, 255, 0.25);
 }
+
