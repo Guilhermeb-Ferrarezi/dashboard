@@ -40,12 +40,18 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+
 // --- Rotas ---
 app.use("/api/auth", authRoutes);
+
+app.get("/api/user/me", verifyJWT, (req, res) => {
+  res.json({ ok: true, user: (req as any).user });
+});
 
 app.get("/api", (req, res) => {
   res.json({ message: "Backend rodando!" });
 });
+
 
 // --- Conexão MongoDB ---
 if (!process.env.MONGO_URI) {

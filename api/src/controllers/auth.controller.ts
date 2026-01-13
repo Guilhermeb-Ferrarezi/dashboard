@@ -20,15 +20,25 @@ export async function register(req: Request, res: Response) {
 
 
 export async function login(req: Request, res: Response) {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ message: "Missing fields" });
+  const { password } = req.body;
 
-  const user = await User.findOne({ username });
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+  if (!password)
+    return res.status(400).json({ message: "Senha obrigatória" });
+
+  // usuário único (admin)
+  const user = await User.findOne();
+  if (!user)
+    return res.status(500).json({ message: "Usuário não configurado" });
 
   const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ message: "Invalid credentials" });
+  if (!match)
+    return res.status(401).json({ message: "Senha inválida" });
 
-  const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+  const token = jwt.sign(
+    { id: user._id },
+    process.env.JWT_SECRET!,
+    { expiresIn: "1h" }
+  );
+
   res.json({ token });
 }
