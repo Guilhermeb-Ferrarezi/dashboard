@@ -1,43 +1,54 @@
+// src/pages/Login.tsx
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { login } from "../services/auth";
+import { login, register } from "../services/auth";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const navigate = useNavigate();
+  const [message, setMessage] = useState("");
 
-  async function handleLogin() {
+  const handleLogin = async () => {
     try {
       await login(username, password);
-      navigate("/dashboard");
+      setMessage("Login feito com sucesso!");
+      window.location.href = "/"; // redireciona pro dashboard
     } catch (err: any) {
-      alert(err.message);
+      setMessage(err.message);
     }
-  }
+  };
+
+  const handleRegister = async () => {
+    try {
+      await register(username, password);
+      setMessage("Conta criada com sucesso! Agora faça login.");
+    } catch (err: any) {
+      setMessage(err.message);
+    }
+  };
 
   return (
-    <div>
-      <h1>Login</h1>
-
+    <div style={{ maxWidth: 400, margin: "50px auto", textAlign: "center" }}>
+      <h1>Login / Criar Conta</h1>
       <input
         placeholder="Usuário"
-        onChange={(e) => setUsername(e.target.value)}
+        value={username}
+        onChange={e => setUsername(e.target.value)}
+        style={{ width: "100%", marginBottom: 10, padding: 8 }}
       />
-
       <input
         type="password"
         placeholder="Senha"
-        onChange={(e) => setPassword(e.target.value)}
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        style={{ width: "100%", marginBottom: 10, padding: 8 }}
       />
-
-      <button onClick={handleLogin}>Entrar</button>
-
-      <hr />
-
-      <button onClick={() => navigate("/register")}>
-        Criar conta
+      <button onClick={handleLogin} style={{ width: "100%", marginBottom: 10 }}>
+        Login
       </button>
+      <button onClick={handleRegister} style={{ width: "100%" }}>
+        Criar Conta
+      </button>
+      {message && <p>{message}</p>}
     </div>
   );
 }

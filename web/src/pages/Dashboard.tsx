@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
   Home,
   Zap,
@@ -14,11 +15,40 @@ import {
 import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
 
+import { getUserFromToken, getUserRole, getAdminArea, getUserArea } from "../services/auth";
+
 /* =========================
    COMPONENTE PRINCIPAL
 ========================= */
-
 export default function Dashboard() {
+  const [message, setMessage] = useState<string>("Carregando...");
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Pega o cargo do token
+    const role = getUserRole();
+    setUserRole(role);
+
+    // Busca dados de acordo com o cargo
+    async function fetchData() {
+      try {
+        if (role === "admin") {
+          const res = await getAdminArea();
+          setMessage(res.message);
+        } else if (role === "user") {
+          const res = await getUserArea();
+          setMessage(res.message);
+        } else {
+          setMessage("Cargo inválido ou token ausente");
+        }
+      } catch (err: any) {
+        setMessage(err.message || "Erro ao buscar dados");
+      }
+    }
+
+    fetchData();
+  }, []);
+
   return (
     <div className="dashboard-root">
       <div className="dashboard-bg" />
@@ -42,26 +72,20 @@ export default function Dashboard() {
       <main className="main">
         <header className="header">
           <div>
-            <span className="subtitle">Colaborador</span>
-            <h2>Henrique</h2>
+            <span className="subtitle">{userRole ? userRole.toUpperCase() : "Visitante"}</span>
+            <h2>{getUserFromToken()?.username || "Usuário"}</h2>
           </div>
 
-          <input
-            className="search"
-            placeholder="Buscar função..."
-          />
+          <input className="search" placeholder="Buscar função..." />
         </header>
 
         <section className="cards">
           <DashboardCard
-            title="Jovem Tech"
-            description="Dashboard geral • Acesso rápido"
+            title="Área do usuário"
+            description={message}
             icon={<Zap />}
             color="red"
-            onClick={() =>
-              window.location.href =
-                "https://banco-de-talentos.santos-tech.com/dashboard"
-            }
+            onClick={() => {}}
           />
 
           <DashboardCard
@@ -69,9 +93,7 @@ export default function Dashboard() {
             description="Participantes, datas e automação"
             icon={<Moon />}
             color="blue"
-            onClick={() =>
-              window.location.href = "https://google.com"
-            }
+            onClick={() => window.location.href = "https://google.com"}
           />
 
           <DashboardCard
@@ -79,9 +101,7 @@ export default function Dashboard() {
             description="Competidores, organização e prêmios"
             icon={<Trophy />}
             color="green"
-            onClick={() =>
-              window.location.href = "https://google.com"
-            }
+            onClick={() => window.location.href = "https://google.com"}
           />
 
           <DashboardCard
@@ -89,9 +109,7 @@ export default function Dashboard() {
             description="Reservas, grupos e fidelização"
             icon={<CalendarDays />}
             color="purple"
-            onClick={() =>
-              window.location.href = "https://google.com"
-            }
+            onClick={() => window.location.href = "https://google.com"}
           />
         </section>
       </main>
@@ -102,18 +120,13 @@ export default function Dashboard() {
 /* =========================
    MENU ITEM (SIDEBAR)
 ========================= */
-
 interface MenuItemProps {
   icon: LucideIcon;
   label: string;
   active?: boolean;
 }
 
-function MenuItem({
-  icon: Icon,
-  label,
-  active = false,
-}: MenuItemProps) {
+function MenuItem({ icon: Icon, label, active = false }: MenuItemProps) {
   return (
     <div className={`menu-item ${active ? "active" : ""}`}>
       <Icon size={18} />
@@ -125,7 +138,6 @@ function MenuItem({
 /* =========================
    DASHBOARD CARD
 ========================= */
-
 interface DashboardCardProps {
   title: string;
   description: string;
@@ -134,13 +146,7 @@ interface DashboardCardProps {
   onClick: () => void;
 }
 
-function DashboardCard({
-  title,
-  description,
-  icon,
-  color,
-  onClick,
-}: DashboardCardProps) {
+function DashboardCard({ title, description, icon, color, onClick }: DashboardCardProps) {
   return (
     <motion.div
       whileHover={{ scale: 1.03 }}
@@ -148,12 +154,9 @@ function DashboardCard({
       onClick={onClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onClick();
-      }}
+      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}
     >
       <div className="card-icon">{icon}</div>
-
       <div>
         <h3>{title}</h3>
         <p>{description}</p>

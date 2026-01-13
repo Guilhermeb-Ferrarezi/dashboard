@@ -1,12 +1,10 @@
-// services/authfetch.ts
-import { API_URL } from "./api";
+export const API_URL = import.meta.env.VITE_API_URL; // ex: http://localhost:4000
 
 export async function authFetch(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token");
+  if (!token) throw new Error("Missing token");
 
-  if (!token) throw new Error("Usuário não autenticado");
-
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       ...(options.headers || {}),
@@ -15,17 +13,16 @@ export async function authFetch(endpoint: string, options: RequestInit = {}) {
     },
   });
 
-  const contentType = res.headers.get("content-type");
-
+  const contentType = response.headers.get("content-type");
   if (!contentType || !contentType.includes("application/json")) {
-    const text = await res.text();
+    const text = await response.text();
     throw new Error(`Resposta não é JSON: ${text}`);
   }
 
-  if (!res.ok) {
-    const err = await res.json();
+  if (!response.ok) {
+    const err = await response.json();
     throw new Error(err.message || "Erro na requisição");
   }
 
-  return res.json();
+  return response.json();
 }

@@ -1,9 +1,7 @@
-// services/auth.ts
-import { authFetch } from "./authfetch";
 import { apiFetch } from "./api";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
-export interface DecodedToken {
+interface DecodedToken {
   id: string;
   username: string;
   role: "user" | "admin";
@@ -17,7 +15,9 @@ export async function login(username: string, password: string) {
   const basicUser = import.meta.env.VITE_BASIC_USER;
   const basicPass = import.meta.env.VITE_BASIC_PASS;
 
-  if (!basicUser || !basicPass) throw new Error("Basic Auth não configurado");
+  if (!basicUser || !basicPass) {
+    throw new Error("Basic Auth não configurado");
+  }
 
   const basicAuth = btoa(`${basicUser}:${basicPass}`);
 
@@ -41,7 +41,9 @@ export async function register(username: string, password: string, role: "user" 
   const basicUser = import.meta.env.VITE_BASIC_USER;
   const basicPass = import.meta.env.VITE_BASIC_PASS;
 
-  if (!basicUser || !basicPass) throw new Error("Basic Auth não configurado");
+  if (!basicUser || !basicPass) {
+    throw new Error("Basic Auth não configurado");
+  }
 
   const basicAuth = btoa(`${basicUser}:${basicPass}`);
 
@@ -58,7 +60,7 @@ export async function register(username: string, password: string, role: "user" 
 }
 
 /* =====================
-   TOKEN E USUÁRIO
+   TOKEN & USUÁRIO
 ===================== */
 export function getToken() {
   return localStorage.getItem("token");
@@ -75,11 +77,11 @@ export function getUserFromToken(): DecodedToken | null {
   }
 }
 
-export function getUserRole(): "user" | "admin" | null {
+export function getUserRole() {
   return getUserFromToken()?.role ?? null;
 }
 
-export function isAuthenticated(): boolean {
+export function isAuthenticated() {
   return !!getToken();
 }
 
@@ -91,9 +93,39 @@ export function logout() {
    ROTAS PROTEGIDAS
 ===================== */
 export async function getUserArea() {
-  return authFetch("/api/user");
+  const token = getToken();
+  if (!token) throw new Error("Missing token");
+
+  const res = await fetch("/api/user", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erro: ${text}`);
+  }
+
+  return res.json();
 }
 
 export async function getAdminArea() {
-  return authFetch("/api/admin");
+  const token = getToken();
+  if (!token) throw new Error("Missing token");
+
+  const res = await fetch("/api/admin", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erro: ${text}`);
+  }
+
+  return res.json();
 }
