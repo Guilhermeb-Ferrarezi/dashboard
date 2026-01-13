@@ -1,29 +1,56 @@
-import Dashboard from "./pages/Dashboard.tsx";
-import { useState } from "react";
-import { login } from "./services/auth";
-import { getUserData } from "./services/user";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
-export default function App() {
-  const [user, setUser] = useState<any>(null);
+import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
 
-  const handleLogin = async () => {
-    try {
-      await login({ email: "teste@mail.com", password: "123456" });
-      const userData = await getUserData();
-      setUser(userData);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-  return (
-    <div>
-      <div className="btn-teste">
-          <h1>Frontend / Backend Teste</h1>
-          <button onClick={handleLogin}>Login & Buscar Dados</button>
-          {user && <pre>{JSON.stringify(user, null, 2)}</pre>}
-        </div>
-      <Dashboard />
-    </div>
-  )
+import type { JSX } from "react/jsx-runtime";
+
+/* =========================
+   PROTECTED ROUTE
+========================= */
+function ProtectedRoute({ children }: { children: JSX.Element }) {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
 }
 
+/* =========================
+   APP
+========================= */
+export default function App() {
+  const [loading, setLoading] = useState(true);
+
+  // só pra evitar flash antes de checar token
+  useEffect(() => {
+    setLoading(false);
+  }, []);
+
+  if (loading) return null;
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* LOGIN */}
+        <Route path="/login" element={<Login />} />
+
+        {/* DASHBOARD PROTEGIDO */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

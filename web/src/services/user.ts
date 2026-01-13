@@ -1,15 +1,12 @@
-import { apiFetch } from "./api";
-
 export async function getUserData() {
   const token = localStorage.getItem("token");
+  if (!token) throw new Error("Não autenticado");
 
-  if (!token) {
-    throw new Error("Usuário não autenticado");
-  }
-
-  return apiFetch("/user/me", {
+  const res = await fetch("/api/user/me", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
+
+  return res.json();
 }
