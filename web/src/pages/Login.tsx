@@ -11,7 +11,7 @@ export default function Login() {
     try {
       await login(username, password);
       setMessage("Login feito com sucesso!");
-      window.location.href = "/"; // redireciona pro dashboard
+      window.location.href = "/dashboard"; // redireciona pro dashboard
     } catch (err: any) {
       setMessage(err.message);
     }
