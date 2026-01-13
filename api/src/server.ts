@@ -20,7 +20,7 @@ app.get("/api/user/me", verifyJWT, (req, res) => {
 });
 
 app.get("/api/user", verifyJWT, requireRole("user"), (req, res) => {
-  res.json({ message: "Área USER" });
+  res.json({ message: "Dashboard Jovem Tech RP " });
 });
 
 app.get("/api/admin", verifyJWT, requireRole("admin"), (req, res) => {
