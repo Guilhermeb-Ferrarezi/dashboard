@@ -86,7 +86,7 @@ export default function Dashboard() {
             description={message}
             icon={<Zap />}
             color="red"
-            onClick={() => {}}
+            onClick={() => {window.location.href = "https://banco-de-talentos.santos-tech.com/dashboard";}}
           />
 
           <DashboardCard
