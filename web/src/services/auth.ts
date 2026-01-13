@@ -1,5 +1,6 @@
 import { apiFetch } from "./api";
 import { jwtDecode } from "jwt-decode";
+import { authFetch } from "./authfetch";
 
 interface DecodedToken {
   id: string;
@@ -58,6 +59,16 @@ export function getUserRole() {
 
 export function isAuthenticated() {
   return !!getToken();
+}
+
+export async function getUserArea() {
+  const res = await authFetch("/api/user");
+  return res.json();
+}
+
+export async function getAdminArea() {
+  const res = await authFetch("/api/admin");
+  return res.json();
 }
 
 export function logout() {
