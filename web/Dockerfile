@@ -7,24 +7,24 @@ WORKDIR /app
 COPY package.json bun.lockb* ./
 RUN bun install
 
-# Copiar o projeto e setar variável de ambiente para o build
+# Copiar projeto e setar variável de ambiente para build
 COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build do frontend (Vite)
+# Build do frontend
 RUN bun run build
 
-# Stage 2: Servir com Nginx
+# Stage 2: Nginx para servir frontend
 FROM nginx:alpine
 
 # Copiar build final
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Configuração customizada do Nginx para SPA
+# Copiar configuração customizada
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expor porta padrão
+# Expor porta 80
 EXPOSE 3000
 
 # Manter Nginx rodando em foreground
