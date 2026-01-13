@@ -15,8 +15,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
-
 import { getUserFromToken, getAdminArea, getUserArea } from "../services/auth";
+import { useNavigate } from "react-router-dom";
+const navigate = useNavigate()
 
 /* =========================
    COMPONENTE PRINCIPAL
@@ -60,8 +61,8 @@ export default function Dashboard() {
         <h1 className="logo">SANTOS TECH</h1>
 
         <nav className="menu">
-          <MenuItem icon={Home} label="Dashboard" active />
-          <MenuItem icon={IdCard} label="Criar usuário" active />
+          <MenuItem icon={Home} label="Dashboard" active/>
+          <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/Register")}/>
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
           <MenuItem icon={Briefcase} label="Estágios / Vagas" />
@@ -126,16 +127,24 @@ interface MenuItemProps {
   icon: LucideIcon;
   label: string;
   active?: boolean;
+  onClick?: () => void; // adiciona a função onClick
 }
 
-function MenuItem({ icon: Icon, label, active = false }: MenuItemProps) {
+function MenuItem({ icon: Icon, label, active = false, onClick }: MenuItemProps) {
   return (
-    <div className={`menu-item ${active ? "active" : ""}`}>
+    <div
+      className={`menu-item ${active ? "active" : ""}`}
+      onClick={onClick}          // aqui chama a função passada
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" && onClick) onClick(); }}
+    >
       <Icon size={18} />
       <span>{label}</span>
     </div>
   );
 }
+
 
 /* =========================
    DASHBOARD CARD
