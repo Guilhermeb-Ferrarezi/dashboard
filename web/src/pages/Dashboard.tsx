@@ -17,7 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
 import { getUserFromToken, getAdminArea, getUserArea } from "../services/auth";
 import { useNavigate } from "react-router-dom";
-const navigate = useNavigate()
+
 
 /* =========================
    COMPONENTE PRINCIPAL
@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [message, setMessage] = useState<string>("Carregando...");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string>("Usuário");
+  const navigate = useNavigate()
 
   useEffect(() => {
     const user = getUserFromToken();
@@ -62,7 +63,7 @@ export default function Dashboard() {
 
         <nav className="menu">
           <MenuItem icon={Home} label="Dashboard" active/>
-          <MenuItem icon={IdCard} label="Criar usuário" active />
+          <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/register")}/>
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
           <MenuItem icon={Briefcase} label="Estágios / Vagas" />
