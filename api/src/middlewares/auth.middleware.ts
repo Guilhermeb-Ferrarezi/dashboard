@@ -27,7 +27,7 @@ export function basicAuth(req: Request, res: Response, next: NextFunction) {
 
   const b64 = auth.split(" ")[1];
   if (!b64) {
-    return res.status(401).json({ message: "Invalid Basic Auth format" });
+    return res.status(401).json({ message: "Usuário ou senha incorreta" });
   }
 
   const decoded = Buffer.from(b64, "base64").toString();

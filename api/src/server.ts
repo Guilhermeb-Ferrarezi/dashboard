@@ -24,7 +24,7 @@ app.get("/api/user", verifyJWT, requireRole("user"), (req, res) => {
 });
 
 app.get("/api/admin", verifyJWT, requireRole("admin"), (req, res) => {
-  res.json({ message: "Área ADMIN" });
+  res.json({ message: "Jovem Tech RP" });
 });
 
 // Teste
