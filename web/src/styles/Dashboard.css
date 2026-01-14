@@ -76,14 +76,18 @@
     background: linear-gradient(90deg, rgba(255, 0, 80, 0.25), transparent);
     color: #fff;
 }
+.menu-item.disponivel {
+    background: linear-gradient(90deg, rgba(0, 235, 176, 0.25), transparent);
+    color: #fff;
+}
 
 /* MAIN */
 .main {
-  flex: 1;
-  height: 100vh;
-  overflow-y: auto;
-  padding: 36px 42px;
-  z-index: 1;
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 36px 42px;
+    z-index: 1;
 }
 
 
@@ -195,6 +199,68 @@
     background: rgba(180, 80, 255, 0.25);
 }
 
-.registro{
-    
+.registro {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255, 0, 0, 0.678);
+    box-shadow: 0px 0px 15px 2px rgb(255, 0, 80, 0.25);
+    border-radius: 12px;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.registro input,
+select,
+button {
+    box-sizing: border-box;
+    width: 400px;
+    height: 50px;
+    background-color: transparent;
+    color: white;
+    margin: 10px;
+    outline: none;
+    font-size: 20px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    box-shadow: 0px 0px 10px 2px rgba(255, 0, 80, 0.25);
+    transition {
+        border-color: 0.3 ease-in;
+    }
+}
+
+.registro input{
+    padding-left: 20px;
+}
+
+.registro input:focus,
+select:focus {
+    border: 2px solid red;
+    transition: 500ms ease-in-out;
+}
+
+.registro select:hover {
+    cursor: pointer;
+    border-color: red;
+}
+
+
+.registro button:hover{
+    cursor: pointer;
+    border: 1px solid white;
+}
+
+.registro button {
+    background-color: rgba(255, 0, 0, 0.56);
+    font-weight: 1000;
+    text-align: center;
+}
+.registro option {
+    background-color: #050508
 }

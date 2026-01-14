@@ -62,8 +62,8 @@ export default function Dashboard() {
         <h1 className="logo">SANTOS TECH</h1>
 
         <nav className="menu">
-          <MenuItem icon={Home} label="Home" active  onClick={() => navigate("/Home")}/>
-          <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/register")}/>
+          <MenuItem icon={Home} label="Home" active onClick={() => navigate("/Home")}/>
+          <MenuItem icon={IdCard} label="Criar usuário" disponivel onClick={() => navigate("/register")}/>
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
           <MenuItem icon={Briefcase} label="Estágios / Vagas" />
@@ -128,13 +128,14 @@ interface MenuItemProps {
   icon: LucideIcon;
   label: string;
   active?: boolean;
+  disponivel?: boolean;
   onClick?: () => void; // adiciona a função onClick
 }
 
-function MenuItem({ icon: Icon, label, active = false, onClick }: MenuItemProps) {
+function MenuItem({ icon: Icon, label, active = false, disponivel = false, onClick }: MenuItemProps) {
   return (
     <div
-      className={`menu-item ${active ? "active" : ""}`}
+      className={`menu-item ${active ? "active" : ""}${disponivel ? "disponivel" : ""}`}
       onClick={onClick}          // aqui chama a função passada
       role="button"
       tabIndex={0}
