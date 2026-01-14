@@ -41,7 +41,7 @@ export default function Login() {
       setMessage("✅ Login feito com sucesso!");
 
       setExiting(true);
-      setTimeout(() => navigate("/dashboard"), 260);
+      setTimeout(() => navigate("/home"), 260);
     } catch (err: any) {
       setMessage(err.message || "❌ Erro no login");
     } finally {
