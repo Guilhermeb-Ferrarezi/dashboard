@@ -1,12 +1,27 @@
-import { useState } from "react";
 import { register } from "../services/auth";
-import "../styles/Dashboard.css"; // mantém o mesmo estilo
+import { useEffect, useState } from "react";
+import {
+  Home,
+  Zap,
+  FileText,
+  Calendar,
+  Briefcase,
+  Users,
+  Megaphone,
+  IdCard
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import "../styles/Dashboard.css";
+import { getUserFromToken, getAdminArea, getUserArea } from "../services/auth";
+import { useNavigate } from "react-router-dom";
+
 
 export default function CreateUser() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
   const [message, setMessage] = useState("");
+  const navigate = useNavigate()
 
   const handleRegister = async () => {
     try {
@@ -25,8 +40,15 @@ export default function CreateUser() {
 
       <aside className="sidebar">
         <h1 className="logo">SANTOS TECH</h1>
+
         <nav className="menu">
-          <span style={{ marginBottom: 20, fontWeight: "bold" }}>Menu</span>
+          <MenuItem icon={Home} label="Dashboard" active/>
+          <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/register")}/>
+          <MenuItem icon={FileText} label="Relatórios" />
+          <MenuItem icon={Calendar} label="Agenda" />
+          <MenuItem icon={Briefcase} label="Estágios / Vagas" />
+          <MenuItem icon={Users} label="Clientes" />
+          <MenuItem icon={Megaphone} label="Marketing" />
         </nav>
       </aside>
 
@@ -67,6 +89,28 @@ export default function CreateUser() {
           {message && <p>{message}</p>}
         </section>
       </main>
+    </div>
+  );
+}
+
+interface MenuItemProps {
+  icon: LucideIcon;
+  label: string;
+  active?: boolean;
+  onClick?: () => void; // adiciona a função onClick
+}
+
+function MenuItem({ icon: Icon, label, active = false, onClick }: MenuItemProps) {
+  return (
+    <div
+      className={`menu-item ${active ? "active" : ""}`}
+      onClick={onClick}          // aqui chama a função passada
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" && onClick) onClick(); }}
+    >
+      <Icon size={18} />
+      <span>{label}</span>
     </div>
   );
 }
