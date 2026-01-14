@@ -2,7 +2,6 @@ import { register } from "../services/auth";
 import { useEffect, useState } from "react";
 import {
   Home,
-  Zap,
   FileText,
   Calendar,
   Briefcase,
@@ -42,7 +41,7 @@ export default function CreateUser() {
         <h1 className="logo">SANTOS TECH</h1>
 
         <nav className="menu">
-          <MenuItem icon={Home} label="Dashboard" active/>
+          <MenuItem icon={Home} label="Home" active onClick={() => navigate("/Home")}/>
           <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/register")}/>
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
@@ -57,31 +56,26 @@ export default function CreateUser() {
           <h2>Criar Usuário</h2>
         </header>
 
-        <section style={{ padding: 20, maxWidth: 400 }}>
+        <section className="registro">
           <input
             placeholder="Usuário"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={{ width: "100%", marginBottom: 10, padding: 8 }}
           />
           <input
             type="password"
             placeholder="Senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", marginBottom: 10, padding: 8 }}
           />
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as "user" | "admin")}
-            style={{ width: "100%", marginBottom: 10, padding: 8 }}
-          >
+            onChange={(e) => setRole(e.target.value as "user" | "admin")}          >
             <option value="user">Usuário</option>
             <option value="admin">Admin</option>
           </select>
           <button
             onClick={handleRegister}
-            style={{ width: "100%", padding: 10, marginBottom: 10 }}
           >
             Criar
           </button>

@@ -29,7 +29,7 @@ export default function App() {
 
         {/* DASHBOARD PROTEGIDO */}
         <Route
-          path="/dashboard"
+          path="/Home"
           element={
             <ProtectedRoute>
               <Dashboard />

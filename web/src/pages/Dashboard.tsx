@@ -62,7 +62,7 @@ export default function Dashboard() {
         <h1 className="logo">SANTOS TECH</h1>
 
         <nav className="menu">
-          <MenuItem icon={Home} label="Dashboard" active/>
+          <MenuItem icon={Home} label="Home" active  onClick={() => navigate("/Home")}/>
           <MenuItem icon={IdCard} label="Criar usuário" active onClick={() => navigate("/register")}/>
           <MenuItem icon={FileText} label="Relatórios" />
           <MenuItem icon={Calendar} label="Agenda" />
