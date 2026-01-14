@@ -8,7 +8,7 @@ export async function register(req: Request, res: Response) {
   const { username, password, role } = req.body;
   if (!username || !password) return res.status(400).json({ message: "Preencha todos os campos." });
 
-  const hashed = await bcrypt.hash(password, hash);
+  const hashed = await bcrypt.hash(password, 10);
   try {
     const user = new User({ username, password: hashed, role: role || "user" });
     await user.save();
