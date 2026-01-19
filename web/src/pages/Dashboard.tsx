@@ -97,7 +97,7 @@ export default function Dashboard() {
             description="Participantes, datas e automação"
             icon={<Moon />}
             color="blue"
-            onClick={() => window.location.href = "https://google.com"}
+            onClick={() => window.location.href = "https://saiba-mais.santos-games/api/users"}
           />
 
           <DashboardCard
