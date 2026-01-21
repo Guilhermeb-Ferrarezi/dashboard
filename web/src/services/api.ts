@@ -22,6 +22,7 @@ export async function apiFetch(
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: "include", // Sempre envia e recebe cookies
   });
 
   const contentType = response.headers.get("content-type");

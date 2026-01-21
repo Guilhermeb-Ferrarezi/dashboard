@@ -11,6 +11,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
+    credentials: "include", // Sempre envia e recebe cookies
   });
 
   const contentType = response.headers.get("content-type");

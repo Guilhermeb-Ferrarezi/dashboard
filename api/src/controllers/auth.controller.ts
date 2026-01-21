@@ -31,8 +31,31 @@ export async function login(req: Request, res: Response) {
   const token = jwt.sign(
     { id: user._id, username: user.username, role: user.role },
     process.env.JWT_SECRET!,
-    { expiresIn: "1h" }
+    { expiresIn: "7d" }
   );
 
-  res.json({ token });
+  // Define o cookie compartilhado entre subdomínios
+  res.cookie("auth_token", token, {
+    httpOnly: true,        // Não acessível via JavaScript (segurança XSS)
+    secure: process.env.NODE_ENV === "production",  // HTTPS apenas em produção
+    sameSite: "lax",       // Proteção CSRF mantendo cookies em navegação
+    domain: process.env.COOKIE_DOMAIN || undefined, // Ex: ".santos-tech.com"
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
+    path: "/"
+  });
+
+  res.json({ token, message: "Login realizado com sucesso!" });
+}
+
+export async function logout(_req: Request, res: Response) {
+  // Limpa o cookie de autenticação
+  res.clearCookie("auth_token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    path: "/"
+  });
+
+  res.json({ message: "Logout realizado com sucesso!" });
 }
