@@ -31,9 +31,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        
-
-
 
         <Route
           path="/Home"

@@ -101,11 +101,11 @@ export default function Dashboard() {
           />
 
           <DashboardCard
-            title="Campeonatos"
-            description="Competidores, organização e prêmios"
+            title="Portal do aluno"
+            description="Exercicíos, Video-aulas, materias, turmas..."
             icon={<Trophy />}
             color="green"
-            onClick={() => window.location.href = "https://google.com"}
+            onClick={() => window.location.href = "https://portaldoaluno.santos-tech.com"}
           />
 
           <DashboardCard
