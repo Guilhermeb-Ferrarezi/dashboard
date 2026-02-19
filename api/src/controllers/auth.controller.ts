@@ -20,9 +20,9 @@ export async function register(req: Request, res: Response) {
 
 export async function login(req: Request, res: Response) {
   const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ message: "Preencha todos os campos." });
+  if (!username.toLowerCase() || !password) return res.status(400).json({ message: "Preencha todos os campos." });
 
-  const user = await User.findOne({ username });
+  const user = await User.findOne({ username: username.toLowerCase() });
   if (!user) return res.status(401).json({ message: "Usuário não encontrado" });
 
   const match = await bcrypt.compare(password, user.password);
