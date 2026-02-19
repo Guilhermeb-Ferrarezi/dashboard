@@ -1,23 +1,13 @@
 export const API_URL = import.meta.env.VITE_API_URL;
 
-function getToken(): string | null {
-  return localStorage.getItem("token");
-}
-
 export async function apiFetch(
   endpoint: string,
   options: RequestInit = {}
 ) {
-  const token = getToken();
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
   };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,

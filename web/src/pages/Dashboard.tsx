@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import "../styles/Dashboard.css";
-import { getUserFromToken, getAdminArea, getUserArea } from "../services/auth";
+import { checkAuth, getAdminArea, getUserArea } from "../services/auth";
 import { useNavigate } from "react-router-dom";
 
 
@@ -29,29 +29,45 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const user = getUserFromToken();
-    const role = user?.role ?? null;
-    setUserRole(role);
-    setUsername(user?.username ?? "Usuário");
+    let cancelled = false;
 
     async function fetchData() {
       try {
+        const user = await checkAuth();
+        if (cancelled) return;
+
+        if (!user) {
+          setMessage("Sessão expirada. Faça login novamente.");
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        const role = user.role;
+        setUserRole(role);
+        setUsername(user.username);
+
         if (role === "admin") {
           const res = await getAdminArea();
+          if (cancelled) return;
           setMessage(res.message);
         } else if (role === "user") {
           const res = await getUserArea();
+          if (cancelled) return;
           setMessage(res.message);
         } else {
           setMessage("Cargo inválido ou token ausente");
         }
       } catch (err: any) {
+        if (cancelled) return;
         setMessage(err.message || "Erro ao buscar dados");
       }
     }
 
     fetchData();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   return (
     <div className="dashboard-root">

@@ -1,14 +1,10 @@
 export const API_URL = import.meta.env.VITE_API_URL; // ex: http://localhost:4000
 
 export async function authFetch(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("token");
-  if (!token) throw new Error("Missing token");
-
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       ...(options.headers || {}),
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     credentials: "include", // Sempre envia e recebe cookies
