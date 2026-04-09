@@ -14,10 +14,19 @@ import { requireRole } from "./middlewares/role";
 dotenv.config();
 
 const app = express();
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
+const isProduction = process.env.NODE_ENV === "production";
+const baseAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").filter(Boolean) || [];
+const allowedOrigins = isProduction
+  ? baseAllowedOrigins
+  : Array.from(
+      new Set([
+        ...baseAllowedOrigins,
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:5173",
+      ]),
+    );
 
 app.use(
   cors({

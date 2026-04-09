@@ -9,11 +9,13 @@ function normalizeEmail(email?: string) {
 }
 
 function buildCookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: "lax" as const,
-    domain: process.env.COOKIE_DOMAIN || undefined,
+    domain: isProduction ? process.env.COOKIE_DOMAIN || undefined : undefined,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   };
