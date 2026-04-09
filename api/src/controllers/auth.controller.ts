@@ -1,61 +1,112 @@
 import type { Request, Response } from "express";
-import { User } from "../models/User";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const hash:any = process.env.HASH
-export async function register(req: Request, res: Response) {
-  const { username, password, role } = req.body;
-  if (!username || !password) return res.status(400).json({ message: "Preencha todos os campos." });
+import { User } from "../models/User";
 
-  const hashed = await bcrypt.hash(password, 10);
+function normalizeEmail(email?: string) {
+  return email?.trim().toLowerCase() || undefined;
+}
+
+function buildCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+}
+
+export async function register(req: Request, res: Response) {
+  const { username, email, password, role } = req.body;
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!username || !password || !normalizedEmail) {
+    return res
+      .status(400)
+      .json({ message: "Preencha usuario, email e senha." });
+  }
+
   try {
-    const user = new User({ username, password: hashed, role: role || "user" });
+    const existingUser = await User.findOne({
+      $or: [{ username }, { email: normalizedEmail }],
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ message: "Usuario ou email ja existe." });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    const user = new User({
+      username,
+      email: normalizedEmail,
+      password: hashed,
+      role: role || "user",
+    });
+
     await user.save();
-    res.status(201).json({ message: "Usuário Criado!" });
+    return res.status(201).json({ message: "Usuario criado!" });
   } catch {
-    res.status(400).json({ message: "Usuário já existe." });
+    return res
+      .status(400)
+      .json({ message: "Nao foi possivel criar o usuario." });
   }
 }
 
 export async function login(req: Request, res: Response) {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ message: "Preencha todos os campos." });
+  const identifier = req.body.identifier || req.body.username || req.body.email;
+  const { password } = req.body;
+  const normalizedIdentifier = normalizeEmail(identifier);
 
-  const user = await User.findOne({ username: username });
-  if (!user) return res.status(401).json({ message: "Usuário não encontrado" });
+  if (!identifier || !password) {
+    return res
+      .status(400)
+      .json({ message: "Preencha usuario/email e senha." });
+  }
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ message: "Senha inválida" });
-
-  const token = jwt.sign(
-    { id: user._id, username: user.username, role: user.role },
-    process.env.JWT_SECRET!,
-    { expiresIn: "7d" }
-  );
-
-  // Define o cookie compartilhado entre subdomínios
-  res.cookie("auth_token", token, {
-    httpOnly: true,        // Não acessível via JavaScript (segurança XSS)
-    secure: process.env.NODE_ENV === "production",  // HTTPS apenas em produção
-    sameSite: "lax",       // Proteção CSRF mantendo cookies em navegação
-    domain: process.env.COOKIE_DOMAIN || undefined, // Ex: ".santos-tech.com"
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
-    path: "/"
+  const user = await User.findOne({
+    $or: [{ username: identifier }, { email: normalizedIdentifier }],
   });
 
-  res.json({ token, message: "Login realizado com sucesso!" });
+  if (!user) {
+    return res.status(401).json({ message: "Usuario nao encontrado." });
+  }
+
+  const match = await bcrypt.compare(password, user.password);
+
+  if (!match) {
+    return res.status(401).json({ message: "Senha invalida." });
+  }
+
+  const token = jwt.sign(
+    {
+      id: user._id,
+      username: user.username,
+      email: user.email ?? null,
+      role: user.role,
+    },
+    process.env.JWT_SECRET!,
+    { expiresIn: "7d" },
+  );
+
+  res.cookie("auth_token", token, buildCookieOptions());
+
+  return res.json({
+    token,
+    message: "Login realizado com sucesso!",
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email ?? null,
+      role: user.role,
+    },
+  });
 }
 
 export async function logout(_req: Request, res: Response) {
-  // Limpa o cookie de autenticação
-  res.clearCookie("auth_token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    domain: process.env.COOKIE_DOMAIN || undefined,
-    path: "/"
-  });
+  res.clearCookie("auth_token", buildCookieOptions());
 
-  res.json({ message: "Logout realizado com sucesso!" });
+  return res.json({ message: "Logout realizado com sucesso!" });
 }

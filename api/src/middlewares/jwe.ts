@@ -24,7 +24,7 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    (req as any).user = jwt.verify(token, process.env.JWT_SECRET!);
+    req.user = jwt.verify(token, process.env.JWT_SECRET!) as Request["user"];
     next();
   } catch {
     return res.status(403).json({ message: "Invalid or expired token" });

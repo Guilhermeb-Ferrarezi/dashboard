@@ -1,61 +1,69 @@
-import express from "express";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
+import express from "express";
 import mongoose from "mongoose";
-import cookieParser from "cookie-parser";
+
 import authRoutes from "./routes/auth.routes";
+import adminRoutes from "./routes/admin.routes";
+import projectRoutes from "./routes/projects.routes";
+import ssoRoutes from "./routes/sso.routes";
 import { verifyJWT } from "./middlewares/jwe";
 import { requireRole } from "./middlewares/role";
 
 dotenv.config();
-const app = express();
 
-// Configuração CORS para permitir cookies entre domínios
+const app = express();
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
   "http://localhost:5173",
-  "http://localhost:3000"
+  "http://localhost:3000",
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Permite requisições sem origin (ex: Postman) ou de origens permitidas
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
       callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true, // Permite envio de cookies
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-sso-shared-secret"],
+  }),
+);
 
 app.use(cookieParser());
 app.use(express.json());
 
-// Rotas de autenticação
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/sso", ssoRoutes);
 
-// Rotas protegidas
 app.get("/api/user/me", verifyJWT, (req, res) => {
-  res.json({ ok: true, user: (req as any).user });
+  res.json({ ok: true, user: req.user });
 });
 
 app.get("/api/user", verifyJWT, requireRole("user"), (_req, res) => {
-  res.json({ message: "Dashboard Jovem Tech RP " });
+  res.json({ message: "Area do usuario liberada." });
 });
 
 app.get("/api/admin", verifyJWT, requireRole("admin"), (_req, res) => {
-  res.json({ message: "Jovem Tech RP" });
+  res.json({ message: "Area administrativa liberada." });
 });
 
-// Teste
 app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
 
-// Mongo
-if (!process.env.MONGO_URI) process.exit(1);
+if (!process.env.MONGO_URI) {
+  process.exit(1);
+}
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
-  const PORT = Number(process.env.PORT) || 4000;
-  app.listen(PORT, () => console.log(`Backend rodando: http://localhost:${PORT}`));
+  const port = Number(process.env.PORT) || 4000;
+  app.listen(port, () => {
+    console.log(`Backend rodando: http://localhost:${port}`);
+  });
 });

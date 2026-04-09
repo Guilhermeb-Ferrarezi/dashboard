@@ -1,31 +1,33 @@
-# Stage 1: Build com Bun
-FROM oven/bun:1.1.38 AS build
+FROM oven/bun:1.3.5 AS deps
 
 WORKDIR /app
 
-# Copiar dependências e instalar
-COPY package.json bun.lockb* ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 
-# Copiar projeto e setar variável de ambiente para build
+FROM oven/bun:1.3.5 AS builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
 
-# Build do frontend
+ENV NODE_ENV=production
 RUN bun run build
 
-# Stage 2: Nginx para servir frontend
-FROM nginx:alpine
+FROM oven/bun:1.3.5 AS runner
 
-# Copiar build final
-COPY --from=build /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copiar configuração customizada
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Expor porta 80
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/next.config.ts ./next.config.ts
+
 EXPOSE 3000
 
-# Manter Nginx rodando em foreground
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["bun", "run", "start"]
