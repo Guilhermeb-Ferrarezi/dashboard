@@ -12,11 +12,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { clientApi } from "@/lib/api";
 
-export function LoginForm() {
+interface LoginFormProps {
+  error?: string;
+}
+
+function getSsoErrorMessage(error?: string) {
+  switch (error) {
+    case "missing-sso-code":
+      return "O retorno do SSO chegou sem codigo de acesso.";
+    case "missing-sso-secret":
+      return "O admin portal esta sem o segredo de SSO configurado.";
+    case "sso-401":
+      return "O codigo SSO expirou ou ja foi usado. Tente abrir o admin portal novamente.";
+    case "sso-403":
+      return "O codigo SSO nao pertence a este portal.";
+    case "sso-404":
+      return "O projeto SSO nao foi encontrado no backend central.";
+    case "sso-503":
+      return "O servico de SSO esta indisponivel no momento.";
+    case "sso-exchange-failed":
+      return "Nao foi possivel concluir a troca do codigo SSO.";
+    default:
+      return null;
+  }
+}
+
+export function LoginForm({ error }: LoginFormProps) {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const ssoErrorMessage = getSsoErrorMessage(error);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,7 +74,7 @@ export function LoginForm() {
           <div className="flex items-center gap-4">
             <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
               <Image
-                src="/assets/logo.png"
+                src="/web/public/assets/logo.png"
                 alt="Santos Tech"
                 width={48}
                 height={48}
@@ -68,10 +94,16 @@ export function LoginForm() {
           <Alert>
             <AlertTitle>SSO piloto ativo</AlertTitle>
             <AlertDescription>
-              O portal ja prepara tickets de acesso para integracoes com o
-              admin-portal.
+              O portal ja prepara tickets de acesso para integracoes com os
+              projetos conectados.
             </AlertDescription>
           </Alert>
+          {ssoErrorMessage ? (
+            <Alert variant="destructive">
+              <AlertTitle>Falha no SSO</AlertTitle>
+              <AlertDescription>{ssoErrorMessage}</AlertDescription>
+            </Alert>
+          ) : null}
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>

@@ -1,15 +1,14 @@
-# api
+# Santos Tech Home
 
-To install dependencies:
+## Backend local
 
 ```bash
+cd api
 bun install
+bun run mongo:dev
+bun run dev
 ```
 
-To run:
+Se a API estiver rodando direto no host, use `localhost` no `MONGO_URI`. Hostnames de container, como `guilherme_home-db`, so funcionam quando a API tambem esta na mesma rede Docker.
 
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+Em desenvolvimento, o backend tenta `MONGO_FALLBACK_HOST=localhost` automaticamente quando o hostname configurado para o Mongo nao pode ser resolvido.

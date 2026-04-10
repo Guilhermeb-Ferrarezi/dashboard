@@ -1,3 +1,4 @@
+import dns from "node:dns/promises";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -27,6 +28,54 @@ const allowedOrigins = isProduction
         "http://localhost:5173",
       ]),
     );
+
+function extractMongoHost(uri: string) {
+  return uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^:/?,]+)/)?.[1] ?? null;
+}
+
+function replaceMongoHost(uri: string, host: string) {
+  return uri.replace(
+    /^(mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?)([^:/?,]+)(.*)$/u,
+    `$1${host}$3`,
+  );
+}
+
+function describeMongoTarget(uri: string) {
+  const match = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^/?]+)(\/[^?]*)?/);
+  const host = match?.[1] ?? "desconhecido";
+  const dbPath = match?.[2] && match[2] !== "/" ? match[2] : "";
+
+  return `${host}${dbPath}`;
+}
+
+async function resolveMongoUri(uri: string) {
+  if (isProduction || uri.startsWith("mongodb+srv://")) {
+    return uri;
+  }
+
+  const originalHost = extractMongoHost(uri);
+
+  if (!originalHost || ["localhost", "127.0.0.1", "::1"].includes(originalHost)) {
+    return uri;
+  }
+
+  try {
+    await dns.lookup(originalHost);
+    return uri;
+  } catch {
+    const fallbackHost = process.env.MONGO_FALLBACK_HOST?.trim() || "localhost";
+
+    if (fallbackHost === originalHost) {
+      return uri;
+    }
+
+    console.warn(
+      `Mongo host "${originalHost}" nao foi resolvido neste ambiente. Tentando "${fallbackHost}" no lugar.`,
+    );
+
+    return replaceMongoHost(uri, fallbackHost);
+  }
+}
 
 app.use(
   cors({
@@ -66,13 +115,35 @@ app.get("/api/admin", verifyJWT, requireRole("admin"), (_req, res) => {
 
 app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
 
-if (!process.env.MONGO_URI) {
-  process.exit(1);
+async function start() {
+  const mongoUri = process.env.MONGO_URI?.trim();
+
+  if (!mongoUri) {
+    console.error("MONGO_URI nao configurada.");
+    process.exit(1);
+  }
+
+  const serverSelectionTimeoutMS =
+    Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 5000;
+
+  try {
+    const resolvedMongoUri = await resolveMongoUri(mongoUri);
+
+    await mongoose.connect(resolvedMongoUri, {
+      serverSelectionTimeoutMS,
+    });
+
+    console.log(`Mongo conectado em ${describeMongoTarget(resolvedMongoUri)}`);
+
+    const port = Number(process.env.PORT) || 4000;
+    app.listen(port, () => {
+      console.log(`Backend rodando: http://localhost:${port}`);
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Falha ao conectar ao Mongo: ${message}`);
+    process.exit(1);
+  }
 }
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
-  const port = Number(process.env.PORT) || 4000;
-  app.listen(port, () => {
-    console.log(`Backend rodando: http://localhost:${port}`);
-  });
-});
+void start();

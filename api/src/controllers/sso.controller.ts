@@ -1,12 +1,22 @@
+import crypto from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
-import jwt from "jsonwebtoken";
 
 import { findProjectById } from "../config/projects";
+import {
+  canStorePendingSsoCode,
+  consumePendingSsoCode,
+  getSsoCodeTtlMs,
+  storePendingSsoCode,
+} from "../lib/sso-code-store";
 
-const issuer = "santos-tech-home";
-
-function resolveSsoSecret() {
-  return process.env.SSO_JWT_SECRET || process.env.JWT_SECRET;
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
 }
 
 export async function startSso(req: Request, res: Response) {
@@ -26,81 +36,100 @@ export async function startSso(req: Request, res: Response) {
       .json({ message: "O usuario precisa de email para usar o SSO." });
   }
 
-  const secret = resolveSsoSecret();
-
-  if (!secret) {
+  if (!project.sso.sharedSecret) {
     return res.status(500).json({ message: "SSO nao configurado no servidor." });
   }
 
-  const ticket = jwt.sign(
-    {
-      sub: user.id,
+  try {
+    const canStore = await canStorePendingSsoCode();
+
+    if (!canStore) {
+      return res.status(503).json({
+        message: "Muitas solicitacoes SSO pendentes. Tente novamente.",
+      });
+    }
+
+    const code = crypto.randomBytes(32).toString("hex");
+
+    await storePendingSsoCode(code, {
+      projectId: project.id,
+      userId: user.id,
       username: user.username,
       email: user.email,
       role: user.role,
-      projectId: project.id,
-    },
-    secret,
-    {
-      audience: project.id,
-      issuer,
-      expiresIn: "2m",
-    },
-  );
+      createdAt: Date.now(),
+    });
 
-  const redirectUrl = new URL(project.sso.redirectPath, project.url);
-  redirectUrl.searchParams.set("ticket", ticket);
+    const redirectUrl = new URL(project.sso.redirectPath, project.url);
+    redirectUrl.searchParams.set("code", code);
 
-  return res.json({
-    redirectUrl: redirectUrl.toString(),
-    expiresInSeconds: 120,
-  });
+    return res.json({
+      redirectUrl: redirectUrl.toString(),
+      expiresInSeconds: Math.floor(getSsoCodeTtlMs() / 1000),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Falha ao criar codigo SSO: ${message}`);
+    return res.status(503).json({
+      message: "Nao foi possivel iniciar o SSO agora.",
+    });
+  }
 }
 
-export async function exchangeSsoTicket(req: Request, res: Response) {
-  const { projectId, ticket } = req.body;
+export async function exchangeSsoCode(req: Request, res: Response) {
+  const { projectId, code } = req.body;
   const project = findProjectById(projectId);
   const sharedSecret = req.header("x-sso-shared-secret");
-  const secret = resolveSsoSecret();
 
   if (!project || project.ssoMode !== "shared-ticket" || !project.sso) {
     return res.status(404).json({ message: "Projeto SSO nao encontrado." });
   }
 
-  if (!ticket || !sharedSecret) {
+  if (!code || typeof code !== "string" || !sharedSecret) {
     return res
       .status(400)
-      .json({ message: "Ticket e segredo compartilhado sao obrigatorios." });
+      .json({ message: "Codigo e segredo compartilhado sao obrigatorios." });
   }
 
-  if (!project.sso.sharedSecret || sharedSecret !== project.sso.sharedSecret) {
+  if (
+    !project.sso.sharedSecret ||
+    !safeCompare(sharedSecret, project.sso.sharedSecret)
+  ) {
     return res.status(403).json({ message: "Shared secret invalido." });
   }
 
-  if (!secret) {
-    return res.status(500).json({ message: "SSO nao configurado no servidor." });
-  }
-
   try {
-    const decoded = jwt.verify(ticket, secret, {
-      audience: project.id,
-      issuer,
-    }) as {
-      sub: string;
-      username: string;
-      email: string;
-      role: "user" | "admin";
-    };
+    const entry = await consumePendingSsoCode(code);
+
+    if (!entry) {
+      return res
+        .status(401)
+        .json({ message: "Codigo SSO invalido ou expirado." });
+    }
+
+    if (entry.projectId !== project.id) {
+      return res
+        .status(403)
+        .json({ message: "Codigo nao pertence a este projeto." });
+    }
+
+    if (Date.now() - entry.createdAt > getSsoCodeTtlMs()) {
+      return res.status(401).json({ message: "Codigo SSO expirado." });
+    }
 
     return res.json({
       user: {
-        id: decoded.sub,
-        username: decoded.username,
-        email: decoded.email,
-        role: decoded.role,
+        id: entry.userId,
+        username: entry.username,
+        email: entry.email,
+        role: entry.role,
       },
     });
-  } catch {
-    return res.status(401).json({ message: "Ticket SSO invalido ou expirado." });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Falha ao trocar codigo SSO: ${message}`);
+    return res.status(503).json({
+      message: "Nao foi possivel validar o SSO agora.",
+    });
   }
 }

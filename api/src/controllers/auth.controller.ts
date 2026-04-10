@@ -8,6 +8,12 @@ function normalizeEmail(email?: string) {
   return email?.trim().toLowerCase() || undefined;
 }
 
+function resolveJwtExpiresIn() {
+  return (
+    (process.env.JWT_EXPIRES_IN?.trim() || "7d") as jwt.SignOptions["expiresIn"]
+  );
+}
+
 function buildCookieOptions() {
   const isProduction = process.env.NODE_ENV === "production";
 
@@ -90,7 +96,7 @@ export async function login(req: Request, res: Response) {
       role: user.role,
     },
     process.env.JWT_SECRET!,
-    { expiresIn: "7d" },
+    { expiresIn: resolveJwtExpiresIn() },
   );
 
   res.cookie("auth_token", token, buildCookieOptions());

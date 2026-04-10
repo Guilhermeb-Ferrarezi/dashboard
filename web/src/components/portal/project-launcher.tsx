@@ -201,7 +201,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
         <AlertTitle>Home universal com integracao progressiva</AlertTitle>
         <AlertDescription>
           O launcher centraliza acesso, guarda favoritos e ja tenta ticket SSO
-          para o <strong>admin-portal.santos-tech.com</strong>.
+          para os projetos com ticket compartilhado.
         </AlertDescription>
       </Alert>
 
@@ -247,7 +247,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
                 <TabsTrigger value="recent">Recentes</TabsTrigger>
               </TabsList>
             </Tabs>
-            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredProjects.map((project) => {
                 const ProjectIcon =
                   iconMap[project.icon as keyof typeof iconMap] ?? SparklesIcon;
@@ -258,20 +258,25 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
                     key={project.id}
                     className="flex h-full flex-col border-border/60 bg-card/85"
                   >
-                    <CardHeader className="gap-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                    <CardHeader className="gap-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                             <ProjectIcon className="size-5" />
                           </div>
-                          <div>
-                            <CardTitle className="text-lg">{project.name}</CardTitle>
-                            <CardDescription>{project.category}</CardDescription>
+                          <div className="min-w-0">
+                            <CardTitle className="truncate text-base leading-tight">
+                              {project.name}
+                            </CardTitle>
+                            <CardDescription className="truncate text-xs">
+                              {project.category}
+                            </CardDescription>
                           </div>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon-sm"
+                          className="shrink-0"
                           onClick={() => toggleFavorite(project.id)}
                           aria-label="Favoritar projeto"
                         >
@@ -282,7 +287,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
                           />
                         </Button>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         <Badge>{project.status}</Badge>
                         <Badge variant="secondary">{project.audience}</Badge>
                         {project.ssoMode !== "none" ? (
@@ -290,22 +295,26 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
                         ) : null}
                       </div>
                     </CardHeader>
-                    <CardContent className="flex flex-1 flex-col gap-4">
-                      <p className="text-sm text-muted-foreground">
+                    <CardContent className="flex flex-1 flex-col gap-3">
+                      <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                         {project.description}
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {project.tags.map((tag) => (
                           <Badge key={tag} variant="outline">
                             {tag}
                           </Badge>
                         ))}
                       </div>
-                      <div className="mt-auto flex items-center justify-between pt-2">
-                        <span className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/40 pt-3">
+                        <span className="truncate text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                           {project.url.replace(/^https?:\/\//, "")}
                         </span>
-                        <Button onClick={() => launchProject(project)}>
+                        <Button
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => launchProject(project)}
+                        >
                           Abrir
                           <ExternalLinkIcon data-icon="inline-end" />
                         </Button>

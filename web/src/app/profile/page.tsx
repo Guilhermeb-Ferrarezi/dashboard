@@ -53,7 +53,7 @@ export default async function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>
-              O piloto atual gera ticket compartilhado para o admin-portal.
+              O piloto atual gera ticket compartilhado para projetos internos.
             </p>
             <p>
               Outros sistemas podem ser conectados reaproveitando o mesmo

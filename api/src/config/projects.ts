@@ -1,6 +1,10 @@
 export type ProjectStatus = "live" | "pilot" | "beta";
 export type ProjectSsoMode = "none" | "shared-ticket";
 
+function resolveSharedSecret(envKey: string) {
+  return process.env[envKey] || process.env.SSO_SHARED_SECRET;
+}
+
 export interface ProjectDefinition {
   id: string;
   name: string;
@@ -48,7 +52,7 @@ export const portalProjects: ProjectDefinition[] = [
     featured: true,
     sso: {
       redirectPath: process.env.ADMIN_PORTAL_SSO_PATH || "/auth/sso",
-      sharedSecret: process.env.ADMIN_PORTAL_SSO_SECRET,
+      sharedSecret: resolveSharedSecret("ADMIN_PORTAL_SSO_SECRET"),
     },
   },
   {
@@ -75,8 +79,12 @@ export const portalProjects: ProjectDefinition[] = [
     tags: ["curso", "aluno", "trilhas"],
     icon: "academy",
     status: "live",
-    ssoMode: "none",
+    ssoMode: "shared-ticket",
     featured: false,
+    sso: {
+      redirectPath: process.env.STUDENT_PORTAL_SSO_PATH || "/auth/sso",
+      sharedSecret: resolveSharedSecret("STUDENT_PORTAL_SSO_SECRET"),
+    },
   },
   {
     id: "alerts",

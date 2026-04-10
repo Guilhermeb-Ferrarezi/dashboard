@@ -5,12 +5,20 @@ import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+interface LoginPageProps {
+  searchParams?: Promise<{
+    error?: string;
+  }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const user = await getSessionUser();
 
   if (user) {
     redirect("/home");
   }
 
-  return <LoginForm />;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  return <LoginForm error={resolvedSearchParams?.error} />;
 }
