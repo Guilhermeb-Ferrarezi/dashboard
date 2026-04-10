@@ -26,7 +26,7 @@ export interface ProjectDefinition {
 export const portalProjects: ProjectDefinition[] = [
   {
     id: "portal",
-    name: "portal.santos-tech.com",
+    name: "Portal",
     description: "Entrada principal para conteudo, rotinas e operacoes centrais.",
     url: process.env.PORTAL_URL || "https://portal.santos-tech.com",
     category: "Operacao",
@@ -39,7 +39,7 @@ export const portalProjects: ProjectDefinition[] = [
   },
   {
     id: "admin-portal",
-    name: "admin-portal.santos-tech.com",
+    name: "Admin Portal",
     description: "Painel administrativo com piloto de acesso por ticket SSO.",
     url:
       process.env.ADMIN_PORTAL_URL || "https://admin-portal.santos-tech.com",
@@ -57,7 +57,7 @@ export const portalProjects: ProjectDefinition[] = [
   },
   {
     id: "zap",
-    name: "zap.santos-tech.com",
+    name: "Zap",
     description: "Ferramentas operacionais para fluxos e automacoes do Zap.",
     url: process.env.ZAP_URL || "https://zap.santos-tech.com",
     category: "Automacao",
@@ -69,26 +69,8 @@ export const portalProjects: ProjectDefinition[] = [
     featured: true,
   },
   {
-    id: "portal-aluno",
-    name: "portaldoaluno.santos-tech.com",
-    description: "Cursos, aulas e acompanhamento de alunos em um unico lugar.",
-    url:
-      process.env.STUDENT_PORTAL_URL || "https://portaldoaluno.santos-tech.com",
-    category: "Educacao",
-    audience: "Aluno",
-    tags: ["curso", "aluno", "trilhas"],
-    icon: "academy",
-    status: "live",
-    ssoMode: "shared-ticket",
-    featured: false,
-    sso: {
-      redirectPath: process.env.STUDENT_PORTAL_SSO_PATH || "/auth/sso",
-      sharedSecret: resolveSharedSecret("STUDENT_PORTAL_SSO_SECRET"),
-    },
-  },
-  {
     id: "alerts",
-    name: "alerts.santos-tech.com",
+    name: "Alertas",
     description: "Central de avisos, incidentes e monitoramento rapido.",
     url: process.env.ALERTS_URL || "https://alerts.santos-tech.com",
     category: "Monitoramento",

@@ -48,6 +48,11 @@ function describeMongoTarget(uri: string) {
   return `${host}${dbPath}`;
 }
 
+function extractMongoDbName(uri: string) {
+  const match = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?[^/?]+\/([^?]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
 async function resolveMongoUri(uri: string) {
   if (isProduction || uri.startsWith("mongodb+srv://")) {
     return uri;
@@ -117,6 +122,7 @@ app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
 
 async function start() {
   const mongoUri = process.env.MONGO_URI?.trim();
+  const configuredDbName = process.env.MONGO_DB_NAME?.trim();
 
   if (!mongoUri) {
     console.error("MONGO_URI nao configurada.");
@@ -128,12 +134,18 @@ async function start() {
 
   try {
     const resolvedMongoUri = await resolveMongoUri(mongoUri);
+    const dbName = configuredDbName || extractMongoDbName(resolvedMongoUri) || undefined;
 
     await mongoose.connect(resolvedMongoUri, {
+      dbName,
       serverSelectionTimeoutMS,
     });
 
-    console.log(`Mongo conectado em ${describeMongoTarget(resolvedMongoUri)}`);
+    const mongoTarget = dbName
+      ? `${describeMongoTarget(resolvedMongoUri)} [db=${dbName}]`
+      : describeMongoTarget(resolvedMongoUri);
+
+    console.log(`Mongo conectado em ${mongoTarget}`);
 
     const port = Number(process.env.PORT) || 4000;
     app.listen(port, () => {
