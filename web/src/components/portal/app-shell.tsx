@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeCheckIcon,
-  CompassIcon,
+  ChevronRightIcon,
+  CrosshairIcon,
   LayoutDashboardIcon,
   ShieldIcon,
   SparklesIcon,
@@ -26,6 +27,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarSeparator,
   SidebarTrigger,
@@ -36,6 +40,15 @@ import type { SessionUser } from "@/lib/session";
 const navigation = [
   { href: "/home", label: "Launcher", icon: LayoutDashboardIcon },
   { href: "/profile", label: "Perfil", icon: UserCircle2Icon },
+];
+
+const adminNavigation = [
+  { href: "/admin/users", label: "Usuarios", icon: ShieldIcon },
+  {
+    href: "/admin/vct-inscricoes",
+    label: "VCT Inscricoes",
+    icon: CrosshairIcon,
+  },
 ];
 
 interface AppShellProps {
@@ -54,6 +67,7 @@ export function AppShell({
   eyebrow,
 }: AppShellProps) {
   const pathname = usePathname();
+  const isAdminSection = pathname.startsWith("/admin");
 
   return (
     <SidebarProvider>
@@ -97,40 +111,37 @@ export function AppShell({
                 {user.role === "admin" ? (
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      render={<Link href="/admin/users" />}
-                      isActive={pathname === "/admin/users"}
+                      isActive={isAdminSection}
                       tooltip="Administracao"
                     >
-                      <ShieldIcon />
-                      <span>Usuarios</span>
+                      <BadgeCheckIcon />
+                      <span>Administracao</span>
+                      <ChevronRightIcon
+                        className={cn(
+                          "ml-auto size-4 transition-transform",
+                          isAdminSection && "rotate-90",
+                        )}
+                      />
                     </SidebarMenuButton>
+                    <SidebarMenuSub>
+                      {adminNavigation.map((item) => (
+                        <SidebarMenuSubItem key={item.href}>
+                          <SidebarMenuSubButton
+                            render={<Link href={item.href} />}
+                            isActive={pathname === item.href}
+                          >
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
                   </SidebarMenuItem>
                 ) : null}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
           <SidebarSeparator />
-          <SidebarGroup>
-            <SidebarGroupLabel>Capacidades</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <div className="flex flex-col gap-3 px-2 text-sm text-sidebar-foreground/75">
-                <div className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/30 p-3">
-                  <div className="mb-2 flex items-center gap-2 font-medium text-sidebar-foreground">
-                    <CompassIcon className="size-4" />
-                    Acesso centralizado
-                  </div>
-                  <p>Busca, favoritos e links rapidos para todos os sistemas.</p>
-                </div>
-                <div className="rounded-xl border border-sidebar-border/70 bg-sidebar-accent/30 p-3">
-                  <div className="mb-2 flex items-center gap-2 font-medium text-sidebar-foreground">
-                    <BadgeCheckIcon className="size-4" />
-                    SSO piloto
-                  </div>
-                  <p>Pronto para ticket compartilhado com o admin-portal.</p>
-                </div>
-              </div>
-            </SidebarGroupContent>
-          </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
           <UserMenu user={user} />

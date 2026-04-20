@@ -5,9 +5,32 @@ dotenv.config();
 
 const mongoUri = process.env.MONGO_URI?.trim();
 
+function extractMongoHost(uri) {
+  return uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^:/?,]+)/u)?.[1] ?? null;
+}
+
+function isLocalMongoHost(host) {
+  if (!host) {
+    return false;
+  }
+
+  if (["localhost", "127.0.0.1", "::1"].includes(host)) {
+    return true;
+  }
+
+  return !host.includes(".");
+}
+
 if (!mongoUri) {
   console.error("MONGO_URI nao configurada no arquivo .env");
   process.exit(1);
+}
+
+const mongoHost = extractMongoHost(mongoUri);
+
+if (!isLocalMongoHost(mongoHost)) {
+  console.log(`Mongo remoto detectado em ${mongoHost}. Pulando bootstrap local via Docker.`);
+  process.exit(0);
 }
 
 const match = mongoUri.match(
@@ -39,7 +62,12 @@ function ensureDockerAvailable() {
   const result = runDocker(["version", "--format", "{{.Server.Version}}"]);
 
   if (result.status !== 0) {
-    console.error("Docker nao esta disponivel. Inicie o Docker e tente novamente.");
+    console.error(
+      [
+        "Docker nao esta disponivel. O script `bun run dev` precisa de um Mongo local para evitar a falha de conexao do Bun.",
+        "Inicie o Docker ou aponte `MONGO_URI` para um Mongo acessivel neste ambiente.",
+      ].join("\n"),
+    );
     if (result.stderr) {
       console.error(result.stderr.trim());
     }

@@ -22,3 +22,24 @@ export interface PortalUserSummary {
   role: "user" | "admin";
   createdAt?: string;
 }
+
+export interface VctInscricaoSummary {
+  _id: string;
+  nome: string;
+  nick: string;
+  email: string;
+  whatsapp: string;
+  instagram: string;
+  elo: string;
+  pico: string;
+  funcaoPrimaria: string;
+  funcaoSecundaria: string;
+  time: number | null;
+  createdAt?: string;
+}
+
+export interface VctTimeSummary {
+  _id: string;
+  numero: number;
+  nome: string;
+}

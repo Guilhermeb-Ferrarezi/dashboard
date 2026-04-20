@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
 import projectRoutes from "./routes/projects.routes";
 import ssoRoutes from "./routes/sso.routes";
+import vctRoutes from "./routes/vct.routes";
 import { verifyJWT } from "./middlewares/jwe";
 import { requireRole } from "./middlewares/role";
 
@@ -31,6 +32,14 @@ const allowedOrigins = isProduction
 
 function extractMongoHost(uri: string) {
   return uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^:/?,]+)/)?.[1] ?? null;
+}
+
+function shouldUseMongoFallbackHost(host: string) {
+  if (["localhost", "127.0.0.1", "::1"].includes(host)) {
+    return true;
+  }
+
+  return !host.includes(".");
 }
 
 function replaceMongoHost(uri: string, host: string) {
@@ -59,16 +68,29 @@ async function resolveMongoUri(uri: string) {
   }
 
   const originalHost = extractMongoHost(uri);
+  const defaultFallbackHost = "127.0.0.1";
 
-  if (!originalHost || ["localhost", "127.0.0.1", "::1"].includes(originalHost)) {
+  if (!originalHost) {
     return uri;
+  }
+
+  if (["localhost", "127.0.0.1", "::1"].includes(originalHost)) {
+    return originalHost === "localhost" ? replaceMongoHost(uri, defaultFallbackHost) : uri;
   }
 
   try {
     await dns.lookup(originalHost);
     return uri;
   } catch {
-    const fallbackHost = process.env.MONGO_FALLBACK_HOST?.trim() || "localhost";
+    if (!shouldUseMongoFallbackHost(originalHost)) {
+      return uri;
+    }
+
+    const configuredFallbackHost = process.env.MONGO_FALLBACK_HOST?.trim();
+    const fallbackHost =
+      !configuredFallbackHost || configuredFallbackHost === "localhost"
+        ? defaultFallbackHost
+        : configuredFallbackHost;
 
     if (fallbackHost === originalHost) {
       return uri;
@@ -93,7 +115,7 @@ app.use(
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-sso-shared-secret"],
   }),
 );
@@ -105,6 +127,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/sso", ssoRoutes);
+app.use("/api/vct", vctRoutes);
 
 app.get("/api/user/me", verifyJWT, (req, res) => {
   res.json({ ok: true, user: req.user });

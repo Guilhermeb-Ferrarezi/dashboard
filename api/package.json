@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "mongo:dev": "node scripts/ensure-dev-mongo.mjs",
-    "dev": "bun --watch src/server.ts",
+    "dev": "bun run mongo:dev && bun --watch src/server.ts",
     "start": "bun src/server.ts"
   },
   "devDependencies": {
