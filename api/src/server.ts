@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
 import projectRoutes from "./routes/projects.routes";
 import ssoRoutes from "./routes/sso.routes";
+import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
 import { verifyJWT } from "./middlewares/jwe";
 import { requireRole } from "./middlewares/role";
@@ -17,7 +18,10 @@ dotenv.config();
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
-const baseAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").filter(Boolean) || [];
+const baseAllowedOrigins =
+  process.env.ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) || [];
 const allowedOrigins = isProduction
   ? baseAllowedOrigins
   : Array.from(
@@ -27,8 +31,33 @@ const allowedOrigins = isProduction
         "http://localhost:3001",
         "http://localhost:3002",
         "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+        "http://127.0.0.1:5173",
+        "http://[::1]:3000",
+        "http://[::1]:3001",
+        "http://[::1]:3002",
+        "http://[::1]:5173",
       ]),
     );
+
+function isAllowedLocalDevOrigin(origin: string) {
+  if (isProduction) {
+    return false;
+  }
+
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+      ["3000", "3001", "3002", "5173"].includes(url.port)
+    );
+  } catch {
+    return false;
+  }
+}
 
 function extractMongoHost(uri: string) {
   return uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^:/?,]+)/)?.[1] ?? null;
@@ -107,7 +136,11 @@ async function resolveMongoUri(uri: string) {
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        isAllowedLocalDevOrigin(origin)
+      ) {
         callback(null, true);
         return;
       }
@@ -127,6 +160,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/sso", ssoRoutes);
+app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 
 app.get("/api/user/me", verifyJWT, (req, res) => {

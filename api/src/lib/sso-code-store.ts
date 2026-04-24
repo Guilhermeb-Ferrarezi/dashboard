@@ -1,5 +1,3 @@
-import { createClient } from "redis";
-
 export interface PendingSsoCode {
   projectId: string;
   userId: string;
@@ -16,10 +14,37 @@ const redisPrefix = process.env.REDIS_PREFIX?.trim() || "sso:code:";
 
 const memoryPendingCodes = new Map<string, PendingSsoCode>();
 
-type SsoRedisClient = ReturnType<typeof createClient>;
+interface SsoRedisClient {
+  isReady: boolean;
+  on(event: "error", listener: (error: Error) => void): void;
+  connect(): Promise<SsoRedisClient>;
+  set(key: string, value: string, options: { PX: number }): Promise<unknown>;
+  getDel(key: string): Promise<string | null>;
+}
 
 let redisClient: SsoRedisClient | null = null;
 let redisConnectPromise: Promise<SsoRedisClient> | null = null;
+let redisUnavailableLogged = false;
+
+async function createRedisClient(url: string) {
+  try {
+    const redisModule = (await new Function("return import('redis')")()) as {
+      createClient: (options: { url: string }) => SsoRedisClient;
+    };
+
+    return redisModule.createClient({ url });
+  } catch (error) {
+    if (!redisUnavailableLogged) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `Redis SSO indisponivel (${message}). Usando armazenamento em memoria.`,
+      );
+      redisUnavailableLogged = true;
+    }
+
+    return null;
+  }
+}
 
 function pruneExpiredMemoryCodes() {
   const now = Date.now();
@@ -44,7 +69,11 @@ async function getRedisClient() {
     return redisConnectPromise;
   }
 
-  const client = createClient({ url: redisUrl });
+  const client = await createRedisClient(redisUrl);
+
+  if (!client) {
+    return null;
+  }
 
   client.on("error", (error) => {
     console.error(`Redis SSO error: ${error.message}`);

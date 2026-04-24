@@ -27,6 +27,15 @@ export interface VctInscricaoSummary {
   _id: string;
   nome: string;
   nick: string;
+  riotName?: string;
+  riotTag?: string;
+  riotPuuid?: string;
+  valorantRegion?: string;
+  valorantAccountLevel?: number | null;
+  valorantCardSmall?: string;
+  valorantCardWide?: string;
+  valorantCurrentRank?: string;
+  valorantPeakRank?: string;
   email: string;
   whatsapp: string;
   instagram: string;
@@ -34,6 +43,9 @@ export interface VctInscricaoSummary {
   pico: string;
   funcaoPrimaria: string;
   funcaoSecundaria: string;
+  tags?: string[];
+  observacoes?: string;
+  highlightColor?: string;
   time: number | null;
   createdAt?: string;
 }
