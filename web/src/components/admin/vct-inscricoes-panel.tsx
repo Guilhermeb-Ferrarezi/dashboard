@@ -639,16 +639,25 @@ export function VctInscricoesPanel({
       },
       body: JSON.stringify({ riotId }),
     });
-    const res = (await response.json()) as {
+
+    const contentType = response.headers.get("content-type") ?? "";
+    const res = contentType.includes("application/json")
+      ? ((await response.json().catch(() => null)) as {
       message?: string;
       account?: ValorantLookupAccount;
-    };
+    } | null)
+      : null;
 
-    if (!response.ok || !res.account) {
-      throw new Error(res.message || "Nao foi possivel buscar a conta Valorant.");
+    const account = res?.account;
+
+    if (!response.ok || !account) {
+      throw new Error(
+        res?.message ||
+          `A busca Valorant retornou erro ${response.status}. Verifique a configuracao da HenrikDev na producao.`,
+      );
     }
 
-    return res.account;
+    return account;
   }
 
   async function handleValorantLookup() {

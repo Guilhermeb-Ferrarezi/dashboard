@@ -3,6 +3,9 @@ import { resolve } from "node:path";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 15;
+
+const HENRIK_TIMEOUT_MS = 8000;
 
 type HenrikAccountResponse = {
   data?: {
@@ -126,7 +129,17 @@ export function OPTIONS(request: Request) {
 }
 
 async function requestHenrik<T>(endpoint: string, headers: Record<string, string>) {
-  const response = await fetch(endpoint, { headers, cache: "no-store" });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HENRIK_TIMEOUT_MS);
+
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: "application/json",
+      ...headers,
+    },
+    cache: "no-store",
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json")
     ? ((await response.json().catch(() => null)) as T | null)
@@ -159,9 +172,20 @@ export async function POST(request: Request) {
   }
 
   const apiKey = getHenrikApiKey();
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "HENRIKDEV_API_KEY nao esta configurada na producao.",
+      },
+      { status: 500, headers: corsHeaders },
+    );
+  }
+
   const endpoint = `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(riotId.name)}/${encodeURIComponent(riotId.tag)}`;
-  const headers: Record<string, string> = {};
-  if (apiKey) headers.Authorization = apiKey;
+  const headers: Record<string, string> = {
+    Authorization: apiKey,
+  };
 
   try {
     const { response, payload } = await requestHenrik<HenrikAccountResponse>(endpoint, headers);
