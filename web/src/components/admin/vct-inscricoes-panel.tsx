@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
   ClockIcon,
   CopyIcon,
   CrosshairIcon,
@@ -457,6 +460,7 @@ export function VctInscricoesPanel({
   const [query, setQuery] = useState("");
   const [phoneQuery, setPhoneQuery] = useState("");
   const [recentFilter, setRecentFilter] = useState<typeof RECENT_FILTERS[number]["value"]>("all");
+  const [eloFilter, setEloFilter] = useState<string>("all");
   const [visibleSemTimeCount, setVisibleSemTimeCount] = useState(INSCRITOS_PAGE_SIZE);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [pendingTimes, setPendingTimes] = useState<Set<number>>(new Set());
@@ -468,6 +472,7 @@ export function VctInscricoesPanel({
   const [riotLookupPending, setRiotLookupPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VctInscricaoSummary | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ column: "elo" | "nome" | "inscricao"; direction: "asc" | "desc" } | null>(null);
 
   const semTime = useMemo(
     () => inscricoes.filter((i) => i.time === null || i.time === undefined),
@@ -487,18 +492,37 @@ export function VctInscricoesPanel({
         .includes(q);
       const matchesPhone = !phone || onlyDigits(i.whatsapp).includes(phone);
       const matchesRecent = isWithinRecentFilter(i.createdAt, recentFilter);
+      const matchesElo = eloFilter === "all" || i.elo === eloFilter;
 
-      return matchesText && matchesPhone && matchesRecent;
+      return matchesText && matchesPhone && matchesRecent && matchesElo;
     });
-  }, [phoneQuery, query, recentFilter, semTime]);
+  }, [eloFilter, phoneQuery, query, recentFilter, semTime]);
+
+  const sortedFilteredSemTime = useMemo(() => {
+    if (!sortConfig) return filteredSemTime;
+    const { column, direction } = sortConfig;
+    return [...filteredSemTime].sort((a, b) => {
+      let cmp = 0;
+      if (column === "elo") {
+        cmp = eloScore(a.elo) - eloScore(b.elo);
+      } else if (column === "nome") {
+        cmp = a.nome.localeCompare(b.nome, "pt-BR");
+      } else if (column === "inscricao") {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        cmp = ta - tb;
+      }
+      return direction === "asc" ? cmp : -cmp;
+    });
+  }, [filteredSemTime, sortConfig]);
 
   useEffect(() => {
     setVisibleSemTimeCount(INSCRITOS_PAGE_SIZE);
-  }, [filteredSemTime]);
+  }, [sortedFilteredSemTime]);
 
   const visibleSemTime = useMemo(
-    () => filteredSemTime.slice(0, visibleSemTimeCount),
-    [filteredSemTime, visibleSemTimeCount],
+    () => sortedFilteredSemTime.slice(0, visibleSemTimeCount),
+    [sortedFilteredSemTime, visibleSemTimeCount],
   );
 
   const teamStats = useMemo(() => {
@@ -877,6 +901,14 @@ export function VctInscricoesPanel({
     );
   }
 
+  function toggleSort(column: "elo" | "nome" | "inscricao") {
+    setSortConfig((current) => {
+      if (!current || current.column !== column) return { column, direction: "desc" };
+      if (current.direction === "desc") return { column, direction: "asc" };
+      return null;
+    });
+  }
+
   function handleInscritosScroll(currentTarget: HTMLDivElement) {
     const isNearBottom =
       currentTarget.scrollTop + currentTarget.clientHeight >= currentTarget.scrollHeight - 120;
@@ -888,7 +920,7 @@ export function VctInscricoesPanel({
 
   function handleLoadMoreInscritos() {
     setVisibleSemTimeCount((current) =>
-      Math.min(current + INSCRITOS_PAGE_SIZE, filteredSemTime.length),
+      Math.min(current + INSCRITOS_PAGE_SIZE, sortedFilteredSemTime.length),
     );
   }
 
@@ -1005,7 +1037,7 @@ export function VctInscricoesPanel({
             <div>
               <h2 className="text-lg font-semibold">Inscritos</h2>
               <p className="text-xs text-muted-foreground">
-                {semTime.length} jogadores aguardando time · {visibleSemTime.length}/{filteredSemTime.length} exibidos
+                {semTime.length} jogadores aguardando time · {visibleSemTime.length}/{sortedFilteredSemTime.length} exibidos
               </p>
             </div>
           </div>
@@ -1045,6 +1077,18 @@ export function VctInscricoesPanel({
                 ))}
               </select>
             </div>
+            <select
+              value={eloFilter}
+              onChange={(e) => setEloFilter(e.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring md:w-36"
+            >
+              <option value="all">Todos elos</option>
+              {ELOS.map((elo) => (
+                <option key={elo} value={elo}>
+                  {elo}
+                </option>
+              ))}
+            </select>
             <Button onClick={handleAutoForm} disabled={autoPending}>
               {autoPending ? (
                 <LoaderCircleIcon className="animate-spin" />
@@ -1076,10 +1120,49 @@ export function VctInscricoesPanel({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nick</TableHead>
-                      <TableHead>Inscricao</TableHead>
-                      <TableHead>Nome</TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("inscricao")}
+                          className="flex items-center gap-1 hover:text-foreground"
+                        >
+                          Inscricao
+                          {sortConfig?.column === "inscricao" ? (
+                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
+                          ) : (
+                            <ArrowUpDownIcon className="size-3 opacity-40" />
+                          )}
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("nome")}
+                          className="flex items-center gap-1 hover:text-foreground"
+                        >
+                          Nome
+                          {sortConfig?.column === "nome" ? (
+                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
+                          ) : (
+                            <ArrowUpDownIcon className="size-3 opacity-40" />
+                          )}
+                        </button>
+                      </TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Elo</TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("elo")}
+                          className="flex items-center gap-1 hover:text-foreground"
+                        >
+                          Elo
+                          {sortConfig?.column === "elo" ? (
+                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
+                          ) : (
+                            <ArrowUpDownIcon className="size-3 opacity-40" />
+                          )}
+                        </button>
+                      </TableHead>
                       <TableHead>Pico</TableHead>
                       <TableHead>Prim.</TableHead>
                       <TableHead>Sec.</TableHead>
@@ -1208,7 +1291,7 @@ export function VctInscricoesPanel({
                     })}
                   </TableBody>
                 </Table>
-                {visibleSemTime.length < filteredSemTime.length ? (
+                {visibleSemTime.length < sortedFilteredSemTime.length ? (
                   <div className="sticky bottom-0 flex items-center justify-center border-t border-border/60 bg-card/95 px-4 py-2 backdrop-blur">
                     <Button
                       type="button"
