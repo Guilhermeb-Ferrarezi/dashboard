@@ -13,6 +13,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PhoneIcon,
+  PlusIcon,
   SearchCheckIcon,
   SaveIcon,
   SearchIcon,
@@ -97,7 +98,7 @@ const ELO_VALUES: Record<string, number> = {
   Radiante: 9,
 };
 
-const TIMES = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+const MIN_TIMES = 8;
 const TIME_CAP = 5;
 const FUNCOES = ["Duelista", "Controlador", "Sentinela", "Iniciador", "Flex"] as const;
 const ELOS = Object.keys(ELO_VALUES);
@@ -452,6 +453,11 @@ export function VctInscricoesPanel({
   initialTimes,
 }: VctInscricoesPanelProps) {
   const [inscricoes, setInscricoes] = useState(initialInscricoes);
+  const [numTimes, setNumTimes] = useState(() => {
+    const maxFromTimes = initialTimes.reduce((max, t) => Math.max(max, t.numero), 0);
+    const maxFromInscricoes = initialInscricoes.reduce((max, i) => Math.max(max, i.time ?? 0), 0);
+    return Math.max(MIN_TIMES, maxFromTimes, maxFromInscricoes);
+  });
   const [timeNames, setTimeNames] = useState<Record<number, string>>(() => {
     const map: Record<number, string> = {};
     for (const t of initialTimes) map[t.numero] = t.nome ?? "";
@@ -525,8 +531,13 @@ export function VctInscricoesPanel({
     [sortedFilteredSemTime, visibleSemTimeCount],
   );
 
+  const timesArray = useMemo(
+    () => Array.from({ length: numTimes }, (_, i) => i + 1),
+    [numTimes],
+  );
+
   const teamStats = useMemo(() => {
-    return TIMES.map((t) => {
+    return timesArray.map((t) => {
       const members = inscricoes.filter((i) => i.time === t);
       const avg =
         members.length > 0
@@ -538,7 +549,7 @@ export function VctInscricoesPanel({
       });
       return { time: t, members, avg, roles };
     });
-  }, [inscricoes]);
+  }, [inscricoes, timesArray]);
 
   const selectedGroup = useMemo(() => {
     if (groupModalTime === null) return null;
@@ -1311,16 +1322,26 @@ export function VctInscricoesPanel({
 
       {/* ============ SEÇÃO 2: TIMES ============ */}
       <section className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <CrosshairIcon className="size-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CrosshairIcon className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Times</h2>
+              <p className="text-xs text-muted-foreground">
+                {inscricoes.length - semTime.length} jogadores distribuídos · {numTimes} times · {TIME_CAP} por time
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">Times</h2>
-            <p className="text-xs text-muted-foreground">
-              {inscricoes.length - semTime.length} jogadores distribuídos · 8 times · {TIME_CAP} por time
-            </p>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setNumTimes((n) => n + 1)}
+          >
+            <PlusIcon />
+            Adicionar time
+          </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -1384,6 +1405,16 @@ export function VctInscricoesPanel({
                             <Trash2Icon />
                             Limpar time
                           </DropdownMenuItem>
+                          {t.time === numTimes && numTimes > MIN_TIMES ? (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={t.members.length > 0}
+                              onClick={() => setNumTimes((n) => n - 1)}
+                            >
+                              <Trash2Icon />
+                              Remover time
+                            </DropdownMenuItem>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
