@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/portal/app-shell";
+import { AppearanceSettingsPanel } from "@/components/portal/appearance-settings-panel";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -44,23 +45,7 @@ export default async function ProfilePage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 bg-card/90">
-          <CardHeader>
-            <CardTitle>Estado da integracao</CardTitle>
-            <CardDescription>
-              O home central esta pronto para expandir o SSO por subdominio.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              O piloto atual gera ticket compartilhado para projetos internos.
-            </p>
-            <p>
-              Outros sistemas podem ser conectados reaproveitando o mesmo
-              endpoint de exchange no backend central.
-            </p>
-          </CardContent>
-        </Card>
+        <AppearanceSettingsPanel preferences={user.preferences} />
       </div>
     </AppShell>
   );

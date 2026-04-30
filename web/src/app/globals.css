@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --font-heading: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", ui-monospace, monospace;
+  --font-heading: var(--font-sora), var(--font-inter), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -81,6 +81,27 @@
   --sidebar-accent-foreground: oklch(0.98 0.01 95);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.69 0.17 28);
+  --app-page-padding-x: 1rem;
+  --app-page-padding-y: 1.5rem;
+  --card-padding-x: 1rem;
+  --card-padding-y: 1rem;
+  --card-gap: 1rem;
+}
+
+html[data-density="compact"] {
+  --app-page-padding-x: 0.75rem;
+  --app-page-padding-y: 1.1rem;
+  --card-padding-x: 0.875rem;
+  --card-padding-y: 0.875rem;
+  --card-gap: 0.75rem;
+}
+
+html[data-density="spacious"] {
+  --app-page-padding-x: 1.25rem;
+  --app-page-padding-y: 1.85rem;
+  --card-padding-x: 1.2rem;
+  --card-padding-y: 1.2rem;
+  --card-gap: 1.15rem;
 }
 
 .dark {

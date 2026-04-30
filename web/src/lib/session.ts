@@ -2,12 +2,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { serverApi } from "@/lib/api";
+import type { ThemePreferences } from "@/lib/theme-preferences";
 
 export interface SessionUser {
   id: string;
   username: string;
   email: string | null;
   role: "user" | "admin";
+  preferences: ThemePreferences;
   exp?: number;
 }
 

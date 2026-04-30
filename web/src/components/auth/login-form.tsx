@@ -67,7 +67,7 @@ export function LoginForm({ error }: LoginFormProps) {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center px-4 py-10">
+    <div className="grid min-h-screen place-items-center px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(255,117,24,0.18),_transparent_36%),linear-gradient(180deg,_rgba(255,255,255,0.04),_transparent)]" />
       <Card className="w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
         <CardHeader className="gap-6">

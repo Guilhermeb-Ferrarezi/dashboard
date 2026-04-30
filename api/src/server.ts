@@ -11,6 +11,11 @@ import projectRoutes from "./routes/projects.routes";
 import ssoRoutes from "./routes/sso.routes";
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
+import {
+  getCurrentUser,
+  updateCurrentUserProfile,
+  updateCurrentUserPreferences,
+} from "./controllers/user.controller";
 import { verifyJWT } from "./middlewares/jwe";
 import { requireRole } from "./middlewares/role";
 
@@ -163,9 +168,9 @@ app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 
-app.get("/api/user/me", verifyJWT, (req, res) => {
-  res.json({ ok: true, user: req.user });
-});
+app.get("/api/user/me", verifyJWT, getCurrentUser);
+app.put("/api/user/profile", verifyJWT, updateCurrentUserProfile);
+app.put("/api/user/preferences", verifyJWT, updateCurrentUserPreferences);
 
 app.get("/api/user", verifyJWT, requireRole("user"), (_req, res) => {
   res.json({ message: "Area do usuario liberada." });

@@ -9,12 +9,11 @@ import {
   LayoutDashboardIcon,
   ShieldIcon,
   SparklesIcon,
-  UserCircle2Icon,
 } from "lucide-react";
 
 import { UserMenu } from "@/components/portal/user-menu";
+import { ThemePreferenceSync } from "@/components/providers/theme-preference-sync";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -39,7 +38,6 @@ import type { SessionUser } from "@/lib/session";
 
 const navigation = [
   { href: "/home", label: "Launcher", icon: LayoutDashboardIcon },
-  { href: "/profile", label: "Perfil", icon: UserCircle2Icon },
 ];
 
 const adminNavigation = [
@@ -71,6 +69,7 @@ export function AppShell({
 
   return (
     <SidebarProvider>
+      <ThemePreferenceSync preferences={user.preferences} />
       <Sidebar variant="floating" collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-3 rounded-xl bg-sidebar-primary/10 p-3">
@@ -150,7 +149,7 @@ export function AppShell({
       <SidebarInset className="bg-transparent">
         <div className="flex min-h-screen flex-col">
           <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-4 md:px-6">
+            <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]">
               <SidebarTrigger />
               <div className="flex min-w-0 flex-1 flex-col">
                 {eyebrow ? (
@@ -166,15 +165,9 @@ export function AppShell({
                   {description}
                 </p>
               </div>
-              <Link
-                href="/profile"
-                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-              >
-                Perfil
-              </Link>
             </div>
           </header>
-          <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6">
+          <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]">
             {children}
           </main>
         </div>
