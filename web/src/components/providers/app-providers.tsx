@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <TooltipProvider>
+      <TooltipProvider delay={1000} closeDelay={500}>
         {children}
         <Toaster richColors position="top-right" />
       </TooltipProvider>

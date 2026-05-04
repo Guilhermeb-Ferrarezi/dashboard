@@ -10,7 +10,7 @@ const CAMPO_LABEL: Record<string, string> = {
   instagram: "Instagram",
 };
 
-const INSCRICAO_FIELDS = [
+const REQUIRED_EDIT_INSCRICAO_FIELDS = [
   "nome",
   "nick",
   "email",
@@ -20,6 +20,86 @@ const INSCRICAO_FIELDS = [
   "funcaoPrimaria",
   "funcaoSecundaria",
 ] as const;
+
+const CREATE_REQUIRED_INSCRICAO_FIELDS = [
+  ...REQUIRED_EDIT_INSCRICAO_FIELDS,
+  "cidade",
+  "diasTreino",
+  "diasSemana",
+  "horariosTreino",
+  "melhorJanela",
+  "compromisso",
+  "rotinaFixa",
+  "horariosDefinidos",
+  "capitao",
+  "presencial",
+  "deslocamento",
+  "autorizacaoContato",
+] as const;
+
+const OPTIONAL_INSCRICAO_FIELDS = [
+  "cidade",
+  "riotName",
+  "riotTag",
+  "riotPuuid",
+  "valorantRegion",
+  "valorantAccountLevel",
+  "valorantCardSmall",
+  "valorantCardWide",
+  "valorantCurrentRank",
+  "valorantPeakRank",
+  "tags",
+  "observacoes",
+  "highlightColor",
+  "time",
+] as const;
+
+const ELO_ORDER = [
+  "Sem elo",
+  "Ferro",
+  "Ferro 1",
+  "Ferro 2",
+  "Ferro 3",
+  "Bronze",
+  "Bronze 1",
+  "Bronze 2",
+  "Bronze 3",
+  "Prata",
+  "Prata 1",
+  "Prata 2",
+  "Prata 3",
+  "Ouro",
+  "Ouro 1",
+  "Ouro 2",
+  "Ouro 3",
+  "Platina",
+  "Platina 1",
+  "Platina 2",
+  "Platina 3",
+  "Diamante",
+  "Diamante 1",
+  "Diamante 2",
+  "Diamante 3",
+  "Ascendente",
+  "Ascendente 1",
+  "Ascendente 2",
+  "Ascendente 3",
+  "Imortal",
+  "Imortal 1",
+  "Imortal 2",
+  "Imortal 3",
+  "Radiante",
+] as const;
+
+const ELO_SCORE = Object.fromEntries(ELO_ORDER.map((value, index) => [value, index]));
+
+function getEloScore(value: string) {
+  return ELO_SCORE[value] ?? -1;
+}
+
+function isPicoBelowElo(elo: string, pico: string) {
+  return getEloScore(pico) < getEloScore(elo);
+}
 
 function normalizeTags(value: unknown) {
   if (!Array.isArray(value)) return [];
@@ -170,10 +250,22 @@ export async function criarInscricao(req: Request, res: Response) {
     email,
     whatsapp,
     instagram,
+    cidade,
     elo,
     pico,
     funcaoPrimaria,
     funcaoSecundaria,
+    diasTreino,
+    diasSemana,
+    horariosTreino,
+    melhorJanela,
+    compromisso,
+    rotinaFixa,
+    horariosDefinidos,
+    capitao,
+    presencial,
+    deslocamento,
+    autorizacaoContato,
     riotName,
     riotTag,
     riotPuuid,
@@ -185,22 +277,47 @@ export async function criarInscricao(req: Request, res: Response) {
     valorantPeakRank,
   } = req.body;
 
-  if (!nome || !nick || !email || !whatsapp || !elo || !pico || !funcaoPrimaria || !funcaoSecundaria) {
-    res.status(400).json({ ok: false, message: "Todos os campos são obrigatórios." });
+  for (const field of CREATE_REQUIRED_INSCRICAO_FIELDS) {
+    const value = req.body[field];
+    if (typeof value !== "string" || value.trim() === "") {
+      res.status(400).json({ ok: false, message: "Todos os campos são obrigatórios." });
+      return;
+    }
+  }
+
+  if (getEloScore(elo.trim()) < 0 || getEloScore(pico.trim()) < 0) {
+    res.status(400).json({ ok: false, message: "Elo inválido." });
+    return;
+  }
+
+  if (isPicoBelowElo(elo.trim(), pico.trim())) {
+    res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
     return;
   }
 
   try {
     const inscricao = new VctInscricao({
-      nome,
-      nick,
-      email,
-      whatsapp,
+      nome: nome.trim(),
+      nick: nick.trim(),
+      email: email.trim().toLowerCase(),
+      whatsapp: whatsapp.trim(),
       instagram: typeof instagram === "string" ? instagram.trim() : "",
-      elo,
-      pico,
-      funcaoPrimaria,
-      funcaoSecundaria,
+      cidade: cidade.trim(),
+      elo: elo.trim(),
+      pico: pico.trim(),
+      funcaoPrimaria: funcaoPrimaria.trim(),
+      funcaoSecundaria: funcaoSecundaria.trim(),
+      diasTreino: diasTreino.trim(),
+      diasSemana: diasSemana.trim(),
+      horariosTreino: horariosTreino.trim(),
+      melhorJanela: melhorJanela.trim(),
+      compromisso: compromisso.trim(),
+      rotinaFixa: rotinaFixa.trim(),
+      horariosDefinidos: horariosDefinidos.trim(),
+      capitao: capitao.trim(),
+      presencial: presencial.trim(),
+      deslocamento: deslocamento.trim(),
+      autorizacaoContato: autorizacaoContato.trim(),
       riotName: typeof riotName === "string" ? riotName.trim() : "",
       riotTag: typeof riotTag === "string" ? riotTag.trim() : "",
       riotPuuid: typeof riotPuuid === "string" ? riotPuuid.trim() : "",
@@ -284,7 +401,7 @@ export async function atualizarInscricao(req: Request, res: Response) {
   const { id } = req.params;
   const update: Record<string, unknown> = {};
 
-  for (const field of INSCRICAO_FIELDS) {
+  for (const field of REQUIRED_EDIT_INSCRICAO_FIELDS) {
     const value = req.body[field];
     if (typeof value !== "string" || value.trim() === "") {
       res.status(400).json({ ok: false, message: "Todos os campos principais sao obrigatorios." });
@@ -294,21 +411,42 @@ export async function atualizarInscricao(req: Request, res: Response) {
   }
 
   update.email = String(update.email).toLowerCase();
-  update.instagram = typeof req.body.instagram === "string" ? req.body.instagram.trim() : "";
-  update.riotName = typeof req.body.riotName === "string" ? req.body.riotName.trim() : "";
-  update.riotTag = typeof req.body.riotTag === "string" ? req.body.riotTag.trim() : "";
-  update.riotPuuid = typeof req.body.riotPuuid === "string" ? req.body.riotPuuid.trim() : "";
-  update.valorantRegion = typeof req.body.valorantRegion === "string" ? req.body.valorantRegion.trim() : "";
-  update.valorantAccountLevel =
-    typeof req.body.valorantAccountLevel === "number" ? req.body.valorantAccountLevel : null;
-  update.valorantCardSmall = typeof req.body.valorantCardSmall === "string" ? req.body.valorantCardSmall.trim() : "";
-  update.valorantCardWide = typeof req.body.valorantCardWide === "string" ? req.body.valorantCardWide.trim() : "";
-  update.valorantCurrentRank =
-    typeof req.body.valorantCurrentRank === "string" ? req.body.valorantCurrentRank.trim() : "";
-  update.valorantPeakRank = typeof req.body.valorantPeakRank === "string" ? req.body.valorantPeakRank.trim() : "";
+  if (typeof req.body.instagram === "string") update.instagram = req.body.instagram.trim();
+  for (const field of OPTIONAL_INSCRICAO_FIELDS) {
+    const value = req.body[field];
+    if (field === "cidade") {
+      if (typeof value === "string") update[field] = value.trim();
+      continue;
+    }
+    if (field === "valorantAccountLevel") {
+      if (value === null || typeof value === "number") update[field] = value;
+      continue;
+    }
+    if (field === "tags") {
+      update[field] = normalizeTags(value);
+      continue;
+    }
+    if (field === "time") {
+      if (value === null || typeof value === "number") update[field] = value;
+      continue;
+    }
+    if (typeof value === "string") {
+      update[field] = value.trim();
+    }
+  }
   update.tags = normalizeTags(req.body.tags);
   update.observacoes = typeof req.body.observacoes === "string" ? req.body.observacoes.trim() : "";
   update.highlightColor = typeof req.body.highlightColor === "string" ? req.body.highlightColor.trim() : "";
+
+  if (getEloScore(String(update.elo)) < 0 || getEloScore(String(update.pico)) < 0) {
+    res.status(400).json({ ok: false, message: "Elo inválido." });
+    return;
+  }
+
+  if (isPicoBelowElo(String(update.elo), String(update.pico))) {
+    res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
+    return;
+  }
 
   try {
     const inscricao = await VctInscricao.findByIdAndUpdate(id, update, {

@@ -16,10 +16,22 @@ export interface IVctInscricao extends Document {
   email: string;
   whatsapp: string;
   instagram: string;
+  cidade: string;
   elo: string;
   pico: string;
   funcaoPrimaria: string;
   funcaoSecundaria: string;
+  diasTreino: string;
+  diasSemana: string;
+  horariosTreino: string;
+  melhorJanela: string;
+  compromisso: string;
+  rotinaFixa: string;
+  horariosDefinidos: string;
+  capitao: string;
+  presencial: string;
+  deslocamento: string;
+  autorizacaoContato: string;
   tags: string[];
   observacoes: string;
   highlightColor: string;
@@ -44,10 +56,22 @@ const VctInscricaoSchema = new Schema<IVctInscricao>(
     email: { type: String, required: true, trim: true, lowercase: true, unique: true },
     whatsapp: { type: String, required: true, trim: true, unique: true },
     instagram: { type: String, default: "", trim: true },
+    cidade: { type: String, required: true, trim: true },
     elo: { type: String, required: true },
     pico: { type: String, required: true },
     funcaoPrimaria: { type: String, required: true },
     funcaoSecundaria: { type: String, required: true },
+    diasTreino: { type: String, required: true },
+    diasSemana: { type: String, required: true },
+    horariosTreino: { type: String, required: true },
+    melhorJanela: { type: String, required: true },
+    compromisso: { type: String, required: true },
+    rotinaFixa: { type: String, required: true },
+    horariosDefinidos: { type: String, required: true },
+    capitao: { type: String, required: true },
+    presencial: { type: String, required: true },
+    deslocamento: { type: String, required: true },
+    autorizacaoContato: { type: String, required: true },
     tags: { type: [String], default: [] },
     observacoes: { type: String, default: "", trim: true },
     highlightColor: { type: String, default: "", trim: true },

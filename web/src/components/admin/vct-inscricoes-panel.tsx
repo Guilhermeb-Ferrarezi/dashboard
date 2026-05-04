@@ -86,22 +86,51 @@ interface VctInscricoesPanelProps {
   initialTimes: VctTimeSummary[];
 }
 
-const ELO_VALUES: Record<string, number> = {
-  Ferro: 1,
-  Bronze: 2,
-  Prata: 3,
-  Ouro: 4,
-  Platina: 5,
-  Diamante: 6,
-  Ascendente: 7,
-  Imortal: 8,
-  Radiante: 9,
-};
+const ELO_ORDER = [
+  "Sem elo",
+  "Ferro",
+  "Ferro 1",
+  "Ferro 2",
+  "Ferro 3",
+  "Bronze",
+  "Bronze 1",
+  "Bronze 2",
+  "Bronze 3",
+  "Prata",
+  "Prata 1",
+  "Prata 2",
+  "Prata 3",
+  "Ouro",
+  "Ouro 1",
+  "Ouro 2",
+  "Ouro 3",
+  "Platina",
+  "Platina 1",
+  "Platina 2",
+  "Platina 3",
+  "Diamante",
+  "Diamante 1",
+  "Diamante 2",
+  "Diamante 3",
+  "Ascendente",
+  "Ascendente 1",
+  "Ascendente 2",
+  "Ascendente 3",
+  "Imortal",
+  "Imortal 1",
+  "Imortal 2",
+  "Imortal 3",
+  "Radiante",
+] as const;
+
+const ELO_VALUES: Record<string, number> = Object.fromEntries(
+  ELO_ORDER.map((elo, index) => [elo, index]),
+);
 
 const MIN_TIMES = 8;
 const TIME_CAP = 5;
 const FUNCOES = ["Duelista", "Controlador", "Sentinela", "Iniciador", "Flex"] as const;
-const ELOS = Object.keys(ELO_VALUES);
+const ELOS = [...ELO_ORDER];
 const TAG_SUGGESTIONS = ["Confirmado", "Pendente", "Capitao", "Sub", "Prioridade", "Revisar"];
 const RECENT_FILTERS = [
   { label: "Todos", value: "all", minutes: null },
@@ -335,14 +364,7 @@ function PlayerNickWithNotes({
 
   if (!notes) return content;
 
-  return (
-    <Tooltip>
-      <TooltipTrigger render={content} />
-      <TooltipContent side="top" align="start" className="max-w-80 whitespace-normal text-left">
-        {notes}
-      </TooltipContent>
-    </Tooltip>
-  );
+  return <span title={notes}>{content}</span>;
 }
 
 function ValorantProfileSummary({ player }: { player: VctInscricaoSummary }) {
@@ -385,6 +407,80 @@ function ValorantProfileSummary({ player }: { player: VctInscricaoSummary }) {
           </Badge>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function getInscricaoFieldValue(value?: string) {
+  return value?.trim() || "—";
+}
+
+function InscricaoDetailsContent({
+  player,
+}: {
+  player: VctInscricaoSummary;
+}) {
+  const sections = [
+    {
+      title: "Base",
+      fields: [
+        { label: "Cidade", value: getInscricaoFieldValue(player.cidade) },
+        { label: "Elo atual", value: getInscricaoFieldValue(player.elo) },
+        { label: "Pico", value: getInscricaoFieldValue(player.pico) },
+      ],
+    },
+    {
+      title: "Treino",
+      fields: [
+        { label: "Dias/semana", value: getInscricaoFieldValue(player.diasTreino) },
+        { label: "Dias exatos", value: getInscricaoFieldValue(player.diasSemana) },
+        { label: "Horários", value: getInscricaoFieldValue(player.horariosTreino) },
+        { label: "Melhor janela", value: getInscricaoFieldValue(player.melhorJanela) },
+      ],
+    },
+    {
+      title: "Compromisso",
+      fields: [
+        { label: "Compromisso", value: getInscricaoFieldValue(player.compromisso) },
+        { label: "Rotina fixa", value: getInscricaoFieldValue(player.rotinaFixa) },
+        { label: "Horários definidos", value: getInscricaoFieldValue(player.horariosDefinidos) },
+        { label: "Capitão", value: getInscricaoFieldValue(player.capitao) },
+      ],
+    },
+    {
+      title: "Logística",
+      fields: [
+        { label: "Presencial", value: getInscricaoFieldValue(player.presencial) },
+        { label: "Deslocamento", value: getInscricaoFieldValue(player.deslocamento) },
+        { label: "Contato", value: getInscricaoFieldValue(player.autorizacaoContato) },
+      ],
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {sections.map((section) => (
+        <div key={section.title} className="space-y-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-primary/80">
+            {section.title}
+          </p>
+          <div className="space-y-1.5">
+            {section.fields.map((field) => (
+              <div
+                key={`${section.title}-${field.label}`}
+                className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-muted/60 px-3 py-2.5"
+              >
+                <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {field.label}
+                </span>
+                <span className="text-right text-[11px] font-semibold leading-tight text-foreground">
+                  {field.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -472,6 +568,8 @@ export function VctInscricoesPanel({
   const [pendingTimes, setPendingTimes] = useState<Set<number>>(new Set());
   const [autoPending, setAutoPending] = useState(false);
   const [groupModalTime, setGroupModalTime] = useState<number | null>(null);
+  const [detailsPlayer, setDetailsPlayer] = useState<VctInscricaoSummary | null>(null);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<VctInscricaoSummary | null>(null);
   const [editForm, setEditForm] = useState<VctEditForm | null>(null);
   const [editPending, setEditPending] = useState(false);
@@ -596,7 +694,17 @@ export function VctInscricoesPanel({
   }
 
   function updateEditForm<K extends keyof VctEditForm>(field: K, value: VctEditForm[K]) {
-    setEditForm((current) => (current ? { ...current, [field]: value } : current));
+    setEditForm((current) => {
+      if (!current) return current;
+      const next = { ...current, [field]: value };
+      if (field === "elo") {
+        const nextElo = String(value);
+        if (next.pico && eloScore(next.pico) < eloScore(nextElo)) {
+          next.pico = "";
+        }
+      }
+      return next;
+    });
   }
 
   function toggleTagSuggestion(tag: string) {
@@ -616,6 +724,15 @@ export function VctInscricoesPanel({
 
     setEditPending(true);
     try {
+      if (eloScore(editForm.elo) < 0 || eloScore(editForm.pico) < 0) {
+        toast.error("Elo inválido.");
+        return;
+      }
+      if (eloScore(editForm.pico) < eloScore(editForm.elo)) {
+        toast.error("O pico de elo não pode ser menor que o elo atual.");
+        return;
+      }
+
       const payload = {
         riotName: editForm.riotName,
         riotTag: editForm.riotTag,
@@ -952,6 +1069,11 @@ export function VctInscricoesPanel({
     setGroupModalTime(numero);
   }
 
+  function openDetailsModal(player: VctInscricaoSummary) {
+    setDetailsPlayer(player);
+    setDetailsExpanded(false);
+  }
+
   function handleCopyGroupContacts(numero: number) {
     const team = teamStats.find((item) => item.time === numero);
     if (!team || team.members.length === 0) {
@@ -989,6 +1111,10 @@ export function VctInscricoesPanel({
         <Item onClick={() => openEditPlayer(player)}>
           <PencilIcon />
           Editar dados
+        </Item>
+        <Item onClick={() => openDetailsModal(player)}>
+          <InboxIcon />
+          Ver detalhes
         </Item>
         <Item onClick={() => openGroupModal(currentTime)}>
           <UsersIcon />
@@ -1276,6 +1402,22 @@ export function VctInscricoesPanel({
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => openDetailsModal(i)}
+                                    />
+                                  }
+                                >
+                                  <InboxIcon />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="center">
+                                  Ver detalhes
+                                </TooltipContent>
+                              </Tooltip>
                               <Button
                                 variant="ghost"
                                 size="icon-xs"
@@ -1453,123 +1595,132 @@ export function VctInscricoesPanel({
                     <div className="flex flex-col gap-2 p-3">
                       {t.members.map((m) => {
                         const isPending = pendingIds.has(m._id);
+                        const playerCard = (
+                          <div
+                            className={cn(
+                              "flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-3 transition-colors",
+                              "hover:bg-muted/60",
+                              getHighlightColorClass(m.highlightColor),
+                              isPending && "opacity-70",
+                            )}
+                          >
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <PlayerNickWithNotes
+                                  player={m}
+                                  onCopyClick={(value) => handleCopyValue("Nick", value)}
+                                  onMiddleClick={handleQuickValorantLookup}
+                                  className={cn(
+                                    "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
+                                    m.observacoes && "cursor-help",
+                                  )}
+                                />
+                                {m.riotName && m.riotTag ? (
+                                  <span className="font-mono text-[11px] text-muted-foreground">
+                                    {m.riotName}#{m.riotTag}
+                                  </span>
+                                ) : null}
+                                <span className="text-xs text-muted-foreground">
+                                  {m.nome}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]"
+                                >
+                                  {m.elo}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  Pico {m.pico}
+                                </Badge>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1">
+                                <Badge className="text-[10px]">
+                                  {m.funcaoPrimaria}
+                                </Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {m.funcaoSecundaria}
+                                </Badge>
+                                {getPlayerTags(m).map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    variant="outline"
+                                    className={cn("gap-1 text-[10px]", getTagColorClass(tag))}
+                                  >
+                                    <TagsIcon className="size-3" />
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                <span className="font-mono">
+                                  Inscrito em {formatInscricaoDate(m.createdAt)}
+                                </span>
+                                <span className="font-mono">{m.email}</span>
+                                <span className="font-mono">
+                                  {getInstagramHandle(m.instagram)}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="gap-1 text-[11px] font-mono"
+                                >
+                                  <PhoneIcon className="size-3" />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyValue("WhatsApp", m.whatsapp)}
+                                    className="cursor-pointer underline decoration-dotted underline-offset-4"
+                                  >
+                                    {m.whatsapp}
+                                  </button>
+                                </Badge>
+                              </div>
+                              <ValorantProfileSummary player={m} />
+                              {m.observacoes ? (
+                                <div className="flex gap-2 rounded-md border border-border/50 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                                  <StickyNoteIcon className="mt-0.5 size-3 shrink-0" />
+                                  <span>{m.observacoes}</span>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                render={<Button variant="ghost" size="icon-xs" />}
+                                disabled={isPending}
+                              >
+                                {isPending ? (
+                                  <LoaderCircleIcon className="animate-spin" />
+                                ) : (
+                                  <MoreHorizontalIcon />
+                                )}
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                {renderPlayerActions(m, t.time, "dropdown")}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        );
+
                         return (
                           <ContextMenu key={m._id}>
                             <ContextMenuTrigger>
-                              <div
-                                className={cn(
-                                  "flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-3 transition-colors",
-                                  "hover:bg-muted/60",
-                                  getHighlightColorClass(m.highlightColor),
-                                  isPending && "opacity-70"
-                                )}
-                              >
-                                <div className="min-w-0 flex-1 space-y-2">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <PlayerNickWithNotes
-                                      player={m}
-                                      onCopyClick={(value) => handleCopyValue("Nick", value)}
-                                      onMiddleClick={handleQuickValorantLookup}
-                                      className={cn(
-                                        "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
-                                        m.observacoes && "cursor-help",
-                                      )}
-                                    />
-                                    {m.riotName && m.riotTag ? (
-                                      <span className="font-mono text-[11px] text-muted-foreground">
-                                        {m.riotName}#{m.riotTag}
-                                      </span>
-                                    ) : null}
-                                    <span className="text-xs text-muted-foreground">
-                                      {m.nome}
-                                    </span>
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px]"
-                                    >
-                                      {m.elo}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px]"
-                                    >
-                                      Pico {m.pico}
-                                    </Badge>
+                              <Tooltip>
+                                <TooltipTrigger render={playerCard} />
+                                <TooltipContent side="top" align="start" className="p-4">
+                                  <div className="w-80">
+                                    <InscricaoDetailsContent player={m} />
                                   </div>
-
-                                  <div className="flex flex-wrap gap-1">
-                                    <Badge className="text-[10px]">
-                                      {m.funcaoPrimaria}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px]"
-                                    >
-                                      {m.funcaoSecundaria}
-                                    </Badge>
-                                    {getPlayerTags(m).map((tag) => (
-                                      <Badge
-                                        key={tag}
-                                        variant="outline"
-                                        className={cn("gap-1 text-[10px]", getTagColorClass(tag))}
-                                      >
-                                        <TagsIcon className="size-3" />
-                                        {tag}
-                                      </Badge>
-                                    ))}
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                                    <span className="font-mono">
-                                      Inscrito em {formatInscricaoDate(m.createdAt)}
-                                    </span>
-                                    <span className="font-mono">{m.email}</span>
-                                    <span className="font-mono">
-                                      {getInstagramHandle(m.instagram)}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <Badge
-                                      variant="secondary"
-                                      className="gap-1 text-[11px] font-mono"
-                                    >
-                                      <PhoneIcon className="size-3" />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCopyValue("WhatsApp", m.whatsapp)}
-                                        className="cursor-pointer underline decoration-dotted underline-offset-4"
-                                      >
-                                        {m.whatsapp}
-                                      </button>
-                                    </Badge>
-                                  </div>
-                                  <ValorantProfileSummary player={m} />
-                                  {m.observacoes ? (
-                                    <div className="flex gap-2 rounded-md border border-border/50 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
-                                      <StickyNoteIcon className="mt-0.5 size-3 shrink-0" />
-                                      <span>{m.observacoes}</span>
-                                    </div>
-                                  ) : null}
-
-                                  
-                                </div>
-
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger
-                                    render={<Button variant="ghost" size="icon-xs" />}
-                                    disabled={isPending}
-                                  >
-                                    {isPending ? (
-                                      <LoaderCircleIcon className="animate-spin" />
-                                    ) : (
-                                      <MoreHorizontalIcon />
-                                    )}
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-52">
-                                    {renderPlayerActions(m, t.time, "dropdown")}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </ContextMenuTrigger>
                             <ContextMenuContent className="w-56">
                               {renderPlayerActions(m, t.time, "context")}
@@ -1626,6 +1777,48 @@ export function VctInscricoesPanel({
                 Copiar contatos
               </Button>
             </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={detailsPlayer !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailsPlayer(null);
+            setDetailsExpanded(false);
+          }
+        }}
+      >
+        {detailsPlayer ? (
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Dados da inscrição</DialogTitle>
+              <DialogDescription>
+                {detailsPlayer.nick} · {detailsPlayer.nome}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <Button
+                type="button"
+                variant={detailsExpanded ? "outline" : "default"}
+                className="w-full"
+                onClick={() => setDetailsExpanded((current) => !current)}
+              >
+                {detailsExpanded ? "Ocultar detalhes" : "Mostrar detalhes da inscrição"}
+              </Button>
+
+              {detailsExpanded ? (
+                <div className="max-h-[65vh] overflow-y-auto pr-1">
+                  <InscricaoDetailsContent player={detailsPlayer} />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                  Clique no botao acima para ver os dados da inscricao.
+                </div>
+              )}
+            </div>
           </DialogContent>
         ) : null}
       </Dialog>
@@ -1753,7 +1946,11 @@ export function VctInscricoesPanel({
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
                   >
                     {ELOS.map((elo) => (
-                      <option key={elo} value={elo}>
+                      <option
+                        key={elo}
+                        value={elo}
+                        disabled={eloScore(elo) < eloScore(editForm.elo)}
+                      >
                         {elo}
                       </option>
                     ))}
