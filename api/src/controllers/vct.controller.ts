@@ -2,6 +2,18 @@ import { execFile } from "node:child_process";
 import type { Request, Response } from "express";
 import { VctInscricao } from "../models/VctInscricao";
 import { VctTime } from "../models/VctTime";
+import {
+  getFormationFiltersByTeamFromBody,
+  getFormationFiltersFromBody,
+  getEloScore as scoreElo,
+  getFormationDetailScore,
+  pickBestCandidateForTeam,
+  pickBestTeamForPlayer,
+  type VctFormationFilters,
+  type VctInscricaoLike,
+  type VctTeamCandidate,
+  type VctTeamState,
+} from "../lib/vct-team-formation";
 
 const CAMPO_LABEL: Record<string, string> = {
   nick: "Nick",
@@ -95,6 +107,21 @@ const ELO_SCORE = Object.fromEntries(ELO_ORDER.map((value, index) => [value, ind
 
 function getEloScore(value: string) {
   return ELO_SCORE[value] ?? -1;
+}
+
+function buildTeamState(inscricoes: VctInscricaoLike[], numero: number): VctTeamState {
+  const TIME_CAP = 5;
+  const members = inscricoes.filter((i) => i.time === numero);
+  return {
+    members,
+    memberCount: members.length,
+    eloSum: members.reduce((acc, m) => acc + scoreElo(m.elo), 0),
+    vacancies: TIME_CAP - members.length,
+  };
+}
+
+function isValidTeamNumber(numero: number) {
+  return Number.isInteger(numero) && numero >= 1;
 }
 
 function isPicoBelowElo(elo: string, pico: string) {
@@ -486,8 +513,11 @@ export async function atualizarTime(req: Request, res: Response) {
   const { id } = req.params;
   const { time } = req.body;
 
-  if (time !== null && (typeof time !== "number" || time < 1 || time > 8)) {
-    res.status(400).json({ ok: false, message: "Time inválido. Use 1-8 ou null." });
+  if (time !== null && (typeof time !== "number" || !isValidTeamNumber(time))) {
+    res.status(400).json({
+      ok: false,
+      message: "Time inválido. Use um número inteiro positivo ou null.",
+    });
     return;
   }
 
@@ -509,7 +539,7 @@ export async function atualizarNomeTime(req: Request, res: Response) {
   const numero = Number(req.params.numero);
   const { nome } = req.body;
 
-  if (!Number.isInteger(numero) || numero < 1 || numero > 8) {
+  if (!isValidTeamNumber(numero)) {
     res.status(400).json({ ok: false, message: "Número do time inválido." });
     return;
   }
@@ -528,43 +558,47 @@ export async function atualizarNomeTime(req: Request, res: Response) {
 }
 
 export async function preencherTime(req: Request, res: Response) {
-  const ELO_VALUES: Record<string, number> = {
-    Ferro: 1, Bronze: 2, Prata: 3, Ouro: 4, Platina: 5,
-    Diamante: 6, Ascendente: 7, Imortal: 8, Radiante: 9,
-  };
   const TIME_CAP = 5;
-  const score = (elo: string) => ELO_VALUES[elo] ?? 0;
 
   const numero = Number(req.params.numero);
-  if (!Number.isInteger(numero) || numero < 1 || numero > 8) {
+  if (!isValidTeamNumber(numero)) {
     res.status(400).json({ ok: false, message: "Número do time inválido." });
     return;
   }
 
   const inscricoes = await VctInscricao.find().lean();
-  const members = inscricoes.filter((i) => i.time === numero);
-  const vacancies = TIME_CAP - members.length;
+  const jogadores = inscricoes as unknown as VctInscricaoLike[];
+  const filters = getFormationFiltersFromBody(req.body) as VctFormationFilters;
+  const team = buildTeamState(jogadores, numero);
+  const { vacancies } = team;
 
   if (vacancies <= 0) {
     res.json({ ok: true, atribuidos: 0, message: "Time já está cheio." });
     return;
   }
 
-  const anchor =
-    members.length > 0
-      ? members.reduce((acc, m) => acc + score(m.elo), 0) / members.length
-      : null;
+  const unassigned = jogadores.filter((i) => i.time === null || i.time === undefined);
+  const chosen: VctInscricaoLike[] = [];
+  let currentTeam: VctTeamState = team;
+  let remaining = [...unassigned];
 
-  const unassigned = inscricoes
-    .filter((i) => i.time === null || i.time === undefined)
-    .sort((a, b) => {
-      if (anchor === null) return score(b.elo) - score(a.elo);
-      return Math.abs(score(a.elo) - anchor) - Math.abs(score(b.elo) - anchor);
-    });
+  while (chosen.length < vacancies) {
+    const best = pickBestCandidateForTeam(remaining, currentTeam, filters);
+    if (!best) break;
 
-  const chosen = unassigned.slice(0, vacancies);
+    chosen.push(best);
+    remaining = remaining.filter((item) => String(item._id) !== String(best._id));
+    currentTeam = {
+      ...currentTeam,
+      members: [...currentTeam.members, best],
+      memberCount: currentTeam.memberCount + 1,
+      eloSum: currentTeam.eloSum + scoreElo(best.elo),
+      vacancies: currentTeam.vacancies - 1,
+    };
+  }
+
   await Promise.all(
-    chosen.map((p) => VctInscricao.updateOne({ _id: p._id }, { time: numero })),
+    chosen.map((p) => VctInscricao.updateOne({ _id: String(p._id) }, { time: numero })),
   );
 
   res.json({ ok: true, atribuidos: chosen.length });
@@ -572,7 +606,7 @@ export async function preencherTime(req: Request, res: Response) {
 
 export async function limparTime(req: Request, res: Response) {
   const numero = Number(req.params.numero);
-  if (!Number.isInteger(numero) || numero < 1 || numero > 8) {
+  if (!isValidTeamNumber(numero)) {
     res.status(400).json({ ok: false, message: "Número do time inválido." });
     return;
   }
@@ -582,27 +616,45 @@ export async function limparTime(req: Request, res: Response) {
 }
 
 export async function atribuirTimesAutomatico(_req: Request, res: Response) {
-  const ELO_VALUES: Record<string, number> = {
-    Ferro: 1, Bronze: 2, Prata: 3, Ouro: 4, Platina: 5,
-    Diamante: 6, Ascendente: 7, Imortal: 8, Radiante: 9,
-  };
   const TIME_CAP = 5;
-  const score = (elo: string) => ELO_VALUES[elo] ?? 0;
+  const teamFilters = getFormationFiltersByTeamFromBody(_req.body);
 
   const inscricoes = await VctInscricao.find().lean();
-  const unassigned = inscricoes
+  const jogadores = inscricoes as unknown as VctInscricaoLike[];
+  const hasSoftFilters = Object.values(teamFilters).some(
+    (filters) => filters.sameTrainingDays || filters.sameAvailability,
+  );
+  const unassigned = jogadores
     .filter((i) => i.time === null || i.time === undefined)
-    .sort((a, b) => score(b.elo) - score(a.elo));
+    .sort((a, b) => {
+      if (hasSoftFilters) {
+        const detailDiff = getFormationDetailScore(b) - getFormationDetailScore(a);
+        if (detailDiff !== 0) return detailDiff;
+      }
+      return scoreElo(b.elo) - scoreElo(a.elo);
+    });
 
-  const teams = Array.from({ length: 8 }, (_, idx) => {
+  const knownTimes = new Set<number>();
+  for (const player of jogadores) {
+    if (typeof player.time === "number" && isValidTeamNumber(player.time)) {
+      knownTimes.add(player.time);
+    }
+  }
+  for (const time of await VctTime.find().select("numero").lean()) {
+    if (isValidTeamNumber(time.numero)) {
+      knownTimes.add(time.numero);
+    }
+  }
+
+  const maxTeamNumber = Math.max(knownTimes.size > 0 ? Math.max(...knownTimes) : 0, 1);
+  const defaultFilters = getFormationFiltersFromBody({});
+  const teams = Array.from({ length: maxTeamNumber }, (_, idx) => {
     const numero = idx + 1;
-    const members = inscricoes.filter((i) => i.time === numero);
     return {
       numero,
-      vacancies: TIME_CAP - members.length,
-      memberCount: members.length,
-      eloSum: members.reduce((acc, m) => acc + score(m.elo), 0),
-    };
+      ...buildTeamState(jogadores, numero),
+      filters: teamFilters[numero] ?? defaultFilters,
+    } satisfies VctTeamCandidate;
   });
 
   const assignments: { id: string; time: number }[] = [];
@@ -611,26 +663,12 @@ export async function atribuirTimesAutomatico(_req: Request, res: Response) {
     const available = teams.filter((t) => t.vacancies > 0);
     if (available.length === 0) break;
 
-    const playerScore = score(player.elo);
-    const withMembers = available.filter((t) => t.memberCount > 0);
-    let target: typeof teams[number] | undefined;
-
-    if (withMembers.length > 0) {
-      target = withMembers.reduce((best, t) => {
-        const avg = t.eloSum / t.memberCount;
-        const bestAvg = best.eloSum / best.memberCount;
-        return Math.abs(avg - playerScore) < Math.abs(bestAvg - playerScore) ? t : best;
-      });
-
-      const avgDiff = Math.abs(target.eloSum / target.memberCount - playerScore);
-      const emptyTeam = available.find((t) => t.memberCount === 0);
-      if (avgDiff > 1 && emptyTeam) target = emptyTeam;
-    } else {
-      target = available[0];
-    }
+    const playerScore = scoreElo(player.elo);
+    const target = pickBestTeamForPlayer(player, available as VctTeamCandidate[]);
 
     if (!target) break;
     assignments.push({ id: String(player._id), time: target.numero });
+    target.members = [...target.members, player];
     target.vacancies -= 1;
     target.memberCount += 1;
     target.eloSum += playerScore;

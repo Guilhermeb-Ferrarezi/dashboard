@@ -48,10 +48,16 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -88,35 +94,27 @@ interface VctInscricoesPanelProps {
 
 const ELO_ORDER = [
   "Sem elo",
-  "Ferro",
   "Ferro 1",
   "Ferro 2",
   "Ferro 3",
-  "Bronze",
   "Bronze 1",
   "Bronze 2",
   "Bronze 3",
-  "Prata",
   "Prata 1",
   "Prata 2",
   "Prata 3",
-  "Ouro",
   "Ouro 1",
   "Ouro 2",
   "Ouro 3",
-  "Platina",
   "Platina 1",
   "Platina 2",
   "Platina 3",
-  "Diamante",
   "Diamante 1",
   "Diamante 2",
   "Diamante 3",
-  "Ascendente",
   "Ascendente 1",
   "Ascendente 2",
   "Ascendente 3",
-  "Imortal",
   "Imortal 1",
   "Imortal 2",
   "Imortal 3",
@@ -182,6 +180,56 @@ const TAG_COLOR_CLASSES: Record<string, string> = {
   revisar: "border-orange-500/40 bg-orange-500/15 text-orange-700 dark:text-orange-300",
 };
 const DEFAULT_TAG_COLOR_CLASS = "border-slate-500/40 bg-slate-500/15 text-slate-700 dark:text-slate-300";
+
+type TeamFormationFilters = {
+  sameTrainingDays: boolean;
+  sameAvailability: boolean;
+  confirmedTravelOnly: boolean;
+  prioritizeCaptainIfMissing: boolean;
+  singleCaptainPerTeam: boolean;
+  maxEloPerTeam: string | null;
+};
+
+const TEAM_ELO_FILTERS = ["Sem limite", ...ELO_ORDER] as const;
+
+function createDefaultTeamFormationFilters(): TeamFormationFilters {
+  return {
+    sameTrainingDays: false,
+    sameAvailability: false,
+    confirmedTravelOnly: false,
+    prioritizeCaptainIfMissing: false,
+    singleCaptainPerTeam: false,
+    maxEloPerTeam: null,
+  };
+}
+
+const TEAM_FORMATION_FILTERS = [
+  {
+    key: "sameTrainingDays",
+    label: "Mesmos dias de treino",
+    description: "Exige o mesmo perfil de dias de treino do time.",
+  },
+  {
+    key: "sameAvailability",
+    label: "Mesma disponibilidade",
+    description: "Alinha horários, janela e compromisso com o time.",
+  },
+  {
+    key: "confirmedTravelOnly",
+    label: "Só deslocamento confirmado",
+    description: "Aceita apenas jogadores com deslocamento confirmado.",
+  },
+  {
+    key: "prioritizeCaptainIfMissing",
+    label: "Priorizar capitão",
+    description: "Se o time ainda não tiver capitão, sobe candidatos com perfil de capitão.",
+  },
+  {
+    key: "singleCaptainPerTeam",
+    label: "1 capitão por time",
+    description: "Não coloca um segundo capitão se o time já tiver um.",
+  },
+] as const;
 
 type VctEditForm = {
   riotId: string;
@@ -563,6 +611,13 @@ export function VctInscricoesPanel({
   const [phoneQuery, setPhoneQuery] = useState("");
   const [recentFilter, setRecentFilter] = useState<typeof RECENT_FILTERS[number]["value"]>("all");
   const [eloFilter, setEloFilter] = useState<string>("all");
+  const [teamFormationFiltersByTime, setTeamFormationFiltersByTime] = useState<
+    Record<number, TeamFormationFilters>
+  >(() => {
+    const map: Record<number, TeamFormationFilters> = {};
+    for (const t of initialTimes) map[t.numero] = createDefaultTeamFormationFilters();
+    return map;
+  });
   const [visibleSemTimeCount, setVisibleSemTimeCount] = useState(INSCRITOS_PAGE_SIZE);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [pendingTimes, setPendingTimes] = useState<Set<number>>(new Set());
@@ -634,6 +689,18 @@ export function VctInscricoesPanel({
     [numTimes],
   );
 
+  useEffect(() => {
+    setTeamFormationFiltersByTime((current) => {
+      const next = { ...current };
+      for (const numero of timesArray) {
+        if (!next[numero]) {
+          next[numero] = createDefaultTeamFormationFilters();
+        }
+      }
+      return next;
+    });
+  }, [timesArray]);
+
   const teamStats = useMemo(() => {
     return timesArray.map((t) => {
       const members = inscricoes.filter((i) => i.time === t);
@@ -659,6 +726,34 @@ export function VctInscricoesPanel({
       "/vct/inscricoes",
     );
     setInscricoes(updated.inscricoes);
+  }
+
+  function getTeamFormationFilters(numero: number) {
+    return teamFormationFiltersByTime[numero] ?? createDefaultTeamFormationFilters();
+  }
+
+  function updateTeamFormationFilters(
+    numero: number,
+    updater: (current: TeamFormationFilters) => TeamFormationFilters,
+  ) {
+    setTeamFormationFiltersByTime((current) => ({
+      ...current,
+      [numero]: updater(current[numero] ?? createDefaultTeamFormationFilters()),
+    }));
+  }
+
+  function buildTeamFormationPayload(numero?: number) {
+    if (typeof numero === "number") {
+      return {
+        ...getTeamFormationFilters(numero),
+      };
+    }
+
+    return {
+      teamFilters: Object.fromEntries(
+        timesArray.map((time) => [time, getTeamFormationFilters(time)]),
+      ),
+    };
   }
 
   async function handleTimeChange(id: string, value: number | null) {
@@ -939,6 +1034,35 @@ export function VctInscricoesPanel({
     }
   }
 
+  async function handleAddTeam() {
+    const nextNumero = numTimes + 1;
+    setPendingTimes((prev) => new Set(prev).add(nextNumero));
+
+    try {
+      await clientApi<{ time: VctTimeSummary }>(`/vct/time/${nextNumero}`, {
+        method: "PUT",
+        body: JSON.stringify({ nome: "" }),
+      });
+      setNumTimes(nextNumero);
+      setTimeNames((current) => ({ ...current, [nextNumero]: current[nextNumero] ?? "" }));
+      setTeamFormationFiltersByTime((current) => ({
+        ...current,
+        [nextNumero]: current[nextNumero] ?? createDefaultTeamFormationFilters(),
+      }));
+      toast.success(`Time ${nextNumero} adicionado.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível adicionar o time.",
+      );
+    } finally {
+      setPendingTimes((prev) => {
+        const next = new Set(prev);
+        next.delete(nextNumero);
+        return next;
+      });
+    }
+  }
+
   async function handleAutoForm() {
     if (semTime.length === 0) {
       toast.info("Não há inscritos sem time.");
@@ -948,9 +1072,12 @@ export function VctInscricoesPanel({
     try {
       const res = await clientApi<{ atribuidos: number }>("/vct/times/auto", {
         method: "POST",
+        body: JSON.stringify(buildTeamFormationPayload()),
       });
       await reloadInscricoes();
-      toast.success(`${res.atribuidos} jogadores atribuídos por proximidade de elo.`);
+      toast.success(
+        `${res.atribuidos} jogadores atribuídos com os filtros atuais.`,
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Não foi possível formar times.",
@@ -965,11 +1092,17 @@ export function VctInscricoesPanel({
     try {
       const res = await clientApi<{ atribuidos: number }>(
         `/vct/times/${numero}/fill`,
-        { method: "POST" },
+        {
+          method: "POST",
+          body: JSON.stringify(buildTeamFormationPayload(numero)),
+        },
       );
       await reloadInscricoes();
-      if (res.atribuidos === 0) toast.info("Nenhum jogador disponível para este time.");
-      else toast.success(`${res.atribuidos} jogadores adicionados ao Time ${numero}.`);
+      if (res.atribuidos === 0) {
+        toast.info("Nenhum jogador elegível com os filtros atuais.");
+      } else {
+        toast.success(`${res.atribuidos} jogadores adicionados ao Time ${numero}.`);
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Não foi possível preencher o time.",
@@ -1232,7 +1365,7 @@ export function VctInscricoesPanel({
               ) : (
                 <SparklesIcon />
               )}
-              Formar times por elo
+              Formar times
             </Button>
           </div>
         </div>
@@ -1479,7 +1612,7 @@ export function VctInscricoesPanel({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setNumTimes((n) => n + 1)}
+            onClick={handleAddTeam}
           >
             <PlusIcon />
             Adicionar time
@@ -1490,6 +1623,8 @@ export function VctInscricoesPanel({
           {teamStats.map((t) => {
             const full = t.members.length >= TIME_CAP;
             const isTeamPending = pendingTimes.has(t.time);
+            const filters = getTeamFormationFilters(t.time);
+            const activeFiltersCount = Object.values(filters).filter(Boolean).length;
             return (
               <Card
                 key={t.time}
@@ -1505,6 +1640,11 @@ export function VctInscricoesPanel({
                       <Badge variant={full ? "default" : "secondary"} className="text-[10px]">
                         {t.members.length}/{TIME_CAP}
                       </Badge>
+                      {activeFiltersCount > 0 ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          {activeFiltersCount} filtros
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <CardDescription className="text-xs">
@@ -1521,15 +1661,97 @@ export function VctInscricoesPanel({
                             <MoreHorizontalIcon />
                           )}
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuContent align="end" className="w-80">
                           <DropdownMenuLabel>Time {t.time}</DropdownMenuLabel>
                           <DropdownMenuSeparator />
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <WandSparklesIcon />
+                              Filtros de formação
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className="w-80 max-h-[360px] overflow-y-auto">
+                              <DropdownMenuLabel>Regra do time</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuCheckboxItem
+                                checked={filters.sameTrainingDays}
+                                onCheckedChange={(checked) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    sameTrainingDays: checked === true,
+                                  }))
+                                }
+                              >
+                                Mesmos dias de treino
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                checked={filters.sameAvailability}
+                                onCheckedChange={(checked) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    sameAvailability: checked === true,
+                                  }))
+                                }
+                              >
+                                Mesma disponibilidade
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                checked={filters.confirmedTravelOnly}
+                                onCheckedChange={(checked) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    confirmedTravelOnly: checked === true,
+                                  }))
+                                }
+                              >
+                                Só deslocamento confirmado
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                checked={filters.prioritizeCaptainIfMissing}
+                                onCheckedChange={(checked) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    prioritizeCaptainIfMissing: checked === true,
+                                  }))
+                                }
+                              >
+                                Priorizar capitão
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuCheckboxItem
+                                checked={filters.singleCaptainPerTeam}
+                                onCheckedChange={(checked) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    singleCaptainPerTeam: checked === true,
+                                  }))
+                                }
+                                >
+                                1 capitão por time
+                              </DropdownMenuCheckboxItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Elo máximo</DropdownMenuLabel>
+                              <DropdownMenuRadioGroup
+                                value={filters.maxEloPerTeam ?? "Sem limite"}
+                                onValueChange={(value) =>
+                                  updateTeamFormationFilters(t.time, (current) => ({
+                                    ...current,
+                                    maxEloPerTeam: value === "Sem limite" ? null : value,
+                                  }))
+                                }
+                              >
+                                {TEAM_ELO_FILTERS.map((elo) => (
+                                  <DropdownMenuRadioItem key={elo} value={elo}>
+                                    {elo}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                           <DropdownMenuItem
                             disabled={full}
                             onClick={() => handleFillTeam(t.time)}
                           >
                             <WandSparklesIcon />
-                            Preencher com elo próximo
+                            Preencher com filtros
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={t.members.length === 0}

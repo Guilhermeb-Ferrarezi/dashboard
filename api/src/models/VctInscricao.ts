@@ -75,7 +75,7 @@ const VctInscricaoSchema = new Schema<IVctInscricao>(
     tags: { type: [String], default: [] },
     observacoes: { type: String, default: "", trim: true },
     highlightColor: { type: String, default: "", trim: true },
-    time: { type: Number, default: null, min: 1, max: 8 },
+    time: { type: Number, default: null, min: 1 },
   },
   { timestamps: true },
 );

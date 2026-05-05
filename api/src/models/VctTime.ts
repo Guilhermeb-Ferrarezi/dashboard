@@ -10,7 +10,7 @@ export interface IVctTime extends Document {
 
 const VctTimeSchema = new Schema<IVctTime>(
   {
-    numero: { type: Number, required: true, unique: true, min: 1, max: 8 },
+    numero: { type: Number, required: true, unique: true, min: 1 },
     nome: { type: String, default: "", trim: true, maxlength: 60 },
   },
   { timestamps: true },
