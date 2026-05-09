@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   BadgeCheckIcon,
   ChevronRightIcon,
   CrosshairIcon,
   LayoutDashboardIcon,
+  LogsIcon,
   ShieldIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -38,7 +40,9 @@ import type { SessionUser } from "@/lib/session";
 
 const navigation = [
   { href: "/home", label: "Launcher", icon: LayoutDashboardIcon },
+  { href: "/logs", label: "Logs", icon: LogsIcon },
 ];
+const LAST_LOGS_PROJECT_ID_KEY = "logs:last-project-id";
 
 const adminNavigation = [
   { href: "/admin/users", label: "Usuarios", icon: ShieldIcon },
@@ -55,6 +59,8 @@ interface AppShellProps {
   title: string;
   description: string;
   eyebrow?: string;
+  fullWidth?: boolean;
+  lockViewport?: boolean;
 }
 
 export function AppShell({
@@ -63,9 +69,39 @@ export function AppShell({
   title,
   description,
   eyebrow,
+  fullWidth = false,
+  lockViewport = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const isAdminSection = pathname.startsWith("/admin");
+  const [logsHref, setLogsHref] = useState(() => {
+    if (typeof window === "undefined") {
+      return "/logs";
+    }
+
+    const lastProjectId = window.localStorage.getItem(LAST_LOGS_PROJECT_ID_KEY);
+    return lastProjectId ? `/logs/${lastProjectId}` : "/logs";
+  });
+
+  useEffect(() => {
+    function handleLastProjectChanged(event: Event) {
+      const customEvent = event as CustomEvent<{ projectId?: string }>;
+      const projectId = customEvent.detail?.projectId;
+      setLogsHref(projectId ? `/logs/${projectId}` : "/logs");
+    }
+
+    window.addEventListener(
+      "logs:last-project-changed",
+      handleLastProjectChanged as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "logs:last-project-changed",
+        handleLastProjectChanged as EventListener,
+      );
+    };
+  }, []);
 
   return (
     <SidebarProvider>
@@ -92,12 +128,16 @@ export function AppShell({
             <SidebarGroupContent>
               <SidebarMenu>
                 {navigation.map((item) => {
-                  const isActive = pathname === item.href;
+                  const href = item.href === "/logs" ? logsHref : item.href;
+                  const isActive =
+                    item.href === "/logs"
+                      ? pathname === "/logs" || pathname.startsWith("/logs/")
+                      : pathname === item.href;
 
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
-                        render={<Link href={item.href} />}
+                        render={<Link href={href} />}
                         isActive={isActive}
                         tooltip={item.label}
                       >
@@ -146,10 +186,20 @@ export function AppShell({
           <UserMenu user={user} />
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="bg-transparent">
-        <div className="flex min-h-screen flex-col">
+      <SidebarInset className={cn("bg-transparent", lockViewport && "h-screen overflow-hidden")}>
+        <div
+          className={cn(
+            "flex min-h-screen flex-col",
+            lockViewport && "h-screen min-h-0 overflow-hidden",
+          )}
+        >
           <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]">
+            <div
+              className={cn(
+                "flex w-full items-center gap-3 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]",
+                fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
+              )}
+            >
               <SidebarTrigger />
               <div className="flex min-w-0 flex-1 flex-col">
                 {eyebrow ? (
@@ -167,7 +217,13 @@ export function AppShell({
               </div>
             </div>
           </header>
-          <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]">
+          <main
+            className={cn(
+              "flex w-full flex-1 flex-col px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]",
+              lockViewport && "min-h-0 overflow-hidden",
+              fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
+            )}
+          >
             {children}
           </main>
         </div>

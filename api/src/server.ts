@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
 import projectRoutes from "./routes/projects.routes";
+import logsRoutes from "./routes/logs.routes";
 import ssoRoutes from "./routes/sso.routes";
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
@@ -17,6 +18,7 @@ import {
   updateCurrentUserPreferences,
 } from "./controllers/user.controller";
 import { verifyJWT } from "./middlewares/jwe";
+import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { requireRole } from "./middlewares/role";
 
 dotenv.config();
@@ -160,10 +162,12 @@ app.use(
 
 app.use(cookieParser());
 app.use(express.json());
+app.use(requestLogsMiddleware);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/logs", logsRoutes);
 app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
