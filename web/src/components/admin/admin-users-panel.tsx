@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  InfoIcon,
   LoaderCircleIcon,
   PlusIcon,
   ShieldIcon,
@@ -37,6 +38,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { clientApi } from "@/lib/api";
 import type { PortalUserSummary } from "@/types/portal";
 
@@ -101,11 +108,9 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
             </CardDescription>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger>
-              <Button>
-                <PlusIcon />
-                Novo usuario
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <PlusIcon />
+              Novo usuario
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -158,7 +163,35 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                   />
                 </label>
                 <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">Perfil</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Perfil</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger
+                          aria-label="Explicar diferenca entre admin e usuario comum"
+                          className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <InfoIcon className="size-4" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-sm">
+                          <div className="space-y-2">
+                            <p>
+                              <span className="font-semibold">Admin:</span>{" "}
+                              acessa a area administrativa, cria usuarios e
+                              gerencia inscricoes e times do VCT.
+                            </p>
+                            <p>
+                              <span className="font-semibold">
+                                Usuario comum:
+                              </span>{" "}
+                              acessa apenas as areas padrao do portal e o proprio
+                              perfil, sem permissoes administrativas.
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Tabs
                     value={form.role}
                     onValueChange={(value) =>

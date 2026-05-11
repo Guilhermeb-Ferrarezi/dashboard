@@ -412,7 +412,14 @@ function PlayerNickWithNotes({
 
   if (!notes) return content;
 
-  return <span title={notes}>{content}</span>;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={content} />
+      <TooltipContent side="top" align="start" className="max-w-sm">
+        <span className="text-xs leading-relaxed">{notes}</span>
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function ValorantProfileSummary({ player }: { player: VctInscricaoSummary }) {
@@ -1298,7 +1305,7 @@ export function VctInscricoesPanel({
   return (
     <div className="flex flex-col gap-8">
       {/* ============ SEÇÃO 1: INSCRITOS SEM TIME ============ */}
-      <section className="flex w-full flex-col gap-4 xl:mx-[calc((100%-100vw+16rem)/2)] xl:w-[calc(100vw-16rem)]">
+      <section className="flex w-full flex-col gap-3 px-4 xl:mx-[calc((100%-100vw+16rem)/2)] xl:w-[calc(100vw-16rem)] xl:px-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1371,7 +1378,7 @@ export function VctInscricoesPanel({
         </div>
 
         <Card className="border-border/60 bg-card/90">
-          <CardContent className="p-0">
+          <CardContent className="p-3">
             {filteredSemTime.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
                 <UsersIcon className="size-8" />
@@ -1383,47 +1390,26 @@ export function VctInscricoesPanel({
               </div>
             ) : (
               <div
-                className="max-h-[640px] overflow-auto"
+                className="max-h-[640px] overflow-auto rounded-lg"
                 onScroll={(event) => handleInscritosScroll(event.currentTarget)}
               >
-                <Table className="min-w-[1580px]">
+                <Table className="w-full table-fixed text-xs">
+                  <colgroup>
+                    <col className="w-[31%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[13%]" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nick</TableHead>
-                      <TableHead>
-                        <button
-                          type="button"
-                          onClick={() => toggleSort("inscricao")}
-                          className="flex items-center gap-1 hover:text-foreground"
-                        >
-                          Inscricao
-                          {sortConfig?.column === "inscricao" ? (
-                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
-                          ) : (
-                            <ArrowUpDownIcon className="size-3 opacity-40" />
-                          )}
-                        </button>
-                      </TableHead>
-                      <TableHead>
-                        <button
-                          type="button"
-                          onClick={() => toggleSort("nome")}
-                          className="flex items-center gap-1 hover:text-foreground"
-                        >
-                          Nome
-                          {sortConfig?.column === "nome" ? (
-                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
-                          ) : (
-                            <ArrowUpDownIcon className="size-3 opacity-40" />
-                          )}
-                        </button>
-                      </TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>
+                      <TableHead className="h-8 py-1.5">Jogador</TableHead>
+                      <TableHead className="h-8 py-1.5 text-center">
                         <button
                           type="button"
                           onClick={() => toggleSort("elo")}
-                          className="flex items-center gap-1 hover:text-foreground"
+                          className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
                         >
                           Elo
                           {sortConfig?.column === "elo" ? (
@@ -1433,13 +1419,10 @@ export function VctInscricoesPanel({
                           )}
                         </button>
                       </TableHead>
-                      <TableHead>Pico</TableHead>
-                      <TableHead>Prim.</TableHead>
-                      <TableHead>Sec.</TableHead>
-                      <TableHead>WhatsApp</TableHead>
-                      <TableHead>Instagram</TableHead>
-                      <TableHead>Atribuir</TableHead>
-                      <TableHead>Acoes</TableHead>
+                      <TableHead className="h-8 py-1.5 text-center">Funcoes</TableHead>
+                      <TableHead className="h-8 py-1.5 text-center">WhatsApp</TableHead>
+                      <TableHead className="h-8 py-1.5 text-center">Atribuir</TableHead>
+                      <TableHead className="h-8 py-1.5 text-center">Acoes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1450,97 +1433,90 @@ export function VctInscricoesPanel({
                           key={i._id}
                           className={cn(getHighlightColorClass(i.highlightColor))}
                         >
-                          <TableCell>
+                          <TableCell className="align-top py-1.5 whitespace-normal break-words">
                             <div className="space-y-1">
                               <PlayerNickWithNotes
                                 player={i}
                                 onCopyClick={(value) => handleCopyValue("Nick", value)}
                                 onMiddleClick={handleQuickValorantLookup}
                                 className={cn(
-                                  "cursor-pointer font-medium underline decoration-dotted underline-offset-4 hover:text-primary",
+                                  "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
                                   i.observacoes && "cursor-help",
                                 )}
                               />
-                              {i.valorantCurrentRank ? (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  {i.valorantCurrentRank}
-                                </Badge>
-                              ) : null}
-                              {getPlayerTags(i).length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {getPlayerTags(i).map((tag) => (
-                                    <Badge
-                                      key={tag}
-                                      variant="outline"
-                                      className={cn("text-[10px]", getTagColorClass(tag))}
-                                    >
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              ) : null}
+                              <div className="text-[11px] text-muted-foreground">
+                                {i.nome}
+                              </div>
+                              <div className="font-mono text-[10px] text-muted-foreground">
+                                {formatInscricaoDate(i.createdAt)}
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-                            {formatInscricaoDate(i.createdAt)}
+                          <TableCell className="align-middle py-1.5 text-center">
+                            <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                              <Badge variant="secondary" className="text-[10px]">
+                                {i.elo}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px]">
+                                Pico {i.pico}
+                              </Badge>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{i.nome}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {i.email}
+                          <TableCell className="align-middle py-1.5 text-center">
+                            <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                              <Badge className="text-[10px]">{i.funcaoPrimaria}</Badge>
+                              <div className="text-[11px] text-muted-foreground">
+                                {i.funcaoSecundaria}
+                              </div>
+                            </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{i.elo}</Badge>
+                          <TableCell className="relative align-middle p-0 text-center">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyValue("WhatsApp", i.whatsapp)}
+                                className="inline-flex items-center gap-1.5 font-mono text-[11px] text-primary transition-colors hover:opacity-80"
+                              >
+                                <PhoneIcon className="size-3" />
+                                {i.whatsapp}
+                              </button>
+                            </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{i.pico}</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs">{i.funcaoPrimaria}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {i.funcaoSecundaria}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyValue("WhatsApp", i.whatsapp)}
-                              className="cursor-pointer underline decoration-dotted underline-offset-4 transition-colors hover:text-primary"
-                            >
-                              {i.whatsapp}
-                            </button>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {i.instagram}
-                          </TableCell>
-                          <TableCell>
-                            <select
-                              value=""
-                              disabled={isPending}
-                              onChange={(e) =>
-                                handleTimeChange(i._id, Number(e.target.value))
-                              }
-                              className="h-8 rounded-md border border-border bg-background px-2 text-xs font-medium outline-none transition-colors focus:border-ring disabled:opacity-50"
-                            >
-                              <option value="" disabled>
-                                Escolher time
-                              </option>
-                              {teamStats.map((t) => (
-                                <option
-                                  key={t.time}
-                                  value={t.time}
-                                  disabled={t.members.length >= TIME_CAP}
-                                >
-                                  Time {t.time} ({t.members.length}/{TIME_CAP})
+                          <TableCell className="relative align-middle p-0 text-center">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <select
+                                value=""
+                                disabled={isPending}
+                                onChange={(e) =>
+                                  handleTimeChange(i._id, Number(e.target.value))
+                                }
+                                className="h-7 w-full max-w-[124px] rounded-md border border-border bg-background px-2 text-[11px] font-medium outline-none transition-colors focus:border-ring disabled:opacity-50"
+                              >
+                                <option value="" disabled>
+                                  Escolher time
                                 </option>
-                              ))}
-                            </select>
+                                {teamStats.map((t) => (
+                                  <option
+                                    key={t.time}
+                                    value={t.time}
+                                    disabled={t.members.length >= TIME_CAP}
+                                  >
+                                    Time {t.time} ({t.members.length}/{TIME_CAP})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Tooltip>
+                          <TableCell className="relative align-middle p-0 text-center">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Tooltip>
                                 <TooltipTrigger
                                   render={
                                     <Button
-                                      variant="ghost"
-                                      size="icon-xs"
+                                      variant="outline"
+                                      size="icon-sm"
+                                      className="size-7"
                                       onClick={() => openDetailsModal(i)}
                                     />
                                   }
@@ -1550,26 +1526,47 @@ export function VctInscricoesPanel({
                                 <TooltipContent side="top" align="center">
                                   Ver detalhes
                                 </TooltipContent>
-                              </Tooltip>
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                onClick={() => openEditPlayer(i)}
-                              >
-                                <PencilIcon />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-xs"
-                                disabled={deletingIds.has(i._id)}
-                                onClick={() => setDeleteTarget(i)}
-                              >
-                                {deletingIds.has(i._id) ? (
-                                  <LoaderCircleIcon className="animate-spin" />
-                                ) : (
-                                  <Trash2Icon />
-                                )}
-                              </Button>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger
+                                    render={
+                                      <Button
+                                        variant="outline"
+                                        size="icon-sm"
+                                        className="size-7"
+                                        onClick={() => openEditPlayer(i)}
+                                      />
+                                    }
+                                  >
+                                    <PencilIcon />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="center">
+                                    Editar
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger
+                                    render={
+                                      <Button
+                                        variant="outline"
+                                        size="icon-sm"
+                                        className="size-7"
+                                        disabled={deletingIds.has(i._id)}
+                                        onClick={() => setDeleteTarget(i)}
+                                      />
+                                    }
+                                  >
+                                    {deletingIds.has(i._id) ? (
+                                      <LoaderCircleIcon className="animate-spin" />
+                                    ) : (
+                                      <Trash2Icon />
+                                    )}
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="center">
+                                    Excluir
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1596,7 +1593,7 @@ export function VctInscricoesPanel({
       </section>
 
       {/* ============ SEÇÃO 2: TIMES ============ */}
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1619,7 +1616,7 @@ export function VctInscricoesPanel({
           </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2">
           {teamStats.map((t) => {
             const full = t.members.length >= TIME_CAP;
             const isTeamPending = pendingTimes.has(t.time);
@@ -1633,7 +1630,7 @@ export function VctInscricoesPanel({
                   full && "border-primary/60",
                 )}
               >
-                <CardHeader className="space-y-2 pb-2">
+                <CardHeader className="space-y-1.5 pb-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-base">Time {t.time}</CardTitle>
@@ -1808,13 +1805,13 @@ export function VctInscricoesPanel({
                     ))}
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-2">
                   {t.members.length === 0 ? (
-                    <div className="px-6 py-6 text-center text-xs italic text-muted-foreground/60">
+                    <div className="px-4 py-4 text-center text-xs italic text-muted-foreground/60">
                       Sem jogadores
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2 p-3">
+                    <div className="flex flex-col gap-1.5 p-1">
                       {t.members.map((m) => {
                         const isPending = pendingIds.has(m._id);
                         const playerCard = (

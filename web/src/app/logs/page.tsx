@@ -1,11 +1,11 @@
 import { LogsProjectPicker } from "@/components/logs/logs-project-picker";
 import { AppShell } from "@/components/portal/app-shell";
-import { requireSession } from "@/lib/session";
+import { requireAdminSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function LogsProjectsPage() {
-  const user = await requireSession();
+  const user = await requireAdminSession();
 
   return (
     <AppShell

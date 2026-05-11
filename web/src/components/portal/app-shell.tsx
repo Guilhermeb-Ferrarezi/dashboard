@@ -127,7 +127,9 @@ export function AppShell({
             <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navigation.map((item) => {
+                {navigation
+                  .filter((item) => item.href !== "/logs" || user.role === "admin")
+                  .map((item) => {
                   const href = item.href === "/logs" ? logsHref : item.href;
                   const isActive =
                     item.href === "/logs"
@@ -186,7 +188,7 @@ export function AppShell({
           <UserMenu user={user} />
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className={cn("bg-transparent", lockViewport && "h-screen overflow-hidden")}>
+      <SidebarInset className={cn(lockViewport && "h-screen overflow-hidden")}>
         <div
           className={cn(
             "flex min-h-screen flex-col",
