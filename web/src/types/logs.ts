@@ -28,6 +28,12 @@ export interface ProjectLogEntry {
   ip: string;
   durationMs: number;
   createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string | null;
+    role: string | null;
+  } | null;
   requestPayload?: unknown;
   responsePayload?: unknown;
 }

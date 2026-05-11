@@ -71,6 +71,11 @@ function normalizeProject(project: Record<string, unknown>): LogsProject {
 }
 
 function normalizeLog(log: Record<string, unknown>): ProjectLogEntry {
+  const user =
+    typeof log.user === "object" && log.user !== null
+      ? (log.user as Record<string, unknown>)
+      : null;
+
   return {
     id: String(log.id ?? ""),
     status: Number(log.status ?? 0),
@@ -80,9 +85,25 @@ function normalizeLog(log: Record<string, unknown>): ProjectLogEntry {
     ip: String(log.ip ?? "-"),
     durationMs: Number(log.durationMs ?? 0),
     createdAt: String(log.createdAt ?? new Date().toISOString()),
+    user: user
+      ? {
+          id: String(user.id ?? ""),
+          name: String(user.name ?? ""),
+          email: typeof user.email === "string" ? user.email : null,
+          role: typeof user.role === "string" ? user.role : null,
+        }
+      : null,
     requestPayload: log.requestPayload,
     responsePayload: log.responsePayload,
   };
+}
+
+function getUserLabel(user: ProjectLogEntry["user"]) {
+  if (!user) {
+    return "-";
+  }
+
+  return user.name || user.id || "-";
 }
 
 function formatPayload(payload: unknown) {
@@ -355,7 +376,7 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
               </div>
             </div>
 
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.8fr)_180px_180px_180px_auto] xl:items-end">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.8fr)_180px_180px_240px_180px_auto] xl:items-end">
               <Input
                 value={draftFilters.search}
                 onChange={(event) =>
@@ -466,6 +487,7 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
                         <TableHead>Status</TableHead>
                         <TableHead>Metodo</TableHead>
                         <TableHead>Endpoint</TableHead>
+                        <TableHead>Autor</TableHead>
                         <TableHead>IP</TableHead>
                         <TableHead>Tempo</TableHead>
                         <TableHead>Data</TableHead>
@@ -475,7 +497,7 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
                       {logsLoading ? (
                         Array.from({ length: 8 }).map((_, index) => (
                           <TableRow key={index}>
-                            <TableCell colSpan={6}>
+                            <TableCell colSpan={7}>
                               <Skeleton className="h-10 w-full rounded-lg" />
                             </TableCell>
                           </TableRow>
@@ -502,6 +524,16 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
                               </TableCell>
                               <TableCell className="max-w-[360px] font-mono text-xs sm:max-w-[520px]">
                                 <span className="block truncate">{entry.endpoint}</span>
+                              </TableCell>
+                              <TableCell className="max-w-[220px]">
+                                <div className="flex min-w-0 flex-col">
+                                  <span className="truncate text-sm font-medium">
+                                    {getUserLabel(entry.user)}
+                                  </span>
+                                  <span className="truncate font-mono text-[11px] text-muted-foreground">
+                                    {entry.user?.id || "sem userId"}
+                                  </span>
+                                </div>
                               </TableCell>
                               <TableCell className="font-mono text-xs text-muted-foreground">
                                 {entry.ip}
@@ -575,7 +607,7 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
                 <DialogTitle>Detalhes da requisição</DialogTitle>
               </DialogHeader>
               <div className="flex min-h-0 flex-1 flex-col gap-5 px-6 py-5">
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[120px_160px_minmax(0,1fr)]">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[120px_160px_220px_minmax(0,1fr)]">
                   <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                       Método
@@ -587,6 +619,17 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
                       IP
                     </p>
                     <p className="mt-2 font-mono text-base">{selectedLog.ip}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Autor
+                    </p>
+                    <p className="mt-2 text-sm font-semibold">
+                      {getUserLabel(selectedLog.user)}
+                    </p>
+                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                      {selectedLog.user?.id || "sem userId"}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">

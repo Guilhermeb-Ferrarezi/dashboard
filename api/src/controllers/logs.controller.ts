@@ -117,6 +117,23 @@ function getEndpointFromLogEntry(entry: Record<string, unknown>) {
   return "/";
 }
 
+function getLogUser(entry: Record<string, unknown>) {
+  const user = entry.user;
+
+  if (typeof user !== "object" || user === null) {
+    return null;
+  }
+
+  const actor = user as Record<string, unknown>;
+
+  return {
+    id: typeof actor.id === "string" ? actor.id : "",
+    name: typeof actor.name === "string" ? actor.name : "",
+    email: typeof actor.email === "string" ? actor.email : null,
+    role: typeof actor.role === "string" ? actor.role : null,
+  };
+}
+
 export async function listLogProjects(_req: Request, res: Response) {
   const db = getLogsDb();
   const [collections, metadataEntries] = await Promise.all([
@@ -288,6 +305,7 @@ export async function listProjectLogs(req: Request, res: Response) {
         typeof entry.occurredAt === "string"
           ? entry.occurredAt
           : new Date().toISOString(),
+      user: getLogUser(entry),
       requestPayload:
         typeof entry.request === "object" && entry.request !== null
           ? entry.request

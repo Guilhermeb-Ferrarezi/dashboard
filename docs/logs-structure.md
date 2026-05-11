@@ -97,6 +97,7 @@ Os campos mais importantes sao:
 - `occurredAt`
 - `method`
 - `url` ou `path`
+- `user.id` / `user.name` quando existir autor autenticado
 - `statusCode`
 - `durationMs`
 - `ip`
@@ -111,11 +112,13 @@ O schema acima foi pensado para suportar:
   - status <- `statusCode`
   - metodo <- `method`
   - endpoint <- `path`, `route` ou pathname derivado de `url`
+  - autor <- `user.name` com fallback para `user.id`
   - ip <- `ip`
   - tempo <- `durationMs`
   - data <- `occurredAt`
 
 - modal de detalhes:
+  - autor da acao <- `user.name` com fallback para `user.id`
   - request <- `request` ou `requestBody`
   - response <- `response.body` ou `responseBody`
   - endpoint completo <- `url`
