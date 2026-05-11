@@ -38,13 +38,11 @@ import {
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
 
-const navigation = [
-  { href: "/home", label: "Launcher", icon: LayoutDashboardIcon },
-  { href: "/logs", label: "Logs", icon: LogsIcon },
-];
+const navigation = [{ href: "/home", label: "Launcher", icon: LayoutDashboardIcon }];
 const LAST_LOGS_PROJECT_ID_KEY = "logs:last-project-id";
 
 const adminNavigation = [
+  { href: "/logs", label: "Logs", icon: LogsIcon },
   { href: "/admin/users", label: "Usuarios", icon: ShieldIcon },
   {
     href: "/admin/vct-inscricoes",
@@ -73,7 +71,7 @@ export function AppShell({
   lockViewport = false,
 }: AppShellProps) {
   const pathname = usePathname();
-  const isAdminSection = pathname.startsWith("/admin");
+  const isAdminSection = pathname.startsWith("/admin") || pathname.startsWith("/logs");
   const [logsHref, setLogsHref] = useState(() => {
     if (typeof window === "undefined") {
       return "/logs";
@@ -127,9 +125,7 @@ export function AppShell({
             <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navigation
-                  .filter((item) => item.href !== "/logs" || user.role === "admin")
-                  .map((item) => {
+                {navigation.map((item) => {
                   const href = item.href === "/logs" ? logsHref : item.href;
                   const isActive =
                     item.href === "/logs"
@@ -168,8 +164,12 @@ export function AppShell({
                       {adminNavigation.map((item) => (
                         <SidebarMenuSubItem key={item.href}>
                           <SidebarMenuSubButton
-                            render={<Link href={item.href} />}
-                            isActive={pathname === item.href}
+                            render={<Link href={item.href === "/logs" ? logsHref : item.href} />}
+                            isActive={
+                              item.href === "/logs"
+                                ? pathname === "/logs" || pathname.startsWith("/logs/")
+                                : pathname === item.href
+                            }
                           >
                             <item.icon />
                             <span>{item.label}</span>
