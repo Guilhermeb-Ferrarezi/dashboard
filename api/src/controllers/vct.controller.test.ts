@@ -6,6 +6,7 @@ import {
   atualizarInscricao,
   atualizarStatusInscricoes,
   preencherTime,
+  listarInscricoes,
 } from "./vct.controller";
 import { VCT_INSCRICAO_STATUS } from "../lib/vct-inscricao-status";
 import { VctInscricao } from "../models/VctInscricao";
@@ -205,5 +206,101 @@ describe("status de participacao no campeonato", () => {
     await atribuirTimesAutomatico(req, res as Response);
 
     expect(updates).toEqual([{ id: "ativo", time: 1 }]);
+  });
+});
+
+describe("modalidades de inscricao", () => {
+  const originalFind = VctInscricao.find;
+  const originalUpdateOne = VctInscricao.updateOne;
+
+  afterEach(() => {
+    VctInscricao.find = originalFind;
+    VctInscricao.updateOne = originalUpdateOne;
+  });
+
+  test("listar inscricoes filtra pela modalidade solicitada", async () => {
+    let filterUsed: unknown = null;
+    VctInscricao.find = mock((filter: unknown) => {
+      filterUsed = filter;
+      return {
+        sort: () => ({
+          lean: async () => [{ _id: "cs-1", modalidade: "counter-strike" }],
+        }),
+      };
+    }) as typeof VctInscricao.find;
+
+    const req = { query: { modalidade: "counter-strike" } } as unknown as Request;
+    const res = makeResponse();
+
+    await listarInscricoes(req, res as Response);
+
+    expect(filterUsed).toEqual({ modalidade: "counter-strike" });
+    expect(res.body).toMatchObject({
+      ok: true,
+      inscricoes: [{ _id: "cs-1", modalidade: "counter-strike" }],
+    });
+  });
+
+  test("listar inscricoes de valorant tambem inclui registros antigos sem modalidade", async () => {
+    let filterUsed: unknown = null;
+    VctInscricao.find = mock((filter: unknown) => {
+      filterUsed = filter;
+      return {
+        sort: () => ({
+          lean: async () => [{ _id: "legacy-1" }],
+        }),
+      };
+    }) as typeof VctInscricao.find;
+
+    const req = { query: { modalidade: "valorant" } } as unknown as Request;
+    const res = makeResponse();
+
+    await listarInscricoes(req, res as Response);
+
+    expect(filterUsed).toEqual({
+      $or: [
+        { modalidade: "valorant" },
+        { modalidade: { $exists: false } },
+      ],
+    });
+    expect(res.body).toMatchObject({
+      ok: true,
+      inscricoes: [{ _id: "legacy-1" }],
+    });
+  });
+
+  test("preencher time usa apenas jogadores da modalidade solicitada", async () => {
+    let filterUsed: unknown = null;
+    const updates: Array<{ id: string; time: number }> = [];
+    VctInscricao.find = mock((filter: unknown) => {
+      filterUsed = filter;
+      return {
+        lean: async () => [
+          {
+            _id: "cs-ativo",
+            modalidade: "counter-strike",
+            elo: "Ouro 2",
+            time: null,
+            status: VCT_INSCRICAO_STATUS.ACTIVE,
+          },
+        ],
+      };
+    }) as typeof VctInscricao.find;
+    VctInscricao.updateOne = mock((filter: { _id: string }, update: { time: number }) => {
+      updates.push({ id: filter._id, time: update.time });
+      return Promise.resolve({});
+    }) as typeof VctInscricao.updateOne;
+
+    const req = {
+      params: { numero: "1" },
+      query: { modalidade: "counter-strike" },
+      body: {},
+    } as unknown as Request;
+    const res = makeResponse();
+
+    await preencherTime(req, res as Response);
+
+    expect(filterUsed).toEqual({ modalidade: "counter-strike" });
+    expect(updates).toEqual([{ id: "cs-ativo", time: 1 }]);
   });
 });

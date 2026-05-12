@@ -27,6 +27,32 @@ const CAMPO_LABEL: Record<string, string> = {
   instagram: "Instagram",
 };
 
+const MODALIDADES = ["valorant", "counter-strike", "lol"] as const;
+type Modalidade = (typeof MODALIDADES)[number];
+
+function normalizeModalidade(value: unknown): Modalidade {
+  return MODALIDADES.includes(value as Modalidade) ? (value as Modalidade) : "valorant";
+}
+
+function getModalidadeFromRequest(req: Request) {
+  return normalizeModalidade(req.query?.modalidade ?? req.body?.modalidade);
+}
+
+function getModalidadeFilter(req: Request) {
+  const modalidade = getModalidadeFromRequest(req);
+
+  if (modalidade === "valorant") {
+    return {
+      $or: [
+        { modalidade },
+        { modalidade: { $exists: false } },
+      ],
+    };
+  }
+
+  return { modalidade };
+}
+
 const REQUIRED_EDIT_INSCRICAO_FIELDS = [
   "nome",
   "nick",
@@ -83,7 +109,7 @@ const OPTIONAL_INSCRICAO_FIELDS = [
   "time",
 ] as const;
 
-const ELO_ORDER = [
+const VALORANT_ELO_ORDER = [
   "Sem elo",
   "Ferro",
   "Ferro 1",
@@ -120,10 +146,51 @@ const ELO_ORDER = [
   "Radiante",
 ] as const;
 
-const ELO_SCORE = Object.fromEntries(ELO_ORDER.map((value, index) => [value, index]));
+const COUNTER_STRIKE_ELO_ORDER = [
+  "Sem elo / não ranqueado",
+  "Silver I",
+  "Silver II",
+  "Silver III",
+  "Silver IV",
+  "Silver Elite",
+  "Silver Elite Master",
+  "Gold Nova I",
+  "Gold Nova II",
+  "Gold Nova III",
+  "Gold Nova Master",
+  "Master Guardian I",
+  "Master Guardian II",
+  "Master Guardian Elite",
+  "Distinguished Master Guardian",
+  "Legendary Eagle",
+  "Legendary Eagle Master",
+  "Supreme Master First Class",
+  "Global Elite",
+] as const;
 
-function getEloScore(value: string) {
-  return ELO_SCORE[value] ?? -1;
+const LOL_ELO_ORDER = [
+  "Sem elo / não ranqueado",
+  "Ferro",
+  "Bronze",
+  "Prata",
+  "Ouro",
+  "Platina",
+  "Esmeralda",
+  "Diamante",
+  "Mestre",
+  "Grão-mestre",
+  "Desafiante",
+] as const;
+
+const ELO_ORDER_BY_MODALIDADE: Record<Modalidade, readonly string[]> = {
+  valorant: VALORANT_ELO_ORDER,
+  "counter-strike": COUNTER_STRIKE_ELO_ORDER,
+  lol: LOL_ELO_ORDER,
+};
+
+function getEloScore(value: string, modalidade: Modalidade = "valorant") {
+  const order = ELO_ORDER_BY_MODALIDADE[modalidade];
+  return Object.fromEntries(order.map((item, index) => [item, index]))[value] ?? -1;
 }
 
 function buildTeamState(inscricoes: VctInscricaoLike[], numero: number): VctTeamState {
@@ -141,8 +208,8 @@ function isValidTeamNumber(numero: number) {
   return Number.isInteger(numero) && numero >= 1;
 }
 
-function isPicoBelowElo(elo: string, pico: string) {
-  return getEloScore(pico) < getEloScore(elo);
+function isPicoBelowElo(elo: string, pico: string, modalidade: Modalidade = "valorant") {
+  return getEloScore(pico, modalidade) < getEloScore(elo, modalidade);
 }
 
 function normalizeTags(value: unknown) {
@@ -296,6 +363,7 @@ async function fetchWithNodeFallback(endpoint: string, apiKey: string | undefine
 }
 
 export async function criarInscricao(req: Request, res: Response) {
+  const modalidade = getModalidadeFromRequest(req);
   const {
     nome,
     nick,
@@ -337,18 +405,19 @@ export async function criarInscricao(req: Request, res: Response) {
     }
   }
 
-  if (getEloScore(elo.trim()) < 0 || getEloScore(pico.trim()) < 0) {
+  if (getEloScore(elo.trim(), modalidade) < 0 || getEloScore(pico.trim(), modalidade) < 0) {
     res.status(400).json({ ok: false, message: "Elo inválido." });
     return;
   }
 
-  if (isPicoBelowElo(elo.trim(), pico.trim())) {
+  if (isPicoBelowElo(elo.trim(), pico.trim(), modalidade)) {
     res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
     return;
   }
 
   try {
     const inscricao = new VctInscricao({
+      modalidade,
       nome: nome.trim(),
       nick: nick.trim(),
       email: email.trim().toLowerCase(),
@@ -394,8 +463,8 @@ export async function criarInscricao(req: Request, res: Response) {
   }
 }
 
-export async function listarInscricoes(_req: Request, res: Response) {
-  const inscricoes = await VctInscricao.find().sort({ createdAt: -1 }).lean();
+export async function listarInscricoes(req: Request, res: Response) {
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).sort({ createdAt: -1 }).lean();
   res.json({ ok: true, inscricoes });
 }
 
@@ -452,6 +521,7 @@ export async function buscarContaValorant(req: Request, res: Response) {
 
 export async function atualizarInscricao(req: Request, res: Response) {
   const { id } = req.params;
+  const modalidade = getModalidadeFromRequest(req);
   const update: Record<string, unknown> = {};
 
   for (const field of REQUIRED_EDIT_INSCRICAO_FIELDS) {
@@ -464,6 +534,7 @@ export async function atualizarInscricao(req: Request, res: Response) {
   }
 
   update.email = String(update.email).toLowerCase();
+  update.modalidade = modalidade;
   if (typeof req.body.instagram === "string") update.instagram = req.body.instagram.trim();
   for (const field of OPTIONAL_INSCRICAO_FIELDS) {
     const value = req.body[field];
@@ -492,12 +563,12 @@ export async function atualizarInscricao(req: Request, res: Response) {
   update.highlightColor = typeof req.body.highlightColor === "string" ? req.body.highlightColor.trim() : "";
   update.status = normalizeStatusField(req.body.status);
 
-  if (getEloScore(String(update.elo)) < 0 || getEloScore(String(update.pico)) < 0) {
+  if (getEloScore(String(update.elo), modalidade) < 0 || getEloScore(String(update.pico), modalidade) < 0) {
     res.status(400).json({ ok: false, message: "Elo inválido." });
     return;
   }
 
-  if (isPicoBelowElo(String(update.elo), String(update.pico))) {
+  if (isPicoBelowElo(String(update.elo), String(update.pico), modalidade)) {
     res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
     return;
   }
@@ -576,6 +647,10 @@ async function atualizarStatusInterno(ids: string[], status: VctInscricaoStatus)
 
 export async function atualizarStatusInscricao(req: Request, res: Response) {
   const { id } = req.params;
+  if (!id) {
+    res.status(400).json({ ok: false, message: "Inscricao invalida." });
+    return;
+  }
   const status = normalizeStatusField(req.body.status);
   const result = await atualizarStatusInterno([id], status);
   res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
@@ -593,12 +668,13 @@ export async function atualizarStatusInscricoes(req: Request, res: Response) {
   res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
 }
 
-export async function listarTimes(_req: Request, res: Response) {
-  const times = await VctTime.find().sort({ numero: 1 }).lean();
+export async function listarTimes(req: Request, res: Response) {
+  const times = await VctTime.find(getModalidadeFilter(req)).sort({ numero: 1 }).lean();
   res.json({ ok: true, times });
 }
 
 export async function atualizarNomeTime(req: Request, res: Response) {
+  const modalidade = getModalidadeFromRequest(req);
   const numero = Number(req.params.numero);
   const { nome } = req.body;
 
@@ -612,8 +688,8 @@ export async function atualizarNomeTime(req: Request, res: Response) {
   }
 
   const time = await VctTime.findOneAndUpdate(
-    { numero },
-    { nome: nome.trim() },
+    { modalidade, numero },
+    { modalidade, nome: nome.trim() },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).lean();
 
@@ -629,7 +705,7 @@ export async function preencherTime(req: Request, res: Response) {
     return;
   }
 
-  const inscricoes = await VctInscricao.find().lean();
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).lean();
   const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
   const filters = getFormationFiltersFromBody(req.body) as VctFormationFilters;
   const team = buildTeamState(jogadores, numero);
@@ -668,21 +744,22 @@ export async function preencherTime(req: Request, res: Response) {
 }
 
 export async function limparTime(req: Request, res: Response) {
+  const modalidade = getModalidadeFromRequest(req);
   const numero = Number(req.params.numero);
   if (!isValidTeamNumber(numero)) {
     res.status(400).json({ ok: false, message: "Número do time inválido." });
     return;
   }
 
-  const result = await VctInscricao.updateMany({ time: numero }, { time: null });
+  const result = await VctInscricao.updateMany({ modalidade, time: numero }, { time: null });
   res.json({ ok: true, removidos: result.modifiedCount });
 }
 
-export async function atribuirTimesAutomatico(_req: Request, res: Response) {
+export async function atribuirTimesAutomatico(req: Request, res: Response) {
   const TIME_CAP = 5;
-  const teamFilters = getFormationFiltersByTeamFromBody(_req.body);
+  const teamFilters = getFormationFiltersByTeamFromBody(req.body);
 
-  const inscricoes = await VctInscricao.find().lean();
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).lean();
   const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
   const hasSoftFilters = Object.values(teamFilters).some(
     (filters) => filters.sameTrainingDays || filters.sameAvailability,
@@ -703,7 +780,7 @@ export async function atribuirTimesAutomatico(_req: Request, res: Response) {
       knownTimes.add(player.time);
     }
   }
-  for (const time of await VctTime.find().select("numero").lean()) {
+  for (const time of await VctTime.find(getModalidadeFilter(req)).select("numero").lean()) {
     if (isValidTeamNumber(time.numero)) {
       knownTimes.add(time.numero);
     }

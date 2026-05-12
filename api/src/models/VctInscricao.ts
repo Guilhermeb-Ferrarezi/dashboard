@@ -3,6 +3,7 @@ import Mongoose from "mongoose";
 import { VCT_INSCRICAO_STATUS } from "../lib/vct-inscricao-status";
 
 export interface IVctInscricao extends Document {
+  modalidade: string;
   nome: string;
   nick: string;
   riotName: string;
@@ -44,8 +45,14 @@ export interface IVctInscricao extends Document {
 
 const VctInscricaoSchema = new Schema<IVctInscricao>(
   {
+    modalidade: {
+      type: String,
+      default: "valorant",
+      enum: ["valorant", "counter-strike", "lol"],
+      trim: true,
+    },
     nome: { type: String, required: true, trim: true },
-    nick: { type: String, required: true, trim: true, unique: true },
+    nick: { type: String, required: true, trim: true },
     riotName: { type: String, default: "", trim: true },
     riotTag: { type: String, default: "", trim: true },
     riotPuuid: { type: String, default: "", trim: true },
@@ -55,8 +62,8 @@ const VctInscricaoSchema = new Schema<IVctInscricao>(
     valorantCardWide: { type: String, default: "", trim: true },
     valorantCurrentRank: { type: String, default: "", trim: true },
     valorantPeakRank: { type: String, default: "", trim: true },
-    email: { type: String, required: true, trim: true, lowercase: true, unique: true },
-    whatsapp: { type: String, required: true, trim: true, unique: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
+    whatsapp: { type: String, required: true, trim: true },
     instagram: { type: String, default: "", trim: true },
     cidade: { type: String, required: true, trim: true },
     elo: { type: String, required: true },
@@ -87,5 +94,9 @@ const VctInscricaoSchema = new Schema<IVctInscricao>(
   },
   { timestamps: true },
 );
+
+VctInscricaoSchema.index({ modalidade: 1, nick: 1 }, { unique: true });
+VctInscricaoSchema.index({ modalidade: 1, email: 1 }, { unique: true });
+VctInscricaoSchema.index({ modalidade: 1, whatsapp: 1 }, { unique: true });
 
 export const VctInscricao = Mongoose.model<IVctInscricao>("VctInscricao", VctInscricaoSchema);

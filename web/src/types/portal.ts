@@ -27,6 +27,7 @@ export interface PortalUserSummary {
 
 export interface VctInscricaoSummary {
   _id: string;
+  modalidade?: "valorant" | "counter-strike" | "lol";
   nome: string;
   nick: string;
   riotName?: string;
@@ -67,6 +68,7 @@ export interface VctInscricaoSummary {
 
 export interface VctTimeSummary {
   _id: string;
+  modalidade?: "valorant" | "counter-strike" | "lol";
   numero: number;
   nome: string;
 }

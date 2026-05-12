@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownIcon,
   ArrowUpDownIcon,
@@ -104,9 +104,12 @@ import { HexColorInput, HexColorPicker } from "react-colorful";
 interface VctInscricoesPanelProps {
   initialInscricoes: VctInscricaoSummary[];
   initialTimes: VctTimeSummary[];
+  modalidade?: GameSlug;
 }
 
-const ELO_ORDER = [
+type GameSlug = "valorant" | "counter-strike" | "lol";
+
+const VALORANT_ELO_ORDER = [
   "Sem elo",
   "Ferro 1",
   "Ferro 2",
@@ -135,14 +138,73 @@ const ELO_ORDER = [
   "Radiante",
 ] as const;
 
-const ELO_VALUES: Record<string, number> = Object.fromEntries(
-  ELO_ORDER.map((elo, index) => [elo, index]),
-);
+const COUNTER_STRIKE_ELO_ORDER = [
+  "Sem elo / não ranqueado",
+  "Silver I",
+  "Silver II",
+  "Silver III",
+  "Silver IV",
+  "Silver Elite",
+  "Silver Elite Master",
+  "Gold Nova I",
+  "Gold Nova II",
+  "Gold Nova III",
+  "Gold Nova Master",
+  "Master Guardian I",
+  "Master Guardian II",
+  "Master Guardian Elite",
+  "Distinguished Master Guardian",
+  "Legendary Eagle",
+  "Legendary Eagle Master",
+  "Supreme Master First Class",
+  "Global Elite",
+] as const;
+
+const LOL_ELO_ORDER = [
+  "Sem elo / não ranqueado",
+  "Ferro",
+  "Bronze",
+  "Prata",
+  "Ouro",
+  "Platina",
+  "Esmeralda",
+  "Diamante",
+  "Mestre",
+  "Grão-mestre",
+  "Desafiante",
+] as const;
+
+const GAME_CONFIGS: Record<
+  GameSlug,
+  {
+    label: string;
+    elos: readonly string[];
+    funcoes: readonly string[];
+    hasValorantLookup: boolean;
+  }
+> = {
+  valorant: {
+    label: "VCT",
+    elos: VALORANT_ELO_ORDER,
+    funcoes: ["Duelista", "Controlador", "Sentinela", "Iniciador", "Flex"],
+    hasValorantLookup: true,
+  },
+  "counter-strike": {
+    label: "Counter-strike",
+    elos: COUNTER_STRIKE_ELO_ORDER,
+    funcoes: ["Entry fragger", "AWPer", "Rifler", "Lurker", "Suporte", "IGL", "Flex"],
+    hasValorantLookup: false,
+  },
+  lol: {
+    label: "League of Legends",
+    elos: LOL_ELO_ORDER,
+    funcoes: ["Topo", "Caçador", "Meio", "Atirador", "Suporte", "Flex"],
+    hasValorantLookup: false,
+  },
+};
 
 const MIN_TIMES = 8;
 const TIME_CAP = 5;
-const FUNCOES = ["Duelista", "Controlador", "Sentinela", "Iniciador", "Flex"] as const;
-const ELOS = [...ELO_ORDER];
 const TAG_SUGGESTIONS = ["Confirmado", "Pendente", "Capitao", "Sub", "Prioridade", "Revisar"];
 const RECENT_FILTERS = [
   { label: "Todos", value: "all", minutes: null },
@@ -171,8 +233,6 @@ type TeamFormationFilters = {
   maxEloPerTeam: string | null;
 };
 
-const TEAM_ELO_FILTERS = ["Sem limite", ...ELO_ORDER] as const;
-
 function createDefaultTeamFormationFilters(): TeamFormationFilters {
   return {
     sameTrainingDays: false,
@@ -183,34 +243,6 @@ function createDefaultTeamFormationFilters(): TeamFormationFilters {
     maxEloPerTeam: null,
   };
 }
-
-const TEAM_FORMATION_FILTERS = [
-  {
-    key: "sameTrainingDays",
-    label: "Mesmos dias de treino",
-    description: "Exige o mesmo perfil de dias de treino do time.",
-  },
-  {
-    key: "sameAvailability",
-    label: "Mesma disponibilidade",
-    description: "Alinha horários, janela e compromisso com o time.",
-  },
-  {
-    key: "confirmedTravelOnly",
-    label: "Só deslocamento confirmado",
-    description: "Aceita apenas jogadores com deslocamento confirmado.",
-  },
-  {
-    key: "prioritizeCaptainIfMissing",
-    label: "Priorizar capitão",
-    description: "Se o time ainda não tiver capitão, sobe candidatos com perfil de capitão.",
-  },
-  {
-    key: "singleCaptainPerTeam",
-    label: "1 capitão por time",
-    description: "Não coloca um segundo capitão se o time já tiver um.",
-  },
-] as const;
 
 type VctEditForm = {
   riotId: string;
@@ -261,8 +293,8 @@ type ValorantLookupAccount = {
   peakRank?: string;
 };
 
-function eloScore(elo: string) {
-  return ELO_VALUES[elo] ?? 0;
+function eloScore(elo: string, elos: readonly string[] = VALORANT_ELO_ORDER) {
+  return Object.fromEntries(elos.map((value, index) => [value, index]))[elo] ?? 0;
 }
 
 function formatAvg(n: number) {
@@ -603,7 +635,15 @@ function ValorantEditPreview({ form }: { form: VctEditForm }) {
 export function VctInscricoesPanel({
   initialInscricoes,
   initialTimes,
+  modalidade = "valorant",
 }: VctInscricoesPanelProps) {
+  const gameConfig = GAME_CONFIGS[modalidade];
+  const modalidadeQuery = `modalidade=${encodeURIComponent(modalidade)}`;
+  const gameElos = gameConfig.elos;
+  const gameFuncoes = gameConfig.funcoes;
+  const teamEloFilters = ["Sem limite", ...gameElos] as const;
+  const withModalidade = (path: string) =>
+    `${path}${path.includes("?") ? "&" : "?"}${modalidadeQuery}`;
   const [inscricoes, setInscricoes] = useState(initialInscricoes);
   const [numTimes, setNumTimes] = useState(() => {
     const maxFromTimes = initialTimes.reduce((max, t) => Math.max(max, t.numero), 0);
@@ -667,7 +707,7 @@ export function VctInscricoesPanel({
     [activeInscricoes],
   );
 
-  function matchesCommonFilters(i: VctInscricaoSummary) {
+  const matchesCommonFilters = useCallback((i: VctInscricaoSummary) => {
     const q = query.trim().toLowerCase();
     const phone = onlyDigits(phoneQuery);
     const matchesText =
@@ -681,16 +721,16 @@ export function VctInscricoesPanel({
     const matchesElo = eloFilter === "all" || i.elo === eloFilter;
 
     return matchesText && matchesPhone && matchesRecent && matchesElo;
-  }
+  }, [eloFilter, phoneQuery, query, recentFilter]);
 
   const filteredActiveSemTime = useMemo(
     () => activeSemTime.filter((i) => matchesCommonFilters(i)),
-    [activeSemTime, eloFilter, phoneQuery, query, recentFilter],
+    [activeSemTime, matchesCommonFilters],
   );
 
   const filteredInactive = useMemo(
     () => inactiveInscricoes.filter((i) => matchesCommonFilters(i)),
-    [inactiveInscricoes, eloFilter, phoneQuery, query, recentFilter],
+    [inactiveInscricoes, matchesCommonFilters],
   );
 
   const sortedFilteredActiveSemTime = useMemo(() => {
@@ -699,7 +739,7 @@ export function VctInscricoesPanel({
     return [...filteredActiveSemTime].sort((a, b) => {
       let cmp = 0;
       if (column === "elo") {
-        cmp = eloScore(a.elo) - eloScore(b.elo);
+        cmp = eloScore(a.elo, gameElos) - eloScore(b.elo, gameElos);
       } else if (column === "nome") {
         cmp = a.nome.localeCompare(b.nome, "pt-BR");
       } else if (column === "inscricao") {
@@ -709,21 +749,11 @@ export function VctInscricoesPanel({
       }
       return direction === "asc" ? cmp : -cmp;
     });
-  }, [filteredActiveSemTime, sortConfig]);
+  }, [filteredActiveSemTime, gameElos, sortConfig]);
 
   useEffect(() => {
     setVisibleActiveCount(INSCRITOS_PAGE_SIZE);
   }, [sortedFilteredActiveSemTime]);
-
-  const visibleActiveSemTime = useMemo(
-    () => sortedFilteredActiveSemTime.slice(0, visibleActiveCount),
-    [sortedFilteredActiveSemTime, visibleActiveCount],
-  );
-
-  const visibleInactive = useMemo(
-    () => filteredInactive.slice(0, visibleInactiveCount),
-    [filteredInactive, visibleInactiveCount],
-  );
 
   useEffect(() => {
     setVisibleInactiveCount(INSCRITOS_PAGE_SIZE);
@@ -751,7 +781,7 @@ export function VctInscricoesPanel({
       const members = activeInscricoes.filter((i) => i.time === t);
       const avg =
         members.length > 0
-          ? members.reduce((acc, m) => acc + eloScore(m.elo), 0) / members.length
+          ? members.reduce((acc, m) => acc + eloScore(m.elo, gameElos), 0) / members.length
           : 0;
       const roles = new Set<string>();
       members.forEach((m) => {
@@ -759,7 +789,7 @@ export function VctInscricoesPanel({
       });
       return { time: t, members, avg, roles };
     });
-  }, [activeInscricoes, timesArray]);
+  }, [activeInscricoes, gameElos, timesArray]);
 
   const selectedGroup = useMemo(() => {
     if (groupModalTime === null) return null;
@@ -768,7 +798,7 @@ export function VctInscricoesPanel({
 
   async function reloadInscricoes() {
     const updated = await clientApi<{ inscricoes: VctInscricaoSummary[] }>(
-      "/vct/inscricoes",
+      withModalidade("/vct/inscricoes"),
     );
     setInscricoes(updated.inscricoes);
   }
@@ -878,7 +908,7 @@ export function VctInscricoesPanel({
       const next = { ...current, [field]: value };
       if (field === "elo") {
         const nextElo = String(value);
-        if (next.pico && eloScore(next.pico) < eloScore(nextElo)) {
+        if (next.pico && eloScore(next.pico, gameElos) < eloScore(nextElo, gameElos)) {
           next.pico = "";
         }
       }
@@ -903,11 +933,11 @@ export function VctInscricoesPanel({
 
     setEditPending(true);
     try {
-      if (eloScore(editForm.elo) < 0 || eloScore(editForm.pico) < 0) {
+      if (eloScore(editForm.elo, gameElos) < 0 || eloScore(editForm.pico, gameElos) < 0) {
         toast.error("Elo inválido.");
         return;
       }
-      if (eloScore(editForm.pico) < eloScore(editForm.elo)) {
+      if (eloScore(editForm.pico, gameElos) < eloScore(editForm.elo, gameElos)) {
         toast.error("O pico de elo não pode ser menor que o elo atual.");
         return;
       }
@@ -922,6 +952,7 @@ export function VctInscricoesPanel({
         valorantCardWide: editForm.valorantCardWide,
         valorantCurrentRank: editForm.valorantCurrentRank,
         valorantPeakRank: editForm.valorantPeakRank,
+        modalidade,
         nome: editForm.nome,
         nick: editForm.nick,
         email: editForm.email,
@@ -1137,7 +1168,7 @@ export function VctInscricoesPanel({
     try {
       await clientApi<{ time: VctTimeSummary }>(`/vct/time/${nextNumero}`, {
         method: "PUT",
-        body: JSON.stringify({ nome: "" }),
+        body: JSON.stringify({ nome: "", modalidade }),
       });
       setNumTimes(nextNumero);
       setTimeNames((current) => ({ ...current, [nextNumero]: current[nextNumero] ?? "" }));
@@ -1166,7 +1197,7 @@ export function VctInscricoesPanel({
     }
     setAutoPending(true);
     try {
-      const res = await clientApi<{ atribuidos: number }>("/vct/times/auto", {
+      const res = await clientApi<{ atribuidos: number }>(withModalidade("/vct/times/auto"), {
         method: "POST",
         body: JSON.stringify(buildTeamFormationPayload()),
       });
@@ -1187,7 +1218,7 @@ export function VctInscricoesPanel({
     setPendingTimes((prev) => new Set(prev).add(numero));
     try {
       const res = await clientApi<{ atribuidos: number }>(
-        `/vct/times/${numero}/fill`,
+        withModalidade(`/vct/times/${numero}/fill`),
         {
           method: "POST",
           body: JSON.stringify(buildTeamFormationPayload(numero)),
@@ -1215,7 +1246,7 @@ export function VctInscricoesPanel({
   async function handleClearTeam(numero: number) {
     setPendingTimes((prev) => new Set(prev).add(numero));
     try {
-      await clientApi<{ removidos: number }>(`/vct/times/${numero}/clear`, {
+      await clientApi<{ removidos: number }>(withModalidade(`/vct/times/${numero}/clear`), {
         method: "POST",
       });
       await reloadInscricoes();
@@ -1322,7 +1353,7 @@ export function VctInscricoesPanel({
     try {
       await clientApi<{ time: VctTimeSummary }>(`/vct/time/${numero}`, {
         method: "PUT",
-        body: JSON.stringify({ nome }),
+        body: JSON.stringify({ nome, modalidade }),
       });
     } catch (error) {
       toast.error(
@@ -1812,7 +1843,7 @@ export function VctInscricoesPanel({
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring md:w-36"
             >
               <option value="all">Todos elos</option>
-              {ELOS.map((elo) => (
+              {gameElos.map((elo) => (
                 <option key={elo} value={elo}>
                   {elo}
                 </option>
@@ -2034,7 +2065,7 @@ export function VctInscricoesPanel({
                                   }))
                                 }
                               >
-                                {TEAM_ELO_FILTERS.map((elo) => (
+                                {teamEloFilters.map((elo) => (
                                   <DropdownMenuRadioItem key={elo} value={elo}>
                                     {elo}
                                   </DropdownMenuRadioItem>
@@ -2090,7 +2121,7 @@ export function VctInscricoesPanel({
                     className="h-8 text-sm"
                   />
                   <div className="flex flex-wrap gap-1">
-                    {FUNCOES.map((f) => (
+                    {gameFuncoes.map((f) => (
                       <Badge
                         key={f}
                         variant={t.roles.has(f) ? "default" : "outline"}
@@ -2128,7 +2159,11 @@ export function VctInscricoesPanel({
                                 <PlayerNickWithNotes
                                   player={m}
                                   onCopyClick={(value) => handleCopyValue("Nick", value)}
-                                  onMiddleClick={handleQuickValorantLookup}
+                                  onMiddleClick={
+                                    gameConfig.hasValorantLookup
+                                      ? handleQuickValorantLookup
+                                      : undefined
+                                  }
                                   className={cn(
                                     "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
                                     m.observacoes && "cursor-help",
@@ -2202,7 +2237,9 @@ export function VctInscricoesPanel({
                                   </button>
                                 </Badge>
                               </div>
-                              <ValorantProfileSummary player={m} />
+                              {gameConfig.hasValorantLookup ? (
+                                <ValorantProfileSummary player={m} />
+                              ) : null}
                               {m.observacoes ? (
                                 <div className="flex gap-2 rounded-md border border-border/50 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
                                   <StickyNoteIcon className="mt-0.5 size-3 shrink-0" />
@@ -2372,6 +2409,7 @@ export function VctInscricoesPanel({
             </DialogHeader>
 
             <div className="max-h-[68vh] space-y-5 overflow-y-auto pr-1">
+              {gameConfig.hasValorantLookup ? (
               <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3">
                 <label className="space-y-1.5">
                   <span className="text-xs font-medium text-muted-foreground">Riot ID</span>
@@ -2417,6 +2455,7 @@ export function VctInscricoesPanel({
                 </div>
                 <ValorantEditPreview form={editForm} />
               </div>
+              ) : null}
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="space-y-1.5">
@@ -2461,7 +2500,7 @@ export function VctInscricoesPanel({
                     onChange={(e) => updateEditForm("elo", e.target.value)}
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
                   >
-                    {ELOS.map((elo) => (
+                    {gameElos.map((elo) => (
                       <option key={elo} value={elo}>
                         {elo}
                       </option>
@@ -2475,11 +2514,11 @@ export function VctInscricoesPanel({
                     onChange={(e) => updateEditForm("pico", e.target.value)}
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
                   >
-                    {ELOS.map((elo) => (
+                    {gameElos.map((elo) => (
                       <option
                         key={elo}
                         value={elo}
-                        disabled={eloScore(elo) < eloScore(editForm.elo)}
+                        disabled={eloScore(elo, gameElos) < eloScore(editForm.elo, gameElos)}
                       >
                         {elo}
                       </option>
@@ -2493,7 +2532,7 @@ export function VctInscricoesPanel({
                     onChange={(e) => updateEditForm("funcaoPrimaria", e.target.value)}
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
                   >
-                    {FUNCOES.map((funcao) => (
+                    {gameFuncoes.map((funcao) => (
                       <option key={funcao} value={funcao}>
                         {funcao}
                       </option>
@@ -2507,7 +2546,7 @@ export function VctInscricoesPanel({
                     onChange={(e) => updateEditForm("funcaoSecundaria", e.target.value)}
                     className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
                   >
-                    {FUNCOES.map((funcao) => (
+                    {gameFuncoes.map((funcao) => (
                       <option key={funcao} value={funcao}>
                         {funcao}
                       </option>
@@ -2765,7 +2804,7 @@ export function VctInscricoesPanel({
             <DialogHeader>
               <DialogTitle>Remover inscricao</DialogTitle>
               <DialogDescription>
-                Esta acao remove {deleteTarget.nick} da base do VCT e tambem tira o jogador de qualquer time.
+                Esta acao remove {deleteTarget.nick} da base de {gameConfig.label} e tambem tira o jogador de qualquer time.
               </DialogDescription>
             </DialogHeader>
 

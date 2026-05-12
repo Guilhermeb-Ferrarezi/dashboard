@@ -52,13 +52,13 @@ const gamesNavigation = [
     href: "/counter-strike",
     label: "Counter-strike",
     icon: ShieldIcon,
-    children: [{ href: "/counter-strike", label: "Painel" }],
+    children: [{ href: "/counter-strike/inscricoes", label: "Inscricoes" }],
   },
   {
     href: "/league-of-legends",
     label: "League of legends",
     icon: SparklesIcon,
-    children: [{ href: "/league-of-legends", label: "Painel" }],
+    children: [{ href: "/league-of-legends/inscricoes", label: "Inscricoes" }],
   },
 ] as const;
 
@@ -128,24 +128,7 @@ export function AppShell({
     };
   }, []);
 
-  useEffect(() => {
-    if (isAdminSection) {
-      setIsAdminMenuOpen(true);
-    }
-  }, [isAdminSection]);
-
-  useEffect(() => {
-    setOpenGameMenus(
-      Object.fromEntries(
-        gamesNavigation.map((section) => [
-          section.href,
-          section.children.some(
-            (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
-          ),
-        ]),
-      ),
-    );
-  }, [pathname]);
+  const adminMenuOpen = isAdminSection || isAdminMenuOpen;
 
   return (
     <SidebarProvider>
@@ -202,7 +185,7 @@ export function AppShell({
                   const isActive = item.children.some(
                     (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
                   );
-                  const isOpen = openGameMenus[item.href] ?? isActive;
+                  const isOpen = isActive || (openGameMenus[item.href] ?? false);
 
                   return (
                     <SidebarMenuItem key={item.href}>
@@ -256,7 +239,7 @@ export function AppShell({
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         isActive={isAdminSection}
-                        aria-expanded={isAdminMenuOpen}
+                        aria-expanded={adminMenuOpen}
                         aria-controls="admin-sidebar-submenu"
                         onClick={() => setIsAdminMenuOpen((value) => !value)}
                         tooltip="Administracao"
@@ -266,11 +249,11 @@ export function AppShell({
                         <ChevronRightIcon
                           className={cn(
                             "ml-auto size-4 transition-transform",
-                            isAdminMenuOpen && "rotate-90",
+                            adminMenuOpen && "rotate-90",
                           )}
                         />
                       </SidebarMenuButton>
-                      {isAdminMenuOpen ? (
+                      {adminMenuOpen ? (
                         <SidebarMenuSub id="admin-sidebar-submenu">
                           {adminNavigation.map((item) => (
                             <SidebarMenuSubItem key={item.href}>
