@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/portal/app-shell";
 import { ProjectLauncher } from "@/components/portal/project-launcher";
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/api-server";
 import { requireSession } from "@/lib/session";
 import type { PortalProject } from "@/types/portal";
 

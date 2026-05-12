@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ApiError, serverApi } from "@/lib/api";
+import { ApiError, serverApi } from "@/lib/api-server";
 
 interface ExchangeResponse {
   user: {

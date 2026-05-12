@@ -74,7 +74,7 @@ export function LoginForm({ error }: LoginFormProps) {
           <div className="flex items-center gap-4">
             <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
               <Image
-                src="/web/public/assets/logo.png"
+                src="/assets/Logo.png"
                 alt="Santos Tech"
                 width={48}
                 height={48}

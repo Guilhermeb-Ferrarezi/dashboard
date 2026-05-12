@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { serverApi } from "@/lib/api";
+import { serverApi } from "@/lib/api-server";
 import type { ThemePreferences } from "@/lib/theme-preferences";
 
 export interface SessionUser {

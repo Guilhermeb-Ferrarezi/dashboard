@@ -1,69 +1,28 @@
-import { API_BASE_URL } from "@/lib/env";
+import { parseApiResponse } from "@/lib/api-core";
 
-type ApiFetchOptions = RequestInit & {
-  cookieHeader?: string;
-};
+const DEFAULT_CLIENT_API_BASE_URL = "/api";
 
-export class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function parseApiResponse<T>(response: Response): Promise<T> {
-  const contentType = response.headers.get("content-type") ?? "";
-  const isJson = contentType.includes("application/json");
-  const payload = isJson ? await response.json() : await response.text();
-
-  if (!response.ok) {
-    const message =
-      typeof payload === "string"
-        ? payload
-        : payload?.message || "Request failed.";
-    throw new ApiError(message, response.status);
-  }
-
-  return payload as T;
+function resolveClientApiBaseUrl() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL;
+  return (apiUrl?.replace(/\/$/, "") || DEFAULT_CLIENT_API_BASE_URL);
 }
 
 export async function clientApi<T>(
   endpoint: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
+  const response = await fetch(
+    `${resolveClientApiBaseUrl()}${endpoint}`,
+    {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+      credentials: "include",
     },
-    credentials: "include",
-  });
+  );
 
   return parseApiResponse<T>(response);
 }
 
-export async function serverApi<T>(
-  endpoint: string,
-  init: ApiFetchOptions = {},
-): Promise<T> {
-  const headers = new Headers(init.headers);
-
-  if (!headers.has("Content-Type") && init.method && init.method !== "GET") {
-    headers.set("Content-Type", "application/json");
-  }
-
-  if (init.cookieHeader) {
-    headers.set("Cookie", init.cookieHeader);
-  }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...init,
-    headers,
-    cache: init.cache ?? "no-store",
-  });
-
-  return parseApiResponse<T>(response);
-}
