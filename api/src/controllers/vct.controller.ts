@@ -3,6 +3,11 @@ import type { Request, Response } from "express";
 import { VctInscricao } from "../models/VctInscricao";
 import { VctTime } from "../models/VctTime";
 import {
+  VCT_INSCRICAO_STATUS,
+  normalizeVctInscricaoStatus,
+  type VctInscricaoStatus,
+} from "../lib/vct-inscricao-status";
+import {
   getFormationFiltersByTeamFromBody,
   getFormationFiltersFromBody,
   getEloScore as scoreElo,
@@ -51,6 +56,17 @@ const CREATE_REQUIRED_INSCRICAO_FIELDS = [
 
 const OPTIONAL_INSCRICAO_FIELDS = [
   "cidade",
+  "diasTreino",
+  "diasSemana",
+  "horariosTreino",
+  "melhorJanela",
+  "compromisso",
+  "rotinaFixa",
+  "horariosDefinidos",
+  "capitao",
+  "presencial",
+  "deslocamento",
+  "autorizacaoContato",
   "riotName",
   "riotTag",
   "riotPuuid",
@@ -63,6 +79,7 @@ const OPTIONAL_INSCRICAO_FIELDS = [
   "tags",
   "observacoes",
   "highlightColor",
+  "status",
   "time",
 ] as const;
 
@@ -135,6 +152,14 @@ function normalizeTags(value: unknown) {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .slice(0, 12);
+}
+
+function normalizeStatusField(value: unknown) {
+  return normalizeVctInscricaoStatus(value);
+}
+
+function isActiveInscricao(inscricao: VctInscricaoLike & { status?: unknown }) {
+  return normalizeVctInscricaoStatus(inscricao.status) === VCT_INSCRICAO_STATUS.ACTIVE;
 }
 
 function duplicateFieldMessage(error: unknown) {
@@ -354,6 +379,7 @@ export async function criarInscricao(req: Request, res: Response) {
       valorantCardWide: typeof valorantCardWide === "string" ? valorantCardWide.trim() : "",
       valorantCurrentRank: typeof valorantCurrentRank === "string" ? valorantCurrentRank.trim() : "",
       valorantPeakRank: typeof valorantPeakRank === "string" ? valorantPeakRank.trim() : "",
+      status: VCT_INSCRICAO_STATUS.ACTIVE,
     });
     await inscricao.save();
     res.status(201).json({ ok: true, message: "Inscrição realizada com sucesso.", id: inscricao._id });
@@ -464,6 +490,7 @@ export async function atualizarInscricao(req: Request, res: Response) {
   update.tags = normalizeTags(req.body.tags);
   update.observacoes = typeof req.body.observacoes === "string" ? req.body.observacoes.trim() : "";
   update.highlightColor = typeof req.body.highlightColor === "string" ? req.body.highlightColor.trim() : "";
+  update.status = normalizeStatusField(req.body.status);
 
   if (getEloScore(String(update.elo)) < 0 || getEloScore(String(update.pico)) < 0) {
     res.status(400).json({ ok: false, message: "Elo inválido." });
@@ -530,6 +557,42 @@ export async function atualizarTime(req: Request, res: Response) {
   res.json({ ok: true, inscricao });
 }
 
+function normalizeIdList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function atualizarStatusInterno(ids: string[], status: VctInscricaoStatus) {
+  const update: Record<string, unknown> = { status };
+  if (status === VCT_INSCRICAO_STATUS.INACTIVE) {
+    update.time = null;
+  }
+
+  return VctInscricao.updateMany({ _id: { $in: ids } }, update);
+}
+
+export async function atualizarStatusInscricao(req: Request, res: Response) {
+  const { id } = req.params;
+  const status = normalizeStatusField(req.body.status);
+  const result = await atualizarStatusInterno([id], status);
+  res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
+}
+
+export async function atualizarStatusInscricoes(req: Request, res: Response) {
+  const ids = normalizeIdList(req.body.ids);
+  if (ids.length === 0) {
+    res.status(400).json({ ok: false, message: "Selecione pelo menos uma inscrição." });
+    return;
+  }
+
+  const status = normalizeStatusField(req.body.status);
+  const result = await atualizarStatusInterno(ids, status);
+  res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
+}
+
 export async function listarTimes(_req: Request, res: Response) {
   const times = await VctTime.find().sort({ numero: 1 }).lean();
   res.json({ ok: true, times });
@@ -567,7 +630,7 @@ export async function preencherTime(req: Request, res: Response) {
   }
 
   const inscricoes = await VctInscricao.find().lean();
-  const jogadores = inscricoes as unknown as VctInscricaoLike[];
+  const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
   const filters = getFormationFiltersFromBody(req.body) as VctFormationFilters;
   const team = buildTeamState(jogadores, numero);
   const { vacancies } = team;
@@ -620,7 +683,7 @@ export async function atribuirTimesAutomatico(_req: Request, res: Response) {
   const teamFilters = getFormationFiltersByTeamFromBody(_req.body);
 
   const inscricoes = await VctInscricao.find().lean();
-  const jogadores = inscricoes as unknown as VctInscricaoLike[];
+  const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
   const hasSoftFilters = Object.values(teamFilters).some(
     (filters) => filters.sameTrainingDays || filters.sameAvailability,
   );

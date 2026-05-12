@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownIcon,
   ArrowUpDownIcon,
@@ -36,6 +36,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -78,14 +79,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { clientApi } from "@/lib/api";
+import {
+  HIGHLIGHT_COLOR_OPTIONS,
+  getHighlightColorClass,
+  getHighlightColorPickerValue,
+  getHighlightColorStyle,
+} from "@/lib/highlight-colors";
+import {
+  VCT_INSCRICAO_STATUS,
+  getVctInscricaoStatusLabel,
+  isVctInscricaoInactive,
+} from "@/lib/vct-inscricao-status";
 import { cn } from "@/lib/utils";
 import type { VctInscricaoSummary, VctTimeSummary } from "@/types/portal";
+import { HexColorInput, HexColorPicker } from "react-colorful";
 
 interface VctInscricoesPanelProps {
   initialInscricoes: VctInscricaoSummary[];
@@ -138,39 +152,6 @@ const RECENT_FILTERS = [
   { label: "24h", value: "24h", minutes: 1440 },
 ] as const;
 const INSCRITOS_PAGE_SIZE = 10;
-const HIGHLIGHT_COLORS = [
-  { label: "Sem cor", value: "", className: "", swatch: "bg-background" },
-  {
-    label: "Amarelo",
-    value: "yellow",
-    className: "border-amber-500/35 bg-amber-500/12 hover:bg-amber-500/18",
-    swatch: "bg-amber-400",
-  },
-  {
-    label: "Verde",
-    value: "green",
-    className: "border-emerald-500/35 bg-emerald-500/12 hover:bg-emerald-500/18",
-    swatch: "bg-emerald-400",
-  },
-  {
-    label: "Azul",
-    value: "blue",
-    className: "border-sky-500/35 bg-sky-500/12 hover:bg-sky-500/18",
-    swatch: "bg-sky-400",
-  },
-  {
-    label: "Rosa",
-    value: "pink",
-    className: "border-rose-500/35 bg-rose-500/12 hover:bg-rose-500/18",
-    swatch: "bg-rose-400",
-  },
-  {
-    label: "Roxo",
-    value: "purple",
-    className: "border-violet-500/35 bg-violet-500/12 hover:bg-violet-500/18",
-    swatch: "bg-violet-400",
-  },
-] as const;
 const TAG_COLOR_CLASSES: Record<string, string> = {
   confirmado: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
   pendente: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
@@ -251,6 +232,18 @@ type VctEditForm = {
   pico: string;
   funcaoPrimaria: string;
   funcaoSecundaria: string;
+  cidade: string;
+  diasTreino: string;
+  diasSemana: string;
+  horariosTreino: string;
+  melhorJanela: string;
+  compromisso: string;
+  rotinaFixa: string;
+  horariosDefinidos: string;
+  capitao: string;
+  presencial: string;
+  deslocamento: string;
+  autorizacaoContato: string;
   tagsText: string;
   observacoes: string;
   highlightColor: string;
@@ -299,10 +292,6 @@ function getPlayerTags(player: VctInscricaoSummary) {
   return player.tags ?? [];
 }
 
-function getHighlightColorClass(value?: string) {
-  return HIGHLIGHT_COLORS.find((color) => color.value === value)?.className ?? "";
-}
-
 function getEditForm(player: VctInscricaoSummary): VctEditForm {
   const riotName = player.riotName ?? "";
   const riotTag = player.riotTag ?? "";
@@ -326,6 +315,18 @@ function getEditForm(player: VctInscricaoSummary): VctEditForm {
     pico: player.pico,
     funcaoPrimaria: player.funcaoPrimaria,
     funcaoSecundaria: player.funcaoSecundaria,
+    cidade: player.cidade ?? "",
+    diasTreino: player.diasTreino ?? "",
+    diasSemana: player.diasSemana ?? "",
+    horariosTreino: player.horariosTreino ?? "",
+    melhorJanela: player.melhorJanela ?? "",
+    compromisso: player.compromisso ?? "",
+    rotinaFixa: player.rotinaFixa ?? "",
+    horariosDefinidos: player.horariosDefinidos ?? "",
+    capitao: player.capitao ?? "",
+    presencial: player.presencial ?? "",
+    deslocamento: player.deslocamento ?? "",
+    autorizacaoContato: player.autorizacaoContato ?? "",
     tagsText: getPlayerTags(player).join(", "),
     observacoes: player.observacoes ?? "",
     highlightColor: player.highlightColor ?? "",
@@ -625,7 +626,6 @@ export function VctInscricoesPanel({
     for (const t of initialTimes) map[t.numero] = createDefaultTeamFormationFilters();
     return map;
   });
-  const [visibleSemTimeCount, setVisibleSemTimeCount] = useState(INSCRITOS_PAGE_SIZE);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [pendingTimes, setPendingTimes] = useState<Set<number>>(new Set());
   const [autoPending, setAutoPending] = useState(false);
@@ -638,36 +638,65 @@ export function VctInscricoesPanel({
   const [riotLookupPending, setRiotLookupPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VctInscricaoSummary | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [inscricoesTab, setInscricoesTab] = useState<"ativas" | "fora">("ativas");
+  const [selectedInscricoes, setSelectedInscricoes] = useState<Set<string>>(new Set());
+  const [visibleActiveCount, setVisibleActiveCount] = useState(INSCRITOS_PAGE_SIZE);
+  const [visibleInactiveCount, setVisibleInactiveCount] = useState(INSCRITOS_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState<{ column: "elo" | "nome" | "inscricao"; direction: "asc" | "desc" } | null>(null);
+  const inscricoesScrollRefs = useRef<Record<"ativas" | "fora", HTMLDivElement | null>>({
+    ativas: null,
+    fora: null,
+  });
+  const inscricoesScrollPositions = useRef<Record<"ativas" | "fora", number>>({
+    ativas: 0,
+    fora: 0,
+  });
 
-  const semTime = useMemo(
-    () => inscricoes.filter((i) => i.time === null || i.time === undefined),
+  const activeInscricoes = useMemo(
+    () => inscricoes.filter((i) => !isVctInscricaoInactive(i.status)),
     [inscricoes],
   );
 
-  const filteredSemTime = useMemo(() => {
+  const inactiveInscricoes = useMemo(
+    () => inscricoes.filter((i) => isVctInscricaoInactive(i.status)),
+    [inscricoes],
+  );
+
+  const activeSemTime = useMemo(
+    () => activeInscricoes.filter((i) => i.time === null || i.time === undefined),
+    [activeInscricoes],
+  );
+
+  function matchesCommonFilters(i: VctInscricaoSummary) {
     const q = query.trim().toLowerCase();
     const phone = onlyDigits(phoneQuery);
-
-    return semTime.filter((i) => {
-      const matchesText =
-        !q ||
-        [i.nome, i.nick, i.email, i.whatsapp, i.instagram, i.elo, i.pico, i.funcaoPrimaria, i.funcaoSecundaria, i.observacoes, ...(i.tags ?? [])]
+    const matchesText =
+      !q ||
+      [i.nome, i.nick, i.email, i.whatsapp, i.instagram, i.elo, i.pico, i.funcaoPrimaria, i.funcaoSecundaria, i.observacoes, ...(i.tags ?? [])]
         .join(" ")
         .toLowerCase()
         .includes(q);
-      const matchesPhone = !phone || onlyDigits(i.whatsapp).includes(phone);
-      const matchesRecent = isWithinRecentFilter(i.createdAt, recentFilter);
-      const matchesElo = eloFilter === "all" || i.elo === eloFilter;
+    const matchesPhone = !phone || onlyDigits(i.whatsapp).includes(phone);
+    const matchesRecent = isWithinRecentFilter(i.createdAt, recentFilter);
+    const matchesElo = eloFilter === "all" || i.elo === eloFilter;
 
-      return matchesText && matchesPhone && matchesRecent && matchesElo;
-    });
-  }, [eloFilter, phoneQuery, query, recentFilter, semTime]);
+    return matchesText && matchesPhone && matchesRecent && matchesElo;
+  }
 
-  const sortedFilteredSemTime = useMemo(() => {
-    if (!sortConfig) return filteredSemTime;
+  const filteredActiveSemTime = useMemo(
+    () => activeSemTime.filter((i) => matchesCommonFilters(i)),
+    [activeSemTime, eloFilter, phoneQuery, query, recentFilter],
+  );
+
+  const filteredInactive = useMemo(
+    () => inactiveInscricoes.filter((i) => matchesCommonFilters(i)),
+    [inactiveInscricoes, eloFilter, phoneQuery, query, recentFilter],
+  );
+
+  const sortedFilteredActiveSemTime = useMemo(() => {
+    if (!sortConfig) return filteredActiveSemTime;
     const { column, direction } = sortConfig;
-    return [...filteredSemTime].sort((a, b) => {
+    return [...filteredActiveSemTime].sort((a, b) => {
       let cmp = 0;
       if (column === "elo") {
         cmp = eloScore(a.elo) - eloScore(b.elo);
@@ -680,16 +709,25 @@ export function VctInscricoesPanel({
       }
       return direction === "asc" ? cmp : -cmp;
     });
-  }, [filteredSemTime, sortConfig]);
+  }, [filteredActiveSemTime, sortConfig]);
 
   useEffect(() => {
-    setVisibleSemTimeCount(INSCRITOS_PAGE_SIZE);
-  }, [sortedFilteredSemTime]);
+    setVisibleActiveCount(INSCRITOS_PAGE_SIZE);
+  }, [sortedFilteredActiveSemTime]);
 
-  const visibleSemTime = useMemo(
-    () => sortedFilteredSemTime.slice(0, visibleSemTimeCount),
-    [sortedFilteredSemTime, visibleSemTimeCount],
+  const visibleActiveSemTime = useMemo(
+    () => sortedFilteredActiveSemTime.slice(0, visibleActiveCount),
+    [sortedFilteredActiveSemTime, visibleActiveCount],
   );
+
+  const visibleInactive = useMemo(
+    () => filteredInactive.slice(0, visibleInactiveCount),
+    [filteredInactive, visibleInactiveCount],
+  );
+
+  useEffect(() => {
+    setVisibleInactiveCount(INSCRITOS_PAGE_SIZE);
+  }, [filteredInactive]);
 
   const timesArray = useMemo(
     () => Array.from({ length: numTimes }, (_, i) => i + 1),
@@ -710,7 +748,7 @@ export function VctInscricoesPanel({
 
   const teamStats = useMemo(() => {
     return timesArray.map((t) => {
-      const members = inscricoes.filter((i) => i.time === t);
+      const members = activeInscricoes.filter((i) => i.time === t);
       const avg =
         members.length > 0
           ? members.reduce((acc, m) => acc + eloScore(m.elo), 0) / members.length
@@ -721,7 +759,7 @@ export function VctInscricoesPanel({
       });
       return { time: t, members, avg, roles };
     });
-  }, [inscricoes, timesArray]);
+  }, [activeInscricoes, timesArray]);
 
   const selectedGroup = useMemo(() => {
     if (groupModalTime === null) return null;
@@ -790,7 +828,46 @@ export function VctInscricoesPanel({
     }
   }
 
+  async function handleStatusChange(ids: string[], status: "active" | "inactive") {
+    if (ids.length === 0) return;
+
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+
+    try {
+      await clientApi<{ atualizados: number; status: "active" | "inactive" }>(
+        "/vct/inscricoes/status",
+        {
+          method: "POST",
+          body: JSON.stringify({ ids, status }),
+        },
+      );
+      await reloadInscricoes();
+      setSelectedInscricoes(new Set());
+      toast.success(
+        status === VCT_INSCRICAO_STATUS.INACTIVE
+          ? "Inscrições movidas para fora do campeonato."
+          : "Inscrições reativadas.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar o status.",
+      );
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }
+
   function openEditPlayer(player: VctInscricaoSummary) {
+    setDetailsPlayer(null);
+    setDetailsExpanded(false);
     setEditingPlayer(player);
     setEditForm(getEditForm(player));
   }
@@ -854,6 +931,18 @@ export function VctInscricoesPanel({
         pico: editForm.pico,
         funcaoPrimaria: editForm.funcaoPrimaria,
         funcaoSecundaria: editForm.funcaoSecundaria,
+        cidade: editForm.cidade,
+        diasTreino: editForm.diasTreino,
+        diasSemana: editForm.diasSemana,
+        horariosTreino: editForm.horariosTreino,
+        melhorJanela: editForm.melhorJanela,
+        compromisso: editForm.compromisso,
+        rotinaFixa: editForm.rotinaFixa,
+        horariosDefinidos: editForm.horariosDefinidos,
+        capitao: editForm.capitao,
+        presencial: editForm.presencial,
+        deslocamento: editForm.deslocamento,
+        autorizacaoContato: editForm.autorizacaoContato,
         tags: parseTags(editForm.tagsText),
         observacoes: editForm.observacoes,
         highlightColor: editForm.highlightColor,
@@ -1071,7 +1160,7 @@ export function VctInscricoesPanel({
   }
 
   async function handleAutoForm() {
-    if (semTime.length === 0) {
+    if (activeSemTime.length === 0) {
       toast.info("Não há inscritos sem time.");
       return;
     }
@@ -1177,18 +1266,55 @@ export function VctInscricoesPanel({
     });
   }
 
-  function handleInscritosScroll(currentTarget: HTMLDivElement) {
+  useLayoutEffect(() => {
+    const currentTarget = inscricoesScrollRefs.current[inscricoesTab];
+    if (currentTarget) {
+      currentTarget.scrollTop = inscricoesScrollPositions.current[inscricoesTab];
+    }
+  }, [inscricoesTab, selectedInscricoes]);
+
+  function preserveInscricoesScroll(tab: "ativas" | "fora") {
+    const currentTarget = inscricoesScrollRefs.current[tab];
+    if (currentTarget) {
+      inscricoesScrollPositions.current[tab] = currentTarget.scrollTop;
+    }
+  }
+
+  function toggleInscricaoSelection(tab: "ativas" | "fora", id: string) {
+    preserveInscricoesScroll(tab);
+    setSelectedInscricoes((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function setInscricoesSelection(tab: "ativas" | "fora", ids: string[]) {
+    preserveInscricoesScroll(tab);
+    setSelectedInscricoes(new Set(ids));
+  }
+
+  function handleInscritosScroll(currentTarget: HTMLDivElement, tab: "ativas" | "fora") {
+    inscricoesScrollPositions.current[tab] = currentTarget.scrollTop;
     const isNearBottom =
       currentTarget.scrollTop + currentTarget.clientHeight >= currentTarget.scrollHeight - 120;
 
     if (!isNearBottom) return;
 
-    handleLoadMoreInscritos();
+    handleLoadMoreInscritos(tab);
   }
 
-  function handleLoadMoreInscritos() {
-    setVisibleSemTimeCount((current) =>
-      Math.min(current + INSCRITOS_PAGE_SIZE, sortedFilteredSemTime.length),
+  function handleLoadMoreInscritos(tab: "ativas" | "fora") {
+    if (tab === "ativas") {
+      setVisibleActiveCount((current) =>
+        Math.min(current + INSCRITOS_PAGE_SIZE, sortedFilteredActiveSemTime.length),
+      );
+      return;
+    }
+
+    setVisibleInactiveCount((current) =>
+      Math.min(current + INSCRITOS_PAGE_SIZE, filteredInactive.length),
     );
   }
 
@@ -1252,6 +1378,21 @@ export function VctInscricoesPanel({
           <PencilIcon />
           Editar dados
         </Item>
+        <Item
+          onClick={() =>
+            handleStatusChange(
+              [player._id],
+              isVctInscricaoInactive(player.status)
+                ? VCT_INSCRICAO_STATUS.ACTIVE
+                : VCT_INSCRICAO_STATUS.INACTIVE,
+            )
+          }
+        >
+          <UsersIcon />
+          {isVctInscricaoInactive(player.status)
+            ? "Reativar inscrição"
+            : "Mover para fora do campeonato"}
+        </Item>
         <Item onClick={() => openDetailsModal(player)}>
           <InboxIcon />
           Ver detalhes
@@ -1302,9 +1443,320 @@ export function VctInscricoesPanel({
     );
   }
 
+  function InscricoesTable({
+    tab,
+    players,
+    visibleCount,
+    onLoadMore,
+    allowSelection,
+    showTimeSelect,
+    emptyMessage,
+    bulkActionLabel,
+    onBulkAction,
+  }: {
+    tab: "ativas" | "fora";
+    players: VctInscricaoSummary[];
+    visibleCount: number;
+    onLoadMore: () => void;
+    allowSelection: boolean;
+    showTimeSelect: boolean;
+    emptyMessage: string;
+    bulkActionLabel: string;
+    onBulkAction: () => void;
+  }) {
+    const visiblePlayers = players.slice(0, visibleCount);
+    const selectedCount = players.filter((player) => selectedInscricoes.has(player._id)).length;
+    const allSelected = players.length > 0 && selectedCount === players.length;
+    const selectionActive = allowSelection && selectedCount > 0;
+
+    return (
+      <Card className="border-border/60 bg-card/90">
+        <CardContent className="relative p-3">
+          {allowSelection && selectedCount > 0 ? (
+            <div
+              className="absolute inset-x-3 top-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-card/95 px-3 py-2 shadow-lg backdrop-blur"
+            >
+              <div className="text-xs text-muted-foreground">
+                {selectedCount} inscrição{selectedCount > 1 ? "ões" : ""} selecionada
+                {selectedCount > 1 ? "s" : ""}
+              </div>
+              <Button type="button" size="sm" onClick={onBulkAction}>
+                {bulkActionLabel}
+              </Button>
+            </div>
+          ) : null}
+
+          {players.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
+              <UsersIcon className="size-8" />
+              <p className="text-sm">{emptyMessage}</p>
+            </div>
+          ) : (
+            <div
+              ref={(node) => {
+                inscricoesScrollRefs.current[tab] = node;
+              }}
+              className="max-h-[640px] overflow-auto rounded-lg"
+              onScroll={(event) => handleInscritosScroll(event.currentTarget, tab)}
+            >
+              <Table className="w-full table-fixed text-xs">
+                <colgroup>
+                  {allowSelection ? <col className="w-[4%]" /> : null}
+                  <col className="w-[31%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[14%]" />
+                  <col className={showTimeSelect ? "w-[12%]" : "w-[12%]"} />
+                  <col className="w-[13%]" />
+                </colgroup>
+                <TableHeader>
+                  <TableRow>
+                    {allowSelection ? (
+                      <TableHead className="h-8 py-1.5 text-center">
+                        <Checkbox
+                          checked={
+                            allSelected
+                              ? true
+                              : selectedCount > 0
+                                ? "indeterminate"
+                                : false
+                          }
+                          onCheckedChange={(checked) =>
+                            setInscricoesSelection(
+                              tab,
+                              checked ? players.map((player) => player._id) : [],
+                            )
+                          }
+                          className={cn(
+                            "mx-auto transition-opacity",
+                            selectionActive ? "opacity-100" : "pointer-events-none opacity-0",
+                          )}
+                          aria-label="Selecionar todos"
+                        />
+                      </TableHead>
+                    ) : null}
+                    <TableHead className="h-8 py-1.5">Jogador</TableHead>
+                    <TableHead className="h-8 py-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("elo")}
+                        className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
+                      >
+                        Elo
+                        {sortConfig?.column === "elo" ? (
+                          sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
+                        ) : (
+                          <ArrowUpDownIcon className="size-3 opacity-40" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead className="h-8 py-1.5 text-center">Funcoes</TableHead>
+                    <TableHead className="h-8 py-1.5 text-center">WhatsApp</TableHead>
+                    {showTimeSelect ? (
+                      <TableHead className="h-8 py-1.5 text-center">Atribuir</TableHead>
+                    ) : (
+                      <TableHead className="h-8 py-1.5 text-center">Status</TableHead>
+                    )}
+                    <TableHead className="h-8 py-1.5 text-center">Acoes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visiblePlayers.map((player) => {
+                    const isPending = pendingIds.has(player._id);
+                    const isSelected = selectedInscricoes.has(player._id);
+                    return (
+                      <TableRow
+                        key={player._id}
+                        className={cn(
+                          "group/inscricao-row",
+                          getHighlightColorClass(player.highlightColor),
+                          isVctInscricaoInactive(player.status) && "opacity-70",
+                        )}
+                        style={getHighlightColorStyle(player.highlightColor)}
+                      >
+                        {allowSelection ? (
+                          <TableCell className="align-middle py-1.5 text-center">
+                            <div className="flex h-full min-h-12 items-center justify-center">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleInscricaoSelection(tab, player._id)}
+                                className={cn(
+                                  "transition-opacity",
+                                  selectionActive || isSelected
+                                    ? "opacity-100"
+                                    : "pointer-events-none opacity-0 group-hover/inscricao-row:pointer-events-auto group-hover/inscricao-row:opacity-100",
+                                )}
+                                aria-label={`Selecionar ${player.nick}`}
+                              />
+                            </div>
+                          </TableCell>
+                        ) : null}
+                        <TableCell className="align-top py-1.5 whitespace-normal break-words">
+                          <div className="space-y-1">
+                            <PlayerNickWithNotes
+                              player={player}
+                              onCopyClick={(value) => handleCopyValue("Nick", value)}
+                              onMiddleClick={handleQuickValorantLookup}
+                              className={cn(
+                                "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
+                                player.observacoes && "cursor-help",
+                              )}
+                            />
+                            <div className="text-[11px] text-muted-foreground">
+                              {player.nome}
+                            </div>
+                            <div className="font-mono text-[10px] text-muted-foreground">
+                              {formatInscricaoDate(player.createdAt)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle py-1.5 text-center">
+                          <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {player.elo}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              Pico {player.pico}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-middle py-1.5 text-center">
+                          <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                            <Badge className="text-[10px]">{player.funcaoPrimaria}</Badge>
+                            <div className="text-[11px] text-muted-foreground">
+                              {player.funcaoSecundaria}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="relative align-middle p-0 text-center">
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyValue("WhatsApp", player.whatsapp)}
+                              className="inline-flex items-center gap-1.5 font-mono text-[11px] text-primary transition-colors hover:opacity-80"
+                            >
+                              <PhoneIcon className="size-3" />
+                              {player.whatsapp}
+                            </button>
+                          </div>
+                        </TableCell>
+                        {showTimeSelect ? (
+                          <TableCell className="relative align-middle p-0 text-center">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <select
+                                value=""
+                                disabled={isPending}
+                                onChange={(e) =>
+                                  handleTimeChange(player._id, Number(e.target.value))
+                                }
+                                className="h-7 w-full max-w-[124px] rounded-md border border-border bg-background px-2 text-[11px] font-medium outline-none transition-colors focus:border-ring disabled:opacity-50"
+                              >
+                                <option value="" disabled>
+                                  Escolher time
+                                </option>
+                                {teamStats.map((t) => (
+                                  <option
+                                    key={t.time}
+                                    value={t.time}
+                                    disabled={t.members.length >= TIME_CAP}
+                                  >
+                                    Time {t.time} ({t.members.length}/{TIME_CAP})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </TableCell>
+                        ) : (
+                          <TableCell className="align-middle py-1.5 text-center">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {getVctInscricaoStatusLabel(player.status)}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        <TableCell className="relative align-middle p-0 text-center">
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant="outline"
+                                      size="icon-sm"
+                                      className="size-7"
+                                      onClick={() => openDetailsModal(player)}
+                                    />
+                                  }
+                                >
+                                  <InboxIcon />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="center">
+                                  Ver detalhes
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant="outline"
+                                      size="icon-sm"
+                                      className="size-7"
+                                      onClick={() => openEditPlayer(player)}
+                                    />
+                                  }
+                                >
+                                  <PencilIcon />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="center">
+                                  Editar
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant="outline"
+                                      size="icon-sm"
+                                      className="size-7"
+                                      disabled={deletingIds.has(player._id)}
+                                      onClick={() => setDeleteTarget(player)}
+                                    />
+                                  }
+                                >
+                                  {deletingIds.has(player._id) ? (
+                                    <LoaderCircleIcon className="animate-spin" />
+                                  ) : (
+                                    <Trash2Icon />
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="center">
+                                  Excluir
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {visiblePlayers.length < players.length ? (
+                <div className="sticky bottom-0 flex items-center justify-center border-t border-border/60 bg-card/95 px-4 py-2 backdrop-blur">
+                  <Button type="button" variant="ghost" size="sm" onClick={onLoadMore}>
+                    Carregar mais 10 inscritos
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
-      {/* ============ SEÇÃO 1: INSCRITOS SEM TIME ============ */}
+      {/* ============ SEÇÃO 1: INSCRITOS ============ */}
       <section className="flex w-full flex-col gap-3 px-4 xl:mx-[calc((100%-100vw+16rem)/2)] xl:w-[calc(100vw-16rem)] xl:px-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
@@ -1314,7 +1766,7 @@ export function VctInscricoesPanel({
             <div>
               <h2 className="text-lg font-semibold">Inscritos</h2>
               <p className="text-xs text-muted-foreground">
-                {semTime.length} jogadores aguardando time · {visibleSemTime.length}/{sortedFilteredSemTime.length} exibidos
+                {activeSemTime.length} aguardando time · {inactiveInscricoes.length} fora do campeonato
               </p>
             </div>
           </div>
@@ -1377,219 +1829,66 @@ export function VctInscricoesPanel({
           </div>
         </div>
 
-        <Card className="border-border/60 bg-card/90">
-          <CardContent className="p-3">
-            {filteredSemTime.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
-                <UsersIcon className="size-8" />
-                <p className="text-sm">
-                  {semTime.length === 0
-                    ? "Todos os inscritos estão em times."
-                    : "Nenhum inscrito encontrado."}
-                </p>
-              </div>
-            ) : (
-              <div
-                className="max-h-[640px] overflow-auto rounded-lg"
-                onScroll={(event) => handleInscritosScroll(event.currentTarget)}
-              >
-                <Table className="w-full table-fixed text-xs">
-                  <colgroup>
-                    <col className="w-[31%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[13%]" />
-                  </colgroup>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="h-8 py-1.5">Jogador</TableHead>
-                      <TableHead className="h-8 py-1.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => toggleSort("elo")}
-                          className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground"
-                        >
-                          Elo
-                          {sortConfig?.column === "elo" ? (
-                            sortConfig.direction === "desc" ? <ArrowDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />
-                          ) : (
-                            <ArrowUpDownIcon className="size-3 opacity-40" />
-                          )}
-                        </button>
-                      </TableHead>
-                      <TableHead className="h-8 py-1.5 text-center">Funcoes</TableHead>
-                      <TableHead className="h-8 py-1.5 text-center">WhatsApp</TableHead>
-                      <TableHead className="h-8 py-1.5 text-center">Atribuir</TableHead>
-                      <TableHead className="h-8 py-1.5 text-center">Acoes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibleSemTime.map((i) => {
-                      const isPending = pendingIds.has(i._id);
-                      return (
-                        <TableRow
-                          key={i._id}
-                          className={cn(getHighlightColorClass(i.highlightColor))}
-                        >
-                          <TableCell className="align-top py-1.5 whitespace-normal break-words">
-                            <div className="space-y-1">
-                              <PlayerNickWithNotes
-                                player={i}
-                                onCopyClick={(value) => handleCopyValue("Nick", value)}
-                                onMiddleClick={handleQuickValorantLookup}
-                                className={cn(
-                                  "cursor-pointer text-sm font-semibold underline decoration-dotted underline-offset-4 hover:text-primary",
-                                  i.observacoes && "cursor-help",
-                                )}
-                              />
-                              <div className="text-[11px] text-muted-foreground">
-                                {i.nome}
-                              </div>
-                              <div className="font-mono text-[10px] text-muted-foreground">
-                                {formatInscricaoDate(i.createdAt)}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="align-middle py-1.5 text-center">
-                            <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                              <Badge variant="secondary" className="text-[10px]">
-                                {i.elo}
-                              </Badge>
-                              <Badge variant="outline" className="text-[10px]">
-                                Pico {i.pico}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="align-middle py-1.5 text-center">
-                            <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                              <Badge className="text-[10px]">{i.funcaoPrimaria}</Badge>
-                              <div className="text-[11px] text-muted-foreground">
-                                {i.funcaoSecundaria}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="relative align-middle p-0 text-center">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyValue("WhatsApp", i.whatsapp)}
-                                className="inline-flex items-center gap-1.5 font-mono text-[11px] text-primary transition-colors hover:opacity-80"
-                              >
-                                <PhoneIcon className="size-3" />
-                                {i.whatsapp}
-                              </button>
-                            </div>
-                          </TableCell>
-                          <TableCell className="relative align-middle p-0 text-center">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <select
-                                value=""
-                                disabled={isPending}
-                                onChange={(e) =>
-                                  handleTimeChange(i._id, Number(e.target.value))
-                                }
-                                className="h-7 w-full max-w-[124px] rounded-md border border-border bg-background px-2 text-[11px] font-medium outline-none transition-colors focus:border-ring disabled:opacity-50"
-                              >
-                                <option value="" disabled>
-                                  Escolher time
-                                </option>
-                                {teamStats.map((t) => (
-                                  <option
-                                    key={t.time}
-                                    value={t.time}
-                                    disabled={t.members.length >= TIME_CAP}
-                                  >
-                                    Time {t.time} ({t.members.length}/{TIME_CAP})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </TableCell>
-                          <TableCell className="relative align-middle p-0 text-center">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <Tooltip>
-                                <TooltipTrigger
-                                  render={
-                                    <Button
-                                      variant="outline"
-                                      size="icon-sm"
-                                      className="size-7"
-                                      onClick={() => openDetailsModal(i)}
-                                    />
-                                  }
-                                >
-                                  <InboxIcon />
-                                </TooltipTrigger>
-                                <TooltipContent side="top" align="center">
-                                  Ver detalhes
-                                </TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger
-                                    render={
-                                      <Button
-                                        variant="outline"
-                                        size="icon-sm"
-                                        className="size-7"
-                                        onClick={() => openEditPlayer(i)}
-                                      />
-                                    }
-                                  >
-                                    <PencilIcon />
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" align="center">
-                                    Editar
-                                  </TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger
-                                    render={
-                                      <Button
-                                        variant="outline"
-                                        size="icon-sm"
-                                        className="size-7"
-                                        disabled={deletingIds.has(i._id)}
-                                        onClick={() => setDeleteTarget(i)}
-                                      />
-                                    }
-                                  >
-                                    {deletingIds.has(i._id) ? (
-                                      <LoaderCircleIcon className="animate-spin" />
-                                    ) : (
-                                      <Trash2Icon />
-                                    )}
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" align="center">
-                                    Excluir
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-                {visibleSemTime.length < sortedFilteredSemTime.length ? (
-                  <div className="sticky bottom-0 flex items-center justify-center border-t border-border/60 bg-card/95 px-4 py-2 backdrop-blur">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLoadMoreInscritos}
-                    >
-                      Carregar mais 10 inscritos
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs
+          value={inscricoesTab}
+          onValueChange={(value) => {
+            setInscricoesTab(value as "ativas" | "fora");
+            setSelectedInscricoes(new Set());
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="ativas">
+              Participam ({sortedFilteredActiveSemTime.length})
+            </TabsTrigger>
+            <TabsTrigger value="fora">
+              Fora do campeonato ({filteredInactive.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="ativas" className="mt-3">
+            <InscricoesTable
+              tab="ativas"
+              players={sortedFilteredActiveSemTime}
+              visibleCount={visibleActiveCount}
+              onLoadMore={() => handleLoadMoreInscritos("ativas")}
+              allowSelection
+              showTimeSelect
+              emptyMessage={
+                activeSemTime.length === 0
+                  ? "Todos os inscritos ativos estão em times."
+                  : "Nenhum inscrito encontrado."
+              }
+              bulkActionLabel="Mover para fora do campeonato"
+              onBulkAction={() =>
+                handleStatusChange(
+                  sortedFilteredActiveSemTime
+                    .filter((player) => selectedInscricoes.has(player._id))
+                    .map((player) => player._id),
+                  VCT_INSCRICAO_STATUS.INACTIVE,
+                )
+              }
+            />
+          </TabsContent>
+          <TabsContent value="fora" className="mt-3">
+            <InscricoesTable
+              tab="fora"
+              players={filteredInactive}
+              visibleCount={visibleInactiveCount}
+              onLoadMore={() => handleLoadMoreInscritos("fora")}
+              allowSelection
+              showTimeSelect={false}
+              emptyMessage="Nenhuma inscrição fora do campeonato."
+              bulkActionLabel="Reativar inscrição"
+              onBulkAction={() =>
+                handleStatusChange(
+                  filteredInactive
+                    .filter((player) => selectedInscricoes.has(player._id))
+                    .map((player) => player._id),
+                  VCT_INSCRICAO_STATUS.ACTIVE,
+                )
+              }
+            />
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* ============ SEÇÃO 2: TIMES ============ */}
@@ -1602,7 +1901,7 @@ export function VctInscricoesPanel({
             <div>
               <h2 className="text-lg font-semibold">Times</h2>
               <p className="text-xs text-muted-foreground">
-                {inscricoes.length - semTime.length} jogadores distribuídos · {numTimes} times · {TIME_CAP} por time
+                {activeInscricoes.length - activeSemTime.length} jogadores distribuídos · {numTimes} times · {TIME_CAP} por time
               </p>
             </div>
           </div>
@@ -1822,6 +2121,7 @@ export function VctInscricoesPanel({
                               getHighlightColorClass(m.highlightColor),
                               isPending && "opacity-70",
                             )}
+                            style={getHighlightColorStyle(m.highlightColor)}
                           >
                             <div className="min-w-0 flex-1 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
@@ -1958,7 +2258,7 @@ export function VctInscricoesPanel({
 
       <Dialog open={groupModalTime !== null} onOpenChange={(open) => !open && setGroupModalTime(null)}>
         {selectedGroup ? (
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>
                 Formar grupo do Time {selectedGroup.time}
@@ -2010,7 +2310,7 @@ export function VctInscricoesPanel({
         }}
       >
         {detailsPlayer ? (
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Dados da inscrição</DialogTitle>
               <DialogDescription>
@@ -2019,14 +2319,25 @@ export function VctInscricoesPanel({
             </DialogHeader>
 
             <div className="space-y-4">
-              <Button
-                type="button"
-                variant={detailsExpanded ? "outline" : "default"}
-                className="w-full"
-                onClick={() => setDetailsExpanded((current) => !current)}
-              >
-                {detailsExpanded ? "Ocultar detalhes" : "Mostrar detalhes da inscrição"}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant={detailsExpanded ? "outline" : "default"}
+                  className="h-auto w-full whitespace-normal px-3 py-2 text-center leading-tight"
+                  onClick={() => setDetailsExpanded((current) => !current)}
+                >
+                  {detailsExpanded ? "Ocultar detalhes" : "Mostrar dados"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto w-full whitespace-normal px-3 py-2 text-center leading-tight"
+                  onClick={() => detailsPlayer && openEditPlayer(detailsPlayer)}
+                >
+                  <PencilIcon />
+                  Editar dados
+                </Button>
+              </div>
 
               {detailsExpanded ? (
                 <div className="max-h-[65vh] overflow-y-auto pr-1">
@@ -2052,7 +2363,7 @@ export function VctInscricoesPanel({
         }}
       >
         {editingPlayer && editForm ? (
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-6xl">
             <DialogHeader>
               <DialogTitle>Editar inscricao</DialogTitle>
               <DialogDescription>
@@ -2205,6 +2516,83 @@ export function VctInscricoesPanel({
                 </label>
               </div>
 
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    Cor de destaque
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span
+                      className={cn(
+                        "size-3.5 rounded-full border border-border/70",
+                        getHighlightColorClass(editForm.highlightColor) || "bg-background",
+                      )}
+                      style={getHighlightColorStyle(editForm.highlightColor)}
+                    />
+                    <span className="max-w-[18rem] truncate font-mono">
+                      {editForm.highlightColor || "Sem cor"}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8 xl:grid-cols-10">
+                  {HIGHLIGHT_COLOR_OPTIONS.map((color) => {
+                    const active =
+                      editForm.highlightColor === color.value ||
+                      editForm.highlightColor === color.hex;
+                    return (
+                      <button
+                        key={color.value || "none"}
+                        type="button"
+                        title={color.label}
+                        aria-label={color.label}
+                        onClick={() => updateEditForm("highlightColor", color.hex || "")}
+                        className={cn(
+                          "aspect-square rounded-full border p-0.5 transition-colors",
+                          active
+                            ? cn("border-primary ring-2 ring-primary/30", color.rowClassName)
+                            : "border-border/70 bg-background/70 hover:scale-105 hover:bg-muted/80",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "block size-full rounded-full border border-border/70",
+                            color.swatchClassName,
+                          )}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="space-y-2">
+                  <div className="overflow-hidden rounded-2xl border border-border/70 bg-background p-3">
+                    <HexColorPicker
+                      color={getHighlightColorPickerValue(editForm.highlightColor)}
+                      onChange={(value) => updateEditForm("highlightColor", value)}
+                      style={{ width: "100%", height: 160 }}
+                    />
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Cor livre</span>
+                      <HexColorInput
+                        color={getHighlightColorPickerValue(editForm.highlightColor)}
+                        onChange={(value) => updateEditForm("highlightColor", value)}
+                        prefixed
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full md:w-auto"
+                      onClick={() => updateEditForm("highlightColor", "")}
+                    >
+                      Limpar cor
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <TagsIcon className="size-3.5" />
@@ -2244,32 +2632,6 @@ export function VctInscricoesPanel({
                   <StickyNoteIcon className="size-3.5" />
                   Observacoes
                 </span>
-                <div className="flex flex-wrap gap-2">
-                  {HIGHLIGHT_COLORS.map((color) => {
-                    const active = editForm.highlightColor === color.value;
-                    return (
-                      <Button
-                        key={color.value || "none"}
-                        type="button"
-                        variant={active ? "default" : "outline"}
-                        size="sm"
-                        className={cn(
-                          "gap-2",
-                          active && color.className,
-                        )}
-                        onClick={() => updateEditForm("highlightColor", color.value)}
-                      >
-                        <span
-                          className={cn(
-                            "size-3 rounded-full border border-border",
-                            color.swatch,
-                          )}
-                        />
-                        {color.label}
-                      </Button>
-                    );
-                  })}
-                </div>
                 <Textarea
                   value={editForm.observacoes}
                   onChange={(e) => updateEditForm("observacoes", e.target.value)}
@@ -2277,6 +2639,93 @@ export function VctInscricoesPanel({
                   className="min-h-24"
                 />
               </label>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Cidade</span>
+                  <Input
+                    value={editForm.cidade}
+                    onChange={(e) => updateEditForm("cidade", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Dias/semana</span>
+                  <Input
+                    value={editForm.diasTreino}
+                    onChange={(e) => updateEditForm("diasTreino", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Dias exatos</span>
+                  <Input
+                    value={editForm.diasSemana}
+                    onChange={(e) => updateEditForm("diasSemana", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Horários</span>
+                  <Input
+                    value={editForm.horariosTreino}
+                    onChange={(e) => updateEditForm("horariosTreino", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Melhor janela</span>
+                  <Input
+                    value={editForm.melhorJanela}
+                    onChange={(e) => updateEditForm("melhorJanela", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Compromisso</span>
+                  <Input
+                    value={editForm.compromisso}
+                    onChange={(e) => updateEditForm("compromisso", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Rotina fixa</span>
+                  <Input
+                    value={editForm.rotinaFixa}
+                    onChange={(e) => updateEditForm("rotinaFixa", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Horários definidos</span>
+                  <Input
+                    value={editForm.horariosDefinidos}
+                    onChange={(e) => updateEditForm("horariosDefinidos", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Capitão</span>
+                  <Input
+                    value={editForm.capitao}
+                    onChange={(e) => updateEditForm("capitao", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Presencial</span>
+                  <Input
+                    value={editForm.presencial}
+                    onChange={(e) => updateEditForm("presencial", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Deslocamento</span>
+                  <Input
+                    value={editForm.deslocamento}
+                    onChange={(e) => updateEditForm("deslocamento", e.target.value)}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Contato</span>
+                  <Input
+                    value={editForm.autorizacaoContato}
+                    onChange={(e) => updateEditForm("autorizacaoContato", e.target.value)}
+                  />
+                </label>
+              </div>
             </div>
 
             <DialogFooter>

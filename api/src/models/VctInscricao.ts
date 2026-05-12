@@ -1,5 +1,6 @@
 import { Document, Schema } from "mongoose";
 import Mongoose from "mongoose";
+import { VCT_INSCRICAO_STATUS } from "../lib/vct-inscricao-status";
 
 export interface IVctInscricao extends Document {
   nome: string;
@@ -35,6 +36,7 @@ export interface IVctInscricao extends Document {
   tags: string[];
   observacoes: string;
   highlightColor: string;
+  status: string;
   time: number | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -75,6 +77,12 @@ const VctInscricaoSchema = new Schema<IVctInscricao>(
     tags: { type: [String], default: [] },
     observacoes: { type: String, default: "", trim: true },
     highlightColor: { type: String, default: "", trim: true },
+    status: {
+      type: String,
+      default: VCT_INSCRICAO_STATUS.ACTIVE,
+      enum: Object.values(VCT_INSCRICAO_STATUS),
+      trim: true,
+    },
     time: { type: Number, default: null, min: 1 },
   },
   { timestamps: true },

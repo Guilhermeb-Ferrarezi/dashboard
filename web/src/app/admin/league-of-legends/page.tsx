@@ -2,6 +2,6 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function VctInscricoesPage() {
-  redirect("/admin/vct");
+export default function LeagueOfLegendsPage() {
+  redirect("/league-of-legends");
 }

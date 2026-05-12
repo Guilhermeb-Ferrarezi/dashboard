@@ -41,14 +41,30 @@ import type { SessionUser } from "@/lib/session";
 const navigation = [{ href: "/home", label: "Launcher", icon: LayoutDashboardIcon }];
 const LAST_LOGS_PROJECT_ID_KEY = "logs:last-project-id";
 
+const gamesNavigation = [
+  {
+    href: "/vct",
+    label: "VCT",
+    icon: CrosshairIcon,
+    children: [{ href: "/vct/inscricoes", label: "Inscricoes" }],
+  },
+  {
+    href: "/counter-strike",
+    label: "Counter-strike",
+    icon: ShieldIcon,
+    children: [{ href: "/counter-strike", label: "Painel" }],
+  },
+  {
+    href: "/league-of-legends",
+    label: "League of legends",
+    icon: SparklesIcon,
+    children: [{ href: "/league-of-legends", label: "Painel" }],
+  },
+] as const;
+
 const adminNavigation = [
   { href: "/logs", label: "Logs", icon: LogsIcon },
   { href: "/admin/users", label: "Usuarios", icon: ShieldIcon },
-  {
-    href: "/admin/vct-inscricoes",
-    label: "VCT Inscricoes",
-    icon: CrosshairIcon,
-  },
 ];
 
 interface AppShellProps {
@@ -72,6 +88,17 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const isAdminSection = pathname.startsWith("/admin") || pathname.startsWith("/logs");
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(isAdminSection);
+  const [openGameMenus, setOpenGameMenus] = useState<Record<string, boolean>>(() => {
+    return Object.fromEntries(
+      gamesNavigation.map((section) => [
+        section.href,
+        section.children.some(
+          (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
+        ),
+      ]),
+    );
+  });
   const [logsHref, setLogsHref] = useState(() => {
     if (typeof window === "undefined") {
       return "/logs";
@@ -100,6 +127,25 @@ export function AppShell({
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (isAdminSection) {
+      setIsAdminMenuOpen(true);
+    }
+  }, [isAdminSection]);
+
+  useEffect(() => {
+    setOpenGameMenus(
+      Object.fromEntries(
+        gamesNavigation.map((section) => [
+          section.href,
+          section.children.some(
+            (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
+          ),
+        ]),
+      ),
+    );
+  }, [pathname]);
 
   return (
     <SidebarProvider>
@@ -145,44 +191,114 @@ export function AppShell({
                     </SidebarMenuItem>
                   );
                 })}
-                {user.role === "admin" ? (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={isAdminSection}
-                      tooltip="Administracao"
-                    >
-                      <BadgeCheckIcon />
-                      <span>Administracao</span>
-                      <ChevronRightIcon
-                        className={cn(
-                          "ml-auto size-4 transition-transform",
-                          isAdminSection && "rotate-90",
-                        )}
-                      />
-                    </SidebarMenuButton>
-                    <SidebarMenuSub>
-                      {adminNavigation.map((item) => (
-                        <SidebarMenuSubItem key={item.href}>
-                          <SidebarMenuSubButton
-                            render={<Link href={item.href === "/logs" ? logsHref : item.href} />}
-                            isActive={
-                              item.href === "/logs"
-                                ? pathname === "/logs" || pathname.startsWith("/logs/")
-                                : pathname === item.href
-                            }
-                          >
-                            <item.icon />
-                            <span>{item.label}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </SidebarMenuItem>
-                ) : null}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-          <SidebarSeparator />
+          <SidebarGroup>
+            <SidebarGroupLabel>Jogos</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {gamesNavigation.map((item) => {
+                  const isActive = item.children.some(
+                    (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
+                  );
+                  const isOpen = openGameMenus[item.href] ?? isActive;
+
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        aria-expanded={isOpen}
+                        aria-controls={`${item.href.slice(1)}-submenu`}
+                        onClick={() =>
+                          setOpenGameMenus((current) => ({
+                            ...current,
+                            [item.href]: !((current[item.href] ?? false) || false),
+                          }))
+                        }
+                        tooltip={item.label}
+                      >
+                        <item.icon />
+                        <span>{item.label}</span>
+                        <ChevronRightIcon
+                          className={cn("ml-auto size-4 transition-transform", isOpen && "rotate-90")}
+                        />
+                      </SidebarMenuButton>
+                      {isOpen ? (
+                        <SidebarMenuSub id={`${item.href.slice(1)}-submenu`}>
+                          {item.children.map((child) => {
+                            const childActive =
+                              pathname === child.href || pathname.startsWith(`${child.href}/`);
+
+                            return (
+                              <SidebarMenuSubItem key={child.href}>
+                                <SidebarMenuSubButton render={<Link href={child.href} />} isActive={childActive}>
+                                  <span>{child.label}</span>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      ) : null}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {user.role === "admin" ? (
+            <>
+              <SidebarSeparator />
+              <SidebarGroup>
+                <SidebarGroupLabel>Administracao</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={isAdminSection}
+                        aria-expanded={isAdminMenuOpen}
+                        aria-controls="admin-sidebar-submenu"
+                        onClick={() => setIsAdminMenuOpen((value) => !value)}
+                        tooltip="Administracao"
+                      >
+                        <BadgeCheckIcon />
+                        <span>Administracao</span>
+                        <ChevronRightIcon
+                          className={cn(
+                            "ml-auto size-4 transition-transform",
+                            isAdminMenuOpen && "rotate-90",
+                          )}
+                        />
+                      </SidebarMenuButton>
+                      {isAdminMenuOpen ? (
+                        <SidebarMenuSub id="admin-sidebar-submenu">
+                          {adminNavigation.map((item) => (
+                            <SidebarMenuSubItem key={item.href}>
+                              <SidebarMenuSubButton
+                                render={
+                                  <Link
+                                    href={item.href === "/logs" ? logsHref : item.href}
+                                  />
+                                }
+                                isActive={
+                                  item.href === "/logs"
+                                    ? pathname === "/logs" || pathname.startsWith("/logs/")
+                                    : pathname === item.href
+                                }
+                              >
+                                <item.icon />
+                                <span>{item.label}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      ) : null}
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </>
+          ) : null}
         </SidebarContent>
         <SidebarFooter>
           <UserMenu user={user} />

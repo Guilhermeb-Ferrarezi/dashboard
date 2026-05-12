@@ -1,3 +1,5 @@
+import type { VctInscricaoStatus } from "@/lib/vct-inscricao-status";
+
 export type ProjectStatus = "live" | "pilot" | "beta";
 export type ProjectSsoMode = "none" | "shared-ticket";
 
@@ -58,6 +60,7 @@ export interface VctInscricaoSummary {
   tags?: string[];
   observacoes?: string;
   highlightColor?: string;
+  status?: VctInscricaoStatus;
   time: number | null;
   createdAt?: string;
 }
