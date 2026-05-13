@@ -34,8 +34,14 @@ function normalizeModalidade(value: unknown): Modalidade {
   return MODALIDADES.includes(value as Modalidade) ? (value as Modalidade) : "valorant";
 }
 
+function getSingleTextValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0] ?? "";
+  return "";
+}
+
 function getModalidadeFromRequest(req: Request) {
-  return normalizeModalidade(req.query?.modalidade ?? req.body?.modalidade);
+  return normalizeModalidade(getSingleTextValue(req.query?.modalidade ?? req.body?.modalidade));
 }
 
 function getModalidadeFilter(req: Request) {
@@ -561,7 +567,7 @@ export async function atualizarInscricao(req: Request, res: Response) {
   update.tags = normalizeTags(req.body.tags);
   update.observacoes = typeof req.body.observacoes === "string" ? req.body.observacoes.trim() : "";
   update.highlightColor = typeof req.body.highlightColor === "string" ? req.body.highlightColor.trim() : "";
-  update.status = normalizeStatusField(req.body.status);
+  update.status = normalizeStatusField(getSingleTextValue(req.body.status));
 
   if (getEloScore(String(update.elo), modalidade) < 0 || getEloScore(String(update.pico), modalidade) < 0) {
     res.status(400).json({ ok: false, message: "Elo inválido." });
@@ -645,14 +651,26 @@ async function atualizarStatusInterno(ids: string[], status: VctInscricaoStatus)
 }
 
 export async function atualizarStatusInscricao(req: Request, res: Response) {
-  const { id } = req.params;
+  const id = getSingleTextValue(req.params.id);
   if (!id) {
     res.status(400).json({ ok: false, message: "Inscricao invalida." });
     return;
   }
-  const status = normalizeStatusField(req.body.status);
-  const result = await atualizarStatusInterno([id], status);
-  res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
+  const rawStatus = req.body.status;
+  const result = await atualizarStatusInterno(
+    [id],
+    rawStatus === VCT_INSCRICAO_STATUS.INACTIVE
+      ? VCT_INSCRICAO_STATUS.INACTIVE
+      : VCT_INSCRICAO_STATUS.ACTIVE,
+  );
+  res.json({
+    ok: true,
+    atualizados: result.modifiedCount ?? 0,
+    status:
+      rawStatus === VCT_INSCRICAO_STATUS.INACTIVE
+        ? VCT_INSCRICAO_STATUS.INACTIVE
+        : VCT_INSCRICAO_STATUS.ACTIVE,
+  });
 }
 
 export async function atualizarStatusInscricoes(req: Request, res: Response) {
@@ -662,7 +680,11 @@ export async function atualizarStatusInscricoes(req: Request, res: Response) {
     return;
   }
 
-  const status = normalizeStatusField(req.body.status);
+  const rawStatus = req.body.status;
+  const status =
+    rawStatus === VCT_INSCRICAO_STATUS.INACTIVE
+      ? VCT_INSCRICAO_STATUS.INACTIVE
+      : VCT_INSCRICAO_STATUS.ACTIVE;
   const result = await atualizarStatusInterno(ids, status);
   res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
 }
@@ -752,6 +774,34 @@ export async function limparTime(req: Request, res: Response) {
 
   const result = await VctInscricao.updateMany({ modalidade, time: numero }, { time: null });
   res.json({ ok: true, removidos: result.modifiedCount });
+}
+
+export async function removerTime(req: Request, res: Response) {
+  const modalidade = getModalidadeFromRequest(req);
+  const numero = Number(req.params.numero);
+
+  if (!isValidTeamNumber(numero)) {
+    res.status(400).json({ ok: false, message: "Número do time inválido." });
+    return;
+  }
+
+  const occupied = await VctInscricao.exists({ modalidade, time: numero });
+  if (occupied) {
+    res.status(409).json({
+      ok: false,
+      message: "Limpe o time antes de removê-lo.",
+    });
+    return;
+  }
+
+  const result = await VctTime.findOneAndDelete({ modalidade, numero }).lean();
+
+  if (!result) {
+    res.status(404).json({ ok: false, message: "Time não encontrado." });
+    return;
+  }
+
+  res.json({ ok: true, removido: numero });
 }
 
 export async function atribuirTimesAutomatico(req: Request, res: Response) {

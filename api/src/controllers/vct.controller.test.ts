@@ -7,6 +7,7 @@ import {
   atualizarStatusInscricoes,
   preencherTime,
   listarInscricoes,
+  removerTime,
 } from "./vct.controller";
 import { VCT_INSCRICAO_STATUS } from "../lib/vct-inscricao-status";
 import { VctInscricao } from "../models/VctInscricao";
@@ -361,5 +362,63 @@ describe("modalidades de inscricao", () => {
 
     expect(filterUsed).toEqual({ modalidade: "counter-strike" });
     expect(updates).toEqual([{ id: "cs-ativo", time: 1 }]);
+  });
+});
+
+describe("remocao de time", () => {
+  const originalExists = VctInscricao.exists;
+  const originalFindOneAndDelete = VctTime.findOneAndDelete;
+
+  afterEach(() => {
+    VctInscricao.exists = originalExists;
+    VctTime.findOneAndDelete = originalFindOneAndDelete;
+  });
+
+  test("remove o time vazio da modalidade solicitada", async () => {
+    let existsFilter: unknown = null;
+    let deleteFilter: unknown = null;
+
+    VctInscricao.exists = mock((filter: unknown) => {
+      existsFilter = filter;
+      return Promise.resolve(null);
+    }) as typeof VctInscricao.exists;
+    VctTime.findOneAndDelete = mock((filter: unknown) => {
+      deleteFilter = filter;
+      return {
+        lean: async () => ({ numero: 8 }),
+      };
+    }) as typeof VctTime.findOneAndDelete;
+
+    const req = { params: { numero: "8" }, query: { modalidade: "lol" } } as unknown as Request;
+    const res = makeResponse();
+
+    await removerTime(req, res as Response);
+
+    expect(existsFilter).toEqual({ modalidade: "lol", time: 8 });
+    expect(deleteFilter).toEqual({ modalidade: "lol", numero: 8 });
+    expect(res.body).toMatchObject({ ok: true, removido: 8 });
+  });
+
+  test("bloqueia a remocao quando o time ainda tem inscritos", async () => {
+    VctInscricao.exists = mock(() => Promise.resolve({ _id: "tem-gente" })) as typeof VctInscricao.exists;
+    let deleteCalled = false;
+    VctTime.findOneAndDelete = mock(() => {
+      deleteCalled = true;
+      return {
+        lean: async () => null,
+      };
+    }) as typeof VctTime.findOneAndDelete;
+
+    const req = { params: { numero: "8" } } as unknown as Request;
+    const res = makeResponse();
+
+    await removerTime(req, res as Response);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({
+      ok: false,
+      message: "Limpe o time antes de removê-lo.",
+    });
+    expect(deleteCalled).toBe(false);
   });
 });

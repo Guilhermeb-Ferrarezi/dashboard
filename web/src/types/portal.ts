@@ -72,3 +72,31 @@ export interface VctTimeSummary {
   numero: number;
   nome: string;
 }
+
+export interface VctFormacaoMembroSummary {
+  _id: string;
+  modalidade?: "valorant" | "counter-strike" | "lol";
+  formacaoTimeId: string;
+  ordem: number;
+  papel: "capitao" | "jogador";
+  nome: string;
+  email: string;
+  instagram: string;
+  whatsapp: string;
+  nick: string;
+  eloAtual: string;
+  peakRanking: string;
+  createdAt?: string;
+}
+
+export interface VctFormacaoSummary {
+  _id: string;
+  modalidade?: "valorant" | "counter-strike" | "lol";
+  nome: string;
+  tag: string;
+  logoKey: string;
+  logoUrl: string;
+  membroCount: number;
+  membros: VctFormacaoMembroSummary[];
+  createdAt?: string;
+}

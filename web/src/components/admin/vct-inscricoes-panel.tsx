@@ -365,6 +365,108 @@ function getEditForm(player: VctInscricaoSummary): VctEditForm {
   };
 }
 
+export const CREATE_INSCRICAO_REQUIRED_FIELDS: Array<keyof VctEditForm> = [
+  "nome",
+  "nick",
+  "email",
+  "whatsapp",
+  "cidade",
+  "elo",
+  "pico",
+  "funcaoPrimaria",
+  "funcaoSecundaria",
+  "diasTreino",
+  "diasSemana",
+  "horariosTreino",
+  "melhorJanela",
+  "compromisso",
+  "rotinaFixa",
+  "horariosDefinidos",
+  "capitao",
+  "presencial",
+  "deslocamento",
+  "autorizacaoContato",
+];
+
+export function createBlankInscricaoForm(gameElos: readonly string[], gameFuncoes: readonly string[]) {
+  return {
+    riotId: "",
+    riotName: "",
+    riotTag: "",
+    riotPuuid: "",
+    valorantRegion: "",
+    valorantAccountLevel: null,
+    valorantCardSmall: "",
+    valorantCardWide: "",
+    valorantCurrentRank: "",
+    valorantPeakRank: "",
+    nome: "",
+    nick: "",
+    email: "",
+    whatsapp: "",
+    instagram: "",
+    elo: gameElos[0] ?? "",
+    pico: gameElos[0] ?? "",
+    funcaoPrimaria: gameFuncoes[0] ?? "",
+    funcaoSecundaria: gameFuncoes[0] ?? "",
+    cidade: "",
+    diasTreino: "",
+    diasSemana: "",
+    horariosTreino: "",
+    melhorJanela: "",
+    compromisso: "",
+    rotinaFixa: "",
+    horariosDefinidos: "",
+    capitao: "",
+    presencial: "",
+    deslocamento: "",
+    autorizacaoContato: "",
+    tagsText: "",
+    observacoes: "",
+    highlightColor: "",
+  } satisfies VctEditForm;
+}
+
+export function isCreateInscricaoFormComplete(form: VctEditForm) {
+  return CREATE_INSCRICAO_REQUIRED_FIELDS.every((field) => String(form[field]).trim().length > 0);
+}
+
+export function buildCreateInscricaoPayload(form: VctEditForm, modalidade: GameSlug) {
+  return {
+    modalidade,
+    nome: form.nome,
+    nick: form.nick,
+    email: form.email,
+    whatsapp: form.whatsapp,
+    instagram: form.instagram,
+    cidade: form.cidade,
+    elo: form.elo,
+    pico: form.pico,
+    funcaoPrimaria: form.funcaoPrimaria,
+    funcaoSecundaria: form.funcaoSecundaria,
+    diasTreino: form.diasTreino,
+    diasSemana: form.diasSemana,
+    horariosTreino: form.horariosTreino,
+    melhorJanela: form.melhorJanela,
+    compromisso: form.compromisso,
+    rotinaFixa: form.rotinaFixa,
+    horariosDefinidos: form.horariosDefinidos,
+    capitao: form.capitao,
+    presencial: form.presencial,
+    deslocamento: form.deslocamento,
+    autorizacaoContato: form.autorizacaoContato,
+    riotName: form.riotName,
+    riotTag: form.riotTag,
+    riotPuuid: form.riotPuuid,
+    valorantRegion: form.valorantRegion,
+    valorantAccountLevel: form.valorantAccountLevel,
+    valorantCardSmall: form.valorantCardSmall,
+    valorantCardWide: form.valorantCardWide,
+    valorantCurrentRank: form.valorantCurrentRank,
+    valorantPeakRank: form.valorantPeakRank,
+  };
+}
+
 function parseTags(tagsText: string) {
   return tagsText
     .split(",")
@@ -676,6 +778,8 @@ export function VctInscricoesPanel({
   const [editForm, setEditForm] = useState<VctEditForm | null>(null);
   const [editPending, setEditPending] = useState(false);
   const [riotLookupPending, setRiotLookupPending] = useState(false);
+  const [createForm, setCreateForm] = useState<VctEditForm | null>(null);
+  const [createPending, setCreatePending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VctInscricaoSummary | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [inscricoesTab, setInscricoesTab] = useState<"ativas" | "fora">("ativas");
@@ -902,6 +1006,14 @@ export function VctInscricoesPanel({
     setEditForm(getEditForm(player));
   }
 
+  function openCreatePlayer() {
+    setDetailsPlayer(null);
+    setDetailsExpanded(false);
+    setEditingPlayer(null);
+    setEditForm(null);
+    setCreateForm(createBlankInscricaoForm(gameElos, gameFuncoes));
+  }
+
   function updateEditForm<K extends keyof VctEditForm>(field: K, value: VctEditForm[K]) {
     setEditForm((current) => {
       if (!current) return current;
@@ -997,6 +1109,55 @@ export function VctInscricoesPanel({
       );
     } finally {
       setEditPending(false);
+    }
+  }
+
+  function updateCreateForm<K extends keyof VctEditForm>(field: K, value: VctEditForm[K]) {
+    setCreateForm((current) => {
+      if (!current) return current;
+      const next = { ...current, [field]: value };
+      if (field === "elo") {
+        const nextElo = String(value);
+        if (next.pico && eloScore(next.pico, gameElos) < eloScore(nextElo, gameElos)) {
+          next.pico = "";
+        }
+      }
+      return next;
+    });
+  }
+
+  async function handleCreateInscricao() {
+    if (!createForm) return;
+
+    if (!isCreateInscricaoFormComplete(createForm)) {
+      toast.error("Preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    if (eloScore(createForm.elo, gameElos) < 0 || eloScore(createForm.pico, gameElos) < 0) {
+      toast.error("Elo inválido.");
+      return;
+    }
+    if (eloScore(createForm.pico, gameElos) < eloScore(createForm.elo, gameElos)) {
+      toast.error("O pico de elo não pode ser menor que o elo atual.");
+      return;
+    }
+
+    setCreatePending(true);
+    try {
+      await clientApi<{ ok: true; id: string }>("/vct/inscricao", {
+        method: "POST",
+        body: JSON.stringify(buildCreateInscricaoPayload(createForm, modalidade)),
+      });
+      await reloadInscricoes();
+      setCreateForm(null);
+      toast.success("Inscrição criada.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Nao foi possivel criar a inscricao.",
+      );
+    } finally {
+      setCreatePending(false);
     }
   }
 
@@ -1254,6 +1415,37 @@ export function VctInscricoesPanel({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Não foi possível limpar o time.",
+      );
+    } finally {
+      setPendingTimes((prev) => {
+        const next = new Set(prev);
+        next.delete(numero);
+        return next;
+      });
+    }
+  }
+
+  async function handleDeleteTime(numero: number) {
+    setPendingTimes((prev) => new Set(prev).add(numero));
+    try {
+      await clientApi<{ removido: number }>(withModalidade(`/vct/time/${numero}`), {
+        method: "DELETE",
+      });
+      setNumTimes((current) => Math.max(MIN_TIMES, current - 1));
+      setTimeNames((current) => {
+        const next = { ...current };
+        delete next[numero];
+        return next;
+      });
+      setTeamFormationFiltersByTime((current) => {
+        const next = { ...current };
+        delete next[numero];
+        return next;
+      });
+      toast.success(`Time ${numero} removido.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível remover o time.",
       );
     } finally {
       setPendingTimes((prev) => {
@@ -1849,6 +2041,10 @@ export function VctInscricoesPanel({
                 </option>
               ))}
             </select>
+            <Button variant="outline" onClick={openCreatePlayer}>
+              <PlusIcon />
+              Nova inscrição
+            </Button>
             <Button onClick={handleAutoForm} disabled={autoPending}>
               {autoPending ? (
                 <LoaderCircleIcon className="animate-spin" />
@@ -2100,7 +2296,7 @@ export function VctInscricoesPanel({
                             <DropdownMenuItem
                               variant="destructive"
                               disabled={t.members.length > 0}
-                              onClick={() => setNumTimes((n) => n - 1)}
+                              onClick={() => handleDeleteTime(t.time)}
                             >
                               <Trash2Icon />
                               Remover time
@@ -2386,6 +2582,285 @@ export function VctInscricoesPanel({
                 </div>
               )}
             </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={createForm !== null}
+        onOpenChange={(open) => {
+          if (!open && !createPending) {
+            setCreateForm(null);
+          }
+        }}
+      >
+        {createForm ? (
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Nova inscrição</DialogTitle>
+              <DialogDescription>
+                Crie uma inscrição manualmente. Os campos principais seguem a mesma validação
+                do formulário público.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-[72vh] space-y-5 overflow-y-auto pr-1">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Nome</span>
+                  <Input
+                    value={createForm.nome}
+                    onChange={(e) => updateCreateForm("nome", e.target.value)}
+                    placeholder="Nome completo"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Nick</span>
+                  <Input
+                    value={createForm.nick}
+                    onChange={(e) => updateCreateForm("nick", e.target.value)}
+                    placeholder="Nome do jogador"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Email</span>
+                  <Input
+                    value={createForm.email}
+                    onChange={(e) => updateCreateForm("email", e.target.value)}
+                    placeholder="email@dominio.com"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">WhatsApp</span>
+                  <Input
+                    value={createForm.whatsapp}
+                    onChange={(e) => updateCreateForm("whatsapp", e.target.value)}
+                    placeholder="16999990000"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Instagram</span>
+                  <Input
+                    value={createForm.instagram}
+                    onChange={(e) => updateCreateForm("instagram", e.target.value)}
+                    placeholder="@usuario"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Cidade</span>
+                  <Input
+                    value={createForm.cidade}
+                    onChange={(e) => updateCreateForm("cidade", e.target.value)}
+                    placeholder="Cidade"
+                  />
+                </label>
+              </div>
+
+              {gameConfig.hasValorantLookup ? (
+                <div className="space-y-2 rounded-md border border-border/60 bg-muted/30 p-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    Valorant
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Riot ID</span>
+                      <Input
+                        value={createForm.riotId}
+                        onChange={(e) => updateCreateForm("riotId", e.target.value)}
+                        placeholder="Nome#TAG"
+                      />
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Região</span>
+                      <Input
+                        value={createForm.valorantRegion}
+                        onChange={(e) => updateCreateForm("valorantRegion", e.target.value)}
+                        placeholder="br"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Elo atual</span>
+                  <select
+                    value={createForm.elo}
+                    onChange={(e) => updateCreateForm("elo", e.target.value)}
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
+                  >
+                    {gameElos.map((elo) => (
+                      <option key={elo} value={elo}>
+                        {elo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Pico</span>
+                  <select
+                    value={createForm.pico}
+                    onChange={(e) => updateCreateForm("pico", e.target.value)}
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
+                  >
+                    {gameElos.map((elo) => (
+                      <option
+                        key={elo}
+                        value={elo}
+                        disabled={eloScore(elo, gameElos) < eloScore(createForm.elo, gameElos)}
+                      >
+                        {elo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Função primária
+                  </span>
+                  <select
+                    value={createForm.funcaoPrimaria}
+                    onChange={(e) => updateCreateForm("funcaoPrimaria", e.target.value)}
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
+                  >
+                    {gameFuncoes.map((funcao) => (
+                      <option key={funcao} value={funcao}>
+                        {funcao}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Função secundária
+                  </span>
+                  <select
+                    value={createForm.funcaoSecundaria}
+                    onChange={(e) => updateCreateForm("funcaoSecundaria", e.target.value)}
+                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm outline-none transition-colors focus:border-ring"
+                  >
+                    {gameFuncoes.map((funcao) => (
+                      <option key={funcao} value={funcao}>
+                        {funcao}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Dias/semana</span>
+                  <Input
+                    value={createForm.diasTreino}
+                    onChange={(e) => updateCreateForm("diasTreino", e.target.value)}
+                    placeholder="2x por semana"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Dias exatos</span>
+                  <Input
+                    value={createForm.diasSemana}
+                    onChange={(e) => updateCreateForm("diasSemana", e.target.value)}
+                    placeholder="Segunda e quarta"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Horários</span>
+                  <Input
+                    value={createForm.horariosTreino}
+                    onChange={(e) => updateCreateForm("horariosTreino", e.target.value)}
+                    placeholder="Noite"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Melhor janela</span>
+                  <Input
+                    value={createForm.melhorJanela}
+                    onChange={(e) => updateCreateForm("melhorJanela", e.target.value)}
+                    placeholder="Tarde"
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Compromisso</span>
+                  <Input
+                    value={createForm.compromisso}
+                    onChange={(e) => updateCreateForm("compromisso", e.target.value)}
+                    placeholder="Quero competir"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Rotina fixa</span>
+                  <Input
+                    value={createForm.rotinaFixa}
+                    onChange={(e) => updateCreateForm("rotinaFixa", e.target.value)}
+                    placeholder="Sim / não"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Horários definidos</span>
+                  <Input
+                    value={createForm.horariosDefinidos}
+                    onChange={(e) => updateCreateForm("horariosDefinidos", e.target.value)}
+                    placeholder="Disponível à noite"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Capitão</span>
+                  <Input
+                    value={createForm.capitao}
+                    onChange={(e) => updateCreateForm("capitao", e.target.value)}
+                    placeholder="Sim / não"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Presencial</span>
+                  <Input
+                    value={createForm.presencial}
+                    onChange={(e) => updateCreateForm("presencial", e.target.value)}
+                    placeholder="Sim / não"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">Deslocamento</span>
+                  <Input
+                    value={createForm.deslocamento}
+                    onChange={(e) => updateCreateForm("deslocamento", e.target.value)}
+                    placeholder="Sim / não"
+                  />
+                </label>
+                <label className="space-y-1.5 md:col-span-2">
+                  <span className="text-xs font-medium text-muted-foreground">Contato</span>
+                  <Input
+                    value={createForm.autorizacaoContato}
+                    onChange={(e) => updateCreateForm("autorizacaoContato", e.target.value)}
+                    placeholder="Pode chamar no WhatsApp"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                disabled={createPending}
+                onClick={() => setCreateForm(null)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateInscricao} disabled={createPending}>
+                {createPending ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <SaveIcon />
+                )}
+                Criar inscrição
+              </Button>
+            </DialogFooter>
           </DialogContent>
         ) : null}
       </Dialog>

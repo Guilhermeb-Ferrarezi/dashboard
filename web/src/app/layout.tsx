@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter, Sora } from "next/font/google";
 
-import { AppProviders } from "@/components/providers/app-providers";
+import { AppProviders } from "@/components/ui/providers/app-providers";
 
 import "./globals.css";
 

@@ -7,14 +7,14 @@ import {
   BadgeCheckIcon,
   ChevronRightIcon,
   CrosshairIcon,
+  InboxIcon,
   LayoutDashboardIcon,
   LogsIcon,
   ShieldIcon,
   SparklesIcon,
 } from "lucide-react";
 
-import { UserMenu } from "@/components/portal/user-menu";
-import { ThemePreferenceSync } from "@/components/providers/theme-preference-sync";
+import { ThemePreferenceSync } from "@/components/ui/providers/theme-preference-sync";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
+import { UserMenu } from "@/components/portal/user-menu";
 
 const navigation = [{ href: "/home", label: "Launcher", icon: LayoutDashboardIcon }];
 const LAST_LOGS_PROJECT_ID_KEY = "logs:last-project-id";
@@ -46,7 +47,10 @@ const gamesNavigation = [
     href: "/vct",
     label: "VCT",
     icon: CrosshairIcon,
-    children: [{ href: "/vct/inscricoes", label: "Inscricoes" }],
+    children: [
+      { href: "/vct/inscricoes", label: "Inscricoes" },
+      { href: "/vct/formacoes", label: "Formacoes", icon: InboxIcon },
+    ],
   },
   {
     href: "/counter-strike",
@@ -269,7 +273,7 @@ export function AppShell({
                                     : pathname === item.href
                                 }
                               >
-                                <item.icon />
+                                {item.icon ? <item.icon /> : null}
                                 <span>{item.label}</span>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
