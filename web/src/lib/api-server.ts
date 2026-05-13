@@ -5,9 +5,13 @@ import { ApiError, parseApiResponse, type ApiFetchOptions } from "@/lib/api-core
 function resolveServerApiBaseUrl(
   requestHeaders: Awaited<ReturnType<typeof headers>>,
 ) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL;
-  if (apiUrl) {
-    return apiUrl.replace(/\/$/, "");
+  const serverApiUrl =
+    process.env.API_INTERNAL_URL ??
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL;
+
+  if (serverApiUrl) {
+    return serverApiUrl.replace(/\/$/, "");
   }
 
   const forwardedProto = requestHeaders.get("x-forwarded-proto") ?? "http";
