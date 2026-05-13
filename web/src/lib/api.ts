@@ -25,4 +25,3 @@ export async function clientApi<T>(
 
   return parseApiResponse<T>(response);
 }
-

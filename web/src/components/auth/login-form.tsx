@@ -91,13 +91,6 @@ export function LoginForm({ error }: LoginFormProps) {
               </p>
             </div>
           </div>
-          <Alert>
-            <AlertTitle>SSO piloto ativo</AlertTitle>
-            <AlertDescription>
-              O portal ja prepara tickets de acesso para integracoes com os
-              projetos conectados.
-            </AlertDescription>
-          </Alert>
           {ssoErrorMessage ? (
             <Alert variant="destructive">
               <AlertTitle>Falha no SSO</AlertTitle>
