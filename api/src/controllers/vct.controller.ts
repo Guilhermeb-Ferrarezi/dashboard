@@ -576,7 +576,6 @@ export async function atualizarInscricao(req: Request, res: Response) {
   try {
     const inscricao = await VctInscricao.findByIdAndUpdate(id, update, {
       new: true,
-      runValidators: true,
     }).lean();
 
     if (!inscricao) {

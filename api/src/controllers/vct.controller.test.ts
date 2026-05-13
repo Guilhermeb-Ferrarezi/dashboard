@@ -34,9 +34,19 @@ describe("atualizarInscricao", () => {
   const originalFindByIdAndUpdate = VctInscricao.findByIdAndUpdate;
 
   beforeEach(() => {
-    VctInscricao.findByIdAndUpdate = mock((id: string, update: Record<string, unknown>) => ({
-      lean: async () => ({ _id: id, ...update }),
-    })) as typeof VctInscricao.findByIdAndUpdate;
+    VctInscricao.findByIdAndUpdate = mock((
+      id: string,
+      update: Record<string, unknown>,
+      options?: Record<string, unknown>,
+    ) => {
+      if (options?.runValidators) {
+        throw new Error("runValidators should not be enabled for edit updates");
+      }
+
+      return {
+        lean: async () => ({ _id: id, ...update }),
+      };
+    }) as typeof VctInscricao.findByIdAndUpdate;
   });
 
   test("persists the inscription detail fields edited from the details modal", async () => {
@@ -91,6 +101,55 @@ describe("atualizarInscricao", () => {
         autorizacaoContato: "Sim",
         observacoes: "precisa revisar",
         highlightColor: "blue",
+      },
+    });
+  });
+
+  test("aceita salvar uma edicao quando campos legados do compromisso estao vazios", async () => {
+    const req = {
+      params: { id: "inscricao-2" },
+      body: {
+        nome: " Guilherme ",
+        nick: " guma ",
+        email: " GUMA@MAIL.COM ",
+        whatsapp: " 16999990000 ",
+        elo: " Platina 1 ",
+        pico: " Platina 2 ",
+        funcaoPrimaria: " Duelista ",
+        funcaoSecundaria: " Flex ",
+        cidade: "",
+        diasTreino: "",
+        diasSemana: "",
+        horariosTreino: "",
+        melhorJanela: "",
+        compromisso: "",
+        rotinaFixa: "",
+        horariosDefinidos: "",
+        capitao: "",
+        presencial: "",
+        deslocamento: "",
+        autorizacaoContato: "",
+        tags: [],
+        observacoes: "",
+        highlightColor: "",
+      },
+    } as Request;
+    const res = makeResponse();
+
+    await atualizarInscricao(req, res as Response);
+
+    expect(res.statusCode).toBeUndefined();
+    expect(res.body).toMatchObject({
+      ok: true,
+      inscricao: {
+        _id: "inscricao-2",
+        compromisso: "",
+        rotinaFixa: "",
+        horariosDefinidos: "",
+        capitao: "",
+        presencial: "",
+        deslocamento: "",
+        autorizacaoContato: "",
       },
     });
   });
