@@ -6,6 +6,7 @@ export interface IAdminAccessToken extends Mongoose.Document {
   type: string;
   label: string;
   tokenHash: string;
+  encryptedToken?: string | null;
   revokedAt?: Date | null;
   lastUsedAt?: Date | null;
   createdAt?: Date;
@@ -18,6 +19,7 @@ const AdminAccessTokenSchema = new Schema<IAdminAccessToken>(
     type: { type: String, required: true, index: true },
     label: { type: String, required: true, trim: true },
     tokenHash: { type: String, required: true, unique: true, index: true },
+    encryptedToken: { type: String, default: null, select: false },
     revokedAt: { type: Date, default: null },
     lastUsedAt: { type: Date, default: null },
   },

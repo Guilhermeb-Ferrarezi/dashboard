@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { AdminAccessToken } from "../models/AdminAccessToken";
+import { encryptSecret, decryptSecret } from "./token-vault";
 
 export type AdminAccessTokenSummary = {
   id: string;
@@ -50,6 +51,7 @@ export async function createAdminAccessToken(params: {
 }) {
   const plaintextToken = createAdminAccessTokenValue();
   const tokenHash = hashAdminAccessToken(plaintextToken);
+  const encryptedToken = encryptSecret(plaintextToken);
 
   if (params.type === "codex") {
     await AdminAccessToken.updateMany(
@@ -63,6 +65,7 @@ export async function createAdminAccessToken(params: {
     type: params.type,
     label: params.label,
     tokenHash,
+    encryptedToken,
     revokedAt: null,
     lastUsedAt: null,
   });
@@ -100,6 +103,18 @@ export async function getActiveAdminAccessToken(adminId: string, type: string) {
   return serializeAccessToken(token);
 }
 
+export async function getActiveAdminAccessTokenSecret(adminId: string, type: string) {
+  const token = await AdminAccessToken.findOne({ adminId, type, revokedAt: null })
+    .select("+encryptedToken")
+    .lean();
+
+  if (!token?.encryptedToken) {
+    return null;
+  }
+
+  return decryptSecret(token.encryptedToken);
+}
+
 export async function authenticateAdminAccessToken(
   adminId: string,
   type: string,
@@ -108,7 +123,12 @@ export async function authenticateAdminAccessToken(
   const tokenHash = hashAdminAccessToken(plaintextToken);
   const token = await AdminAccessToken.findOneAndUpdate(
     { adminId, type, revokedAt: null, tokenHash },
-    { $set: { lastUsedAt: new Date() } },
+    {
+      $set: {
+        lastUsedAt: new Date(),
+        encryptedToken: encryptSecret(plaintextToken),
+      },
+    },
     { new: true },
   ).lean();
 

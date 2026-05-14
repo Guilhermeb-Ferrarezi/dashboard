@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 
 import {
   authenticateAdminAccessToken,
+  getActiveAdminAccessToken,
   type AdminAccessTokenSummary,
 } from "../lib/admin-access-token";
 import { CODEX_ACCESS_BLOCKED_REASON } from "../lib/codex-access";
@@ -35,28 +36,37 @@ export function requireCodexAccessToken(req: Request, res: Response, next: NextF
     return res.status(401).json({ message: "Missing token" });
   }
 
-  const tokenValue = readCodexAccessToken(req);
-
-  if (!tokenValue) {
-    return res.status(403).json({
-      message: CODEX_ACCESS_BLOCKED_REASON,
-    });
-  }
-
-  return authenticateAdminAccessToken(adminId, "codex", tokenValue)
+  return getActiveAdminAccessToken(adminId, "codex")
     .then((token: AdminAccessTokenSummary | null) => {
       if (!token) {
         return res.status(403).json({
-          message: "Token de acesso do Codex invalido ou revogado.",
+          message: CODEX_ACCESS_BLOCKED_REASON,
         });
       }
 
-      req.codexAccessToken = token;
-      next();
-      return null;
+      const tokenValue = readCodexAccessToken(req);
+
+      if (!tokenValue) {
+        req.codexAccessToken = token;
+        next();
+        return null;
+      }
+
+      return authenticateAdminAccessToken(adminId, "codex", tokenValue)
+        .then((authenticatedToken: AdminAccessTokenSummary | null) => {
+          req.codexAccessToken = authenticatedToken ?? token;
+          next();
+          return null;
+        })
+        .catch((error) => {
+          console.error("[codex-access] erro ao autenticar token:", error);
+          return res.status(500).json({
+            message: "Falha ao validar o token de acesso do Codex.",
+          });
+        });
     })
     .catch((error) => {
-      console.error("[codex-access] erro ao autenticar token:", error);
+      console.error("[codex-access] erro ao carregar token ativo:", error);
       return res.status(500).json({
         message: "Falha ao validar o token de acesso do Codex.",
       });

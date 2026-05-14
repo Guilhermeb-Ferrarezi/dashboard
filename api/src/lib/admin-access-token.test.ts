@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { AdminAccessToken } from "../models/AdminAccessToken";
+import { decryptSecret, encryptSecret } from "./token-vault";
 import {
   authenticateAdminAccessToken,
   createAdminAccessToken,
@@ -19,6 +20,14 @@ describe("admin access token helpers", () => {
     expect(token.length).toBeGreaterThan(32);
     expect(hashAdminAccessToken(token)).toBe(hashAdminAccessToken(token));
     expect(hashAdminAccessToken(token)).not.toBe(token);
+  });
+
+  test("criptografa e descriptografa o valor bruto", () => {
+    const secret = "unit-test-secret";
+    const encrypted = encryptSecret("at_secret", secret);
+
+    expect(encrypted).toContain("v1:");
+    expect(decryptSecret(encrypted, secret)).toBe("at_secret");
   });
 });
 
@@ -61,6 +70,15 @@ describe("admin access token service", () => {
     expect(revokedCount).toBe(1);
     expect(result.id).toBe("token-1");
     expect(result.plaintextToken).toMatch(/^at_/);
+    expect(AdminAccessToken.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminId: "admin-1",
+        type: "codex",
+        label: "Codex",
+        tokenHash: expect.any(String),
+        encryptedToken: expect.any(String),
+      }),
+    );
   });
 
   test("lista tokens sem expor o hash bruto", async () => {
@@ -158,5 +176,20 @@ describe("admin access token service", () => {
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-03T00:00:00.000Z",
     });
+    expect(AdminAccessToken.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        adminId: "admin-1",
+        type: "codex",
+        revokedAt: null,
+        tokenHash: expect.any(String),
+      },
+      {
+        $set: {
+          lastUsedAt: expect.any(Date),
+          encryptedToken: expect.any(String),
+        },
+      },
+      { new: true },
+    );
   });
 });
