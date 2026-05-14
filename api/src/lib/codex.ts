@@ -8,6 +8,7 @@ import WebSocket, { WebSocketServer } from "ws";
 
 import type { AuthUserPayload } from "../types/express";
 import { CodexThreadSession } from "../models/CodexThreadSession";
+import { authenticateAdminAccessToken } from "./admin-access-token";
 import { resolveCodexAccessState } from "./codex-access";
 
 type JsonRpcId = string | number;
@@ -947,6 +948,28 @@ function parseCookieHeader(cookieHeader: string | undefined) {
   );
 }
 
+function readCodexAccessTokenFromRequest(request: IncomingMessage) {
+  const cookies = parseCookieHeader(request.headers.cookie);
+
+  if (typeof cookies.codex_access_token === "string" && cookies.codex_access_token.trim()) {
+    return decodeURIComponent(cookies.codex_access_token.trim());
+  }
+
+  const headerToken = request.headers["x-codex-access-token"];
+
+  if (typeof headerToken === "string" && headerToken.trim()) {
+    return headerToken.trim();
+  }
+
+  const authHeader = request.headers.authorization;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice("Bearer ".length).trim();
+  }
+
+  return null;
+}
+
 function authenticateAdminSocket(request: IncomingMessage) {
   const cookies = parseCookieHeader(request.headers.cookie);
   const token = cookies.auth_token;
@@ -1081,6 +1104,30 @@ export function attachCodexGateway(server: HttpServer) {
           message:
             accessState.codexAccessBlockedReason ??
             "Crie um token de acesso do Codex nas configuracoes do admin.",
+        });
+        browserSocket.close();
+        return;
+      }
+
+      const accessToken = readCodexAccessTokenFromRequest(_request);
+
+      if (!accessToken) {
+        sendBrowserEvent(browserSocket, {
+          type: "error",
+          message:
+            accessState.codexAccessBlockedReason ??
+            "Crie um token de acesso do Codex nas configuracoes do admin.",
+        });
+        browserSocket.close();
+        return;
+      }
+
+      const authenticatedToken = await authenticateAdminAccessToken(user.id, "codex", accessToken);
+
+      if (!authenticatedToken) {
+        sendBrowserEvent(browserSocket, {
+          type: "error",
+          message: "Token de acesso do Codex invalido ou revogado.",
         });
         browserSocket.close();
         return;

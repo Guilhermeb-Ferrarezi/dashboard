@@ -42,6 +42,21 @@ interface AccountSettingsDialogProps {
 
 type SettingsSection = "account" | "preferences" | "session" | "codex";
 
+function buildSettingsSections(role: SessionUser["role"]) {
+  return [
+    { id: "account", label: "Minha conta", icon: UserRoundPenIcon },
+    { id: "preferences", label: "Preferencias", icon: PaletteIcon },
+    ...(role === "admin"
+      ? [{ id: "codex", label: "Acesso Codex", icon: ShieldIcon }]
+      : []),
+    { id: "session", label: "Sessao", icon: ShieldIcon },
+  ] as Array<{
+    id: SettingsSection;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+  }>;
+}
+
 export function AccountSettingsDialog({
   user,
   open,
@@ -54,18 +69,7 @@ export function AccountSettingsDialog({
   const [email, setEmail] = useState(user.email ?? "");
   const [pending, setPending] = useState(false);
   const [activeSection, setActiveSection] = useState<SettingsSection>("account");
-  const settingsSections = [
-    { id: "account", label: "Minha conta", icon: UserRoundPenIcon },
-    { id: "preferences", label: "Preferencias", icon: PaletteIcon },
-    ...(user.role === "admin"
-      ? [{ id: "codex", label: "Acesso Codex", icon: ShieldIcon }]
-      : []),
-    { id: "session", label: "Sessao", icon: ShieldIcon },
-  ] as Array<{
-    id: SettingsSection;
-    label: string;
-    icon: ComponentType<{ className?: string }>;
-  }>;
+  const settingsSections = buildSettingsSections(user.role);
 
   useEffect(() => {
     setUsername(user.username);

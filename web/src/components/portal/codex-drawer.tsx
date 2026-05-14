@@ -25,7 +25,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { clientApi } from "@/lib/api";
+import { CodexMarkdown } from "@/components/portal/codex-markdown";
+import { codexClientApi } from "@/lib/codex-api";
 import { getCodexWebSocketUrl, formatCodexTimestamp } from "@/lib/codex";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
@@ -218,6 +219,54 @@ function ensureFileChangeEntry(
       ? { ...item, changes }
       : item,
   );
+}
+
+function renderDiffLine(line: string, index: number) {
+  const baseClass = "block whitespace-pre-wrap break-words rounded-sm px-2 py-0.5 leading-6";
+
+  if (line.startsWith("+")) {
+    return (
+      <span key={`${index}:${line}`} className={cn(baseClass, "text-emerald-300", "bg-emerald-500/8")}>
+        {line}
+      </span>
+    );
+  }
+
+  if (line.startsWith("-")) {
+    return (
+      <span key={`${index}:${line}`} className={cn(baseClass, "text-rose-300", "bg-rose-500/8")}>
+        {line}
+      </span>
+    );
+  }
+
+  if (line.startsWith("@@")) {
+    return (
+      <span key={`${index}:${line}`} className={cn(baseClass, "text-sky-300", "bg-sky-500/8")}>
+        {line}
+      </span>
+    );
+  }
+
+  if (line.startsWith("diff --git") || line.startsWith("index ") || line.startsWith("---") || line.startsWith("+++")) {
+    return (
+      <span key={`${index}:${line}`} className={cn(baseClass, "text-amber-200")}>
+        {line}
+      </span>
+    );
+  }
+
+  return (
+    <span key={`${index}:${line}`} className={cn(baseClass, "text-muted-foreground")}>
+      {line}
+    </span>
+  );
+}
+
+function renderStructuredDiff(diff: string) {
+  return diff
+    .split("\n")
+    .map((line, index) => renderDiffLine(line, index));
 }
 
 export function CodexDrawer({
@@ -516,13 +565,13 @@ export function CodexDrawer({
   }, [historySearch, threads]);
 
   async function refreshAccount() {
-    const response = await clientApi<{ ok: true; account: CodexAccountStatus }>("/codex/account");
+    const response = await codexClientApi<{ ok: true; account: CodexAccountStatus }>("/codex/account");
     setAccount(response.account);
     return response.account;
   }
 
   async function refreshThreads() {
-    const response = await clientApi<{ ok: true; threads: CodexThreadSummary[] }>("/codex/threads");
+    const response = await codexClientApi<{ ok: true; threads: CodexThreadSummary[] }>("/codex/threads");
     setThreads(response.threads);
     setCurrentThread((current) =>
       current
@@ -535,7 +584,7 @@ export function CodexDrawer({
     setLoadingThread(true);
 
     try {
-      const response = await clientApi<{ ok: true } & CodexThreadDetail>(`/codex/threads/${threadId}`);
+      const response = await codexClientApi<{ ok: true } & CodexThreadDetail>(`/codex/threads/${threadId}`);
       setCurrentThread(response.thread);
       setTimeline(response.timeline);
     } catch (error) {
@@ -549,7 +598,7 @@ export function CodexDrawer({
 
   async function logout() {
     try {
-      await clientApi("/codex/account/logout", { method: "POST" });
+      await codexClientApi("/codex/account/logout", { method: "POST" });
       setAccount((current) =>
         current
           ? { ...current, connected: false, email: null, planType: null, sharedAccountLabel: null }
@@ -839,7 +888,9 @@ export function CodexDrawer({
               if (entry.kind === "user") {
                 return (
                   <div key={entry.id} className="ml-auto max-w-[88%] rounded-[16px] bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_90%,white),color-mix(in_oklch,var(--primary)_72%,black))] px-3 py-2 text-sm text-primary-foreground shadow-[0_4px_14px_rgba(98,110,255,0.18)]">
-                    <p className="whitespace-pre-wrap">{entry.text}</p>
+                    <CodexMarkdown tone="inverse" className="text-sm leading-7">
+                      {entry.text}
+                    </CodexMarkdown>
                   </div>
                 );
               }
@@ -847,7 +898,9 @@ export function CodexDrawer({
               if (entry.kind === "assistant") {
                 return (
                   <div key={entry.id} className="max-w-[92%] px-0.5 py-0.5 text-sm text-foreground">
-                    <p className="whitespace-pre-wrap">{entry.text}</p>
+                    <CodexMarkdown className="text-sm leading-7">
+                      {entry.text}
+                    </CodexMarkdown>
                   </div>
                 );
               }
@@ -863,11 +916,13 @@ export function CodexDrawer({
                         {entry.status}
                       </Badge>
                     </div>
-                    <code className="mt-2 block overflow-x-auto whitespace-pre-wrap rounded-lg bg-background/70 px-2.5 py-2 text-xs text-foreground">
+                    <code className="mt-2 block overflow-x-auto whitespace-pre-wrap rounded-lg border border-border/60 bg-background/70 px-2.5 py-2 text-xs leading-6 text-foreground">
                       {entry.command}
                     </code>
-                    <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-background/70 px-2.5 py-2.5 text-xs text-muted-foreground">
-                      {entry.output || "Sem saida registrada."}
+                    <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-border/60 bg-background/70 px-2.5 py-2.5 text-xs leading-6 text-muted-foreground">
+                      <code className="block whitespace-pre-wrap break-words">
+                        {entry.output || "Sem saida registrada."}
+                      </code>
                     </pre>
                   </div>
                 );
@@ -893,8 +948,10 @@ export function CodexDrawer({
                             </p>
                             <Badge variant="secondary">{change.kind}</Badge>
                           </div>
-                          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap text-[11px] text-muted-foreground">
-                            {change.diff}
+                          <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-border/50 bg-background/70 p-2 text-[11px] leading-5">
+                            <code className="block font-mono">
+                              {renderStructuredDiff(change.diff)}
+                            </code>
                           </pre>
                         </div>
                       ))}
@@ -905,7 +962,9 @@ export function CodexDrawer({
 
               return (
                 <div key={entry.id} className="rounded-lg border border-border/60 bg-card/40 px-3 py-2.5 text-sm text-muted-foreground">
-                  <p className="whitespace-pre-wrap">{entry.text}</p>
+                  <CodexMarkdown tone="muted" className="text-sm leading-7">
+                    {entry.text}
+                  </CodexMarkdown>
                 </div>
               );
             })}

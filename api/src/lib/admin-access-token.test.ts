@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { AdminAccessToken } from "../models/AdminAccessToken";
 import {
+  authenticateAdminAccessToken,
   createAdminAccessToken,
   createAdminAccessTokenValue,
   getActiveAdminAccessToken,
@@ -128,6 +129,34 @@ describe("admin access token service", () => {
       lastUsedAt: null,
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-02T00:00:00.000Z",
+    });
+  });
+
+  test("autentica token pelo valor bruto e atualiza lastUsedAt", async () => {
+    AdminAccessToken.findOneAndUpdate = mock(() => ({
+      lean: async () => ({
+        _id: "token-1",
+        adminId: "admin-1",
+        type: "codex",
+        label: "Codex",
+        revokedAt: null,
+        lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2024-01-03T00:00:00.000Z"),
+      }),
+    })) as typeof AdminAccessToken.findOneAndUpdate;
+
+    const token = await authenticateAdminAccessToken("admin-1", "codex", "at_secret");
+
+    expect(token).toEqual({
+      id: "token-1",
+      adminId: "admin-1",
+      type: "codex",
+      label: "Codex",
+      revokedAt: null,
+      lastUsedAt: "2024-01-03T00:00:00.000Z",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-03T00:00:00.000Z",
     });
   });
 });

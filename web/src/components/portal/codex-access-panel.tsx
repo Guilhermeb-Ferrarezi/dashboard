@@ -17,6 +17,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { clientApi } from "@/lib/api";
+import {
+  clearCodexAccessTokenCookie,
+  setCodexAccessTokenCookie,
+} from "@/lib/codex-access";
 import { cn } from "@/lib/utils";
 import type { AdminAccessTokenSummary } from "@/types/admin-access-token";
 
@@ -74,6 +78,12 @@ export function CodexAccessPanel() {
     [tokens],
   );
 
+  useEffect(() => {
+    if (!loading && !activeCodexToken) {
+      clearCodexAccessTokenCookie();
+    }
+  }, [activeCodexToken, loading]);
+
   async function loadTokens() {
     setLoading(true);
 
@@ -111,6 +121,7 @@ export function CodexAccessPanel() {
         value: response.token,
         label: response.label,
       });
+      setCodexAccessTokenCookie(response.token);
       await loadTokens();
       window.dispatchEvent(new Event("codex-access-updated"));
       toast.success("Token de acesso criado.");
@@ -130,6 +141,7 @@ export function CodexAccessPanel() {
       await clientApi<AdminAccessTokenRevokeResponse>(`/admin/tokens/${tokenId}/revoke`, {
         method: "POST",
       });
+      clearCodexAccessTokenCookie();
       await loadTokens();
       window.dispatchEvent(new Event("codex-access-updated"));
       toast.success("Token revogado.");

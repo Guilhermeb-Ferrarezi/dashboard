@@ -1,4 +1,5 @@
 import "express";
+import type { AdminAccessTokenSummary } from "../lib/admin-access-token";
 
 export interface AuthUserPayload {
   id: string;
@@ -12,5 +13,6 @@ export interface AuthUserPayload {
 declare module "express-serve-static-core" {
   interface Request {
     user?: AuthUserPayload;
+    codexAccessToken?: AdminAccessTokenSummary;
   }
 }

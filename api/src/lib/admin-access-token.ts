@@ -99,3 +99,22 @@ export async function getActiveAdminAccessToken(adminId: string, type: string) {
 
   return serializeAccessToken(token);
 }
+
+export async function authenticateAdminAccessToken(
+  adminId: string,
+  type: string,
+  plaintextToken: string,
+) {
+  const tokenHash = hashAdminAccessToken(plaintextToken);
+  const token = await AdminAccessToken.findOneAndUpdate(
+    { adminId, type, revokedAt: null, tokenHash },
+    { $set: { lastUsedAt: new Date() } },
+    { new: true },
+  ).lean();
+
+  if (!token) {
+    return null;
+  }
+
+  return serializeAccessToken(token);
+}
