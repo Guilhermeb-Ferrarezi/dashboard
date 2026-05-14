@@ -469,6 +469,7 @@ async function startCodexAppServer() {
   );
 
   appServerProcess = child;
+  let appServerReady = false;
 
   child.stdout.on("data", (chunk) => {
     const text = chunk.toString().trim();
@@ -486,6 +487,30 @@ async function startCodexAppServer() {
     }
   });
 
+  const startupFailure = new Promise<void>((_resolve, reject) => {
+    child.once("error", (error) => {
+      appServerProcess = null;
+      reject(
+        error instanceof Error
+          ? error
+          : new Error("Falha ao iniciar o Codex app-server."),
+      );
+    });
+
+    child.once("exit", (code, signal) => {
+      if (appServerReady) {
+        return;
+      }
+
+      appServerProcess = null;
+      reject(
+        new Error(
+          `Codex app-server encerrou antes de iniciar (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
+        ),
+      );
+    });
+  });
+
   child.once("exit", (code, signal) => {
     console.warn(
       `[codex-app-server] finalizado (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
@@ -493,7 +518,17 @@ async function startCodexAppServer() {
     appServerProcess = null;
   });
 
-  await waitForAppServer(CODEX_APP_SERVER_URL, APP_SERVER_START_TIMEOUT_MS);
+  try {
+    await Promise.race([
+      waitForAppServer(CODEX_APP_SERVER_URL, APP_SERVER_START_TIMEOUT_MS).then(() => {
+        appServerReady = true;
+      }),
+      startupFailure,
+    ]);
+  } catch (error) {
+    appServerProcess = null;
+    throw error;
+  }
 }
 
 export async function ensureCodexAppServer() {
