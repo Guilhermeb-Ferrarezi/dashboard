@@ -419,14 +419,12 @@ async function waitForAppServer(url: string, timeoutMs: number) {
           }
 
           settled = true;
-          socket.removeAllListeners();
           reject(error);
         };
 
         socket.once("error", handleError);
         socket.once("open", () => {
           settled = true;
-          socket.removeAllListeners();
           socket.close();
           resolve();
         });
