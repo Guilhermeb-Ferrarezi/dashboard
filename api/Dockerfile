@@ -3,6 +3,8 @@ FROM oven/bun:1.3.11
 WORKDIR /app
 ENV PATH="/root/.bun/bin:${PATH}"
 
+RUN apk add --no-cache curl
+
 COPY package.json bun.lock ./
 
 RUN bun install --frozen-lockfile --production
