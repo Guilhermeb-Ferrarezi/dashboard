@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { AnimatePresence, motion, type HTMLMotionProps } from "framer-motion"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -635,29 +636,89 @@ function SidebarMenuSkeleton({
   )
 }
 
-function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
-  return (
+function SidebarMenuSub({
+  className,
+  open = true,
+  ...props
+}: React.ComponentProps<"ul"> & {
+  open?: boolean
+}) {
+  const submenuVariants = {
+    hidden: {
+      opacity: 0,
+      y: -4,
+      height: 0,
+      transition: {
+        duration: 0.18,
+        when: "afterChildren",
+        staggerChildren: 0.02,
+        staggerDirection: -1,
+      },
+    },
+    open: {
+      opacity: 1,
+      y: 0,
+      height: "auto",
+      transition: {
+        duration: 0.24,
+        when: "beforeChildren",
+        staggerChildren: 0.03,
+        delayChildren: 0.03,
+      },
+    },
+  } as const
+
+  const content = (
     <ul
       data-slot="sidebar-menu-sub"
       data-sidebar="menu-sub"
       className={cn(
-        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5 group-data-[collapsible=icon]:hidden",
+        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5 overflow-hidden group-data-[collapsible=icon]:hidden",
         className
       )}
       {...props}
     />
+  )
+
+  return (
+    <AnimatePresence initial={false} mode="sync">
+      {open ? (
+        <motion.div
+          key="sidebar-menu-sub"
+          data-slot="sidebar-menu-sub-viewport"
+          className="group/sidebar-menu-sub-viewport overflow-hidden motion-reduce:transition-none"
+          variants={submenuVariants}
+          initial="hidden"
+          animate="open"
+          exit="hidden"
+          style={{ willChange: "height, opacity, transform" }}
+        >
+          {content}
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 
 function SidebarMenuSubItem({
   className,
   ...props
-}: React.ComponentProps<"li">) {
+}: HTMLMotionProps<"li">) {
+  const itemVariants = {
+    hidden: { opacity: 0, x: -8 },
+    open: { opacity: 1, x: 0 },
+  } as const
+
   return (
-    <li
+    <motion.li
       data-slot="sidebar-menu-sub-item"
       data-sidebar="menu-sub-item"
-      className={cn("group/menu-sub-item relative", className)}
+      variants={itemVariants}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className={cn(
+        "group/menu-sub-item relative motion-reduce:transition-none",
+        className
+      )}
       {...props}
     />
   )
@@ -679,7 +740,7 @@ function SidebarMenuSubButton({
     props: mergeProps<"a">(
       {
         className: cn(
-          "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+          "flex h-7 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,transform] duration-200 ease-out group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
           className
         ),
       },

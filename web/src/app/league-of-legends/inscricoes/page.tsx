@@ -7,8 +7,8 @@ export default async function LeagueOfLegendsInscricoesPage() {
     <GameInscricoesPage
       modalidade="lol"
       eyebrow="League of Legends"
-      title="Inscricoes League of Legends"
-      description="Monte e balanceie os times de League of Legends a partir das inscricoes recebidas."
+      title="Inscricoes LoL"
+      description="Monte e balanceie os times de LoL a partir das inscricoes recebidas."
     />
   );
 }

@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { AppShell } from "@/components/portal/app-shell";
 import { VctFormacoesPanel } from "@/components/admin/vct-formacoes-panel";
 import { serverApi } from "@/lib/api-server";
-import { requireAdminSession } from "@/lib/session";
+import { requireSession } from "@/lib/session";
 import type { VctFormacaoSummary } from "@/types/portal";
 
 type GameSlug = "valorant" | "counter-strike" | "lol";
@@ -21,7 +21,7 @@ export async function GameFormacoesPage({
   title,
   description,
 }: GameFormacoesPageProps) {
-  const user = await requireAdminSession();
+  const user = await requireSession();
   const cookieHeader = (await cookies()).toString();
   const query = `modalidade=${encodeURIComponent(modalidade)}`;
 

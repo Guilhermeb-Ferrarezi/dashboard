@@ -2,18 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  BadgeCheckIcon,
   ChevronRightIcon,
-  CrosshairIcon,
-  InboxIcon,
-  LayoutDashboardIcon,
-  LogsIcon,
-  ShieldIcon,
   SparklesIcon,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { ThemePreferenceSync } from "@/components/ui/providers/theme-preference-sync";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,51 +20,29 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarProvider,
-  SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
 import { UserMenu } from "@/components/portal/user-menu";
-
-const navigation = [{ href: "/home", label: "Launcher", icon: LayoutDashboardIcon }];
-const LAST_LOGS_PROJECT_ID_KEY = "logs:last-project-id";
-
-const gamesNavigation = [
-  {
-    href: "/vct",
-    label: "VCT",
-    icon: CrosshairIcon,
-    children: [
-      { href: "/vct/inscricoes", label: "Inscricoes" },
-      { href: "/vct/formacoes", label: "Formacoes", icon: InboxIcon },
-    ],
-  },
-  {
-    href: "/counter-strike",
-    label: "Counter-strike",
-    icon: ShieldIcon,
-    children: [{ href: "/counter-strike/inscricoes", label: "Inscricoes" }],
-  },
-  {
-    href: "/league-of-legends",
-    label: "League of legends",
-    icon: SparklesIcon,
-    children: [{ href: "/league-of-legends/inscricoes", label: "Inscricoes" }],
-  },
-] as const;
-
-const adminNavigation = [
-  { href: "/logs", label: "Logs", icon: LogsIcon },
-  { href: "/admin/users", label: "Usuarios", icon: ShieldIcon },
-];
+import {
+  PortalQuickSearchDialog,
+  PortalSearchLauncher,
+} from "@/components/portal/portal-quick-search";
+import {
+  PortalRecentSection,
+} from "@/components/portal/portal-recent-section";
+import {
+  buildPortalSidebarGroups,
+  portalIconMap,
+  type PortalSidebarItem,
+} from "@/components/portal/portal-shell-data";
 
 interface AppShellProps {
   user: SessionUser;
@@ -79,6 +52,28 @@ interface AppShellProps {
   eyebrow?: string;
   fullWidth?: boolean;
   lockViewport?: boolean;
+}
+
+function isItemActive(item: PortalSidebarItem, pathname: string, logsHref: string) {
+  if (item.href === logsHref) {
+    return pathname === "/logs" || pathname.startsWith("/logs/");
+  }
+
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+function isGroupActive(
+  group: { items: PortalSidebarItem[] },
+  pathname: string,
+  logsHref: string,
+) {
+  return group.items.some((item) => {
+    if (isItemActive(item, pathname, logsHref)) {
+      return true;
+    }
+
+    return item.children?.some((child) => isItemActive(child, pathname, logsHref)) ?? false;
+  });
 }
 
 export function AppShell({
@@ -91,24 +86,12 @@ export function AppShell({
   lockViewport = false,
 }: AppShellProps) {
   const pathname = usePathname();
-  const isAdminSection = pathname.startsWith("/admin") || pathname.startsWith("/logs");
-  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(isAdminSection);
-  const [openGameMenus, setOpenGameMenus] = useState<Record<string, boolean>>(() => {
-    return Object.fromEntries(
-      gamesNavigation.map((section) => [
-        section.href,
-        section.children.some(
-          (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
-        ),
-      ]),
-    );
-  });
   const [logsHref, setLogsHref] = useState(() => {
     if (typeof window === "undefined") {
       return "/logs";
     }
 
-    const lastProjectId = window.localStorage.getItem(LAST_LOGS_PROJECT_ID_KEY);
+    const lastProjectId = window.localStorage.getItem("logs:last-project-id");
     return lastProjectId ? `/logs/${lastProjectId}` : "/logs";
   });
 
@@ -132,165 +115,213 @@ export function AppShell({
     };
   }, []);
 
-  const adminMenuOpen = isAdminSection || isAdminMenuOpen;
+  const sidebarGroups = useMemo(() => buildPortalSidebarGroups(logsHref), [logsHref]);
+
+  const visibleSidebarGroups = useMemo(
+    () =>
+      sidebarGroups.filter((group) => {
+        if (user.role === "admin") {
+          return true;
+        }
+
+        return group.label === "Operacao" || group.label === "Jogos";
+      }),
+    [sidebarGroups, user.role],
+  );
+
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const routeOpenMenus = useMemo(() => {
+    const entries: Array<[string, boolean]> = [];
+
+    for (const group of visibleSidebarGroups) {
+      for (const item of group.items) {
+        if (!item.children?.length) {
+          continue;
+        }
+
+        entries.push([
+          item.href,
+          isItemActive(item, pathname, logsHref) ||
+            item.children.some((child) => isItemActive(child, pathname, logsHref)),
+        ]);
+      }
+    }
+
+    return Object.fromEntries(entries);
+  }, [logsHref, pathname, visibleSidebarGroups]);
+
+  const routeOpenGroups = useMemo(() => {
+    const entries: Array<[string, boolean]> = [];
+
+    for (const group of visibleSidebarGroups) {
+      entries.push([group.label, isGroupActive(group, pathname, logsHref)]);
+    }
+
+    return Object.fromEntries(entries);
+  }, [logsHref, pathname, visibleSidebarGroups]);
+
+  function renderSidebarItem(item: PortalSidebarItem) {
+    const hasChildren = Boolean(item.children?.length);
+    const active = hasChildren
+      ? pathname === item.href || (item.href === logsHref && pathname.startsWith("/logs"))
+      : isItemActive(item, pathname, logsHref);
+    const isOpen =
+      hasChildren && (openMenus[item.href] ?? routeOpenMenus[item.href] ?? false);
+
+    return (
+      <SidebarMenuItem key={item.href} className="group/menu-item">
+        {hasChildren ? (
+          <SidebarMenuButton
+            render={<button type="button" />}
+            isActive={active}
+            className="relative w-full h-8 !py-0 !pl-2 !pr-8 !flex items-center gap-2"
+            aria-expanded={isOpen}
+            aria-controls={`${item.href.slice(1)}-submenu`}
+            onClick={() => {
+              setOpenMenus((current) => ({
+                ...current,
+                [item.href]: !(current[item.href] ?? routeOpenMenus[item.href] ?? false),
+              }));
+            }}
+          >
+            <span className="min-w-0 truncate text-sm leading-none">{item.label}</span>
+            <span className="absolute right-2 top-1/2 flex size-4 shrink-0 -translate-y-1/2 items-center justify-center">
+              <ChevronRightIcon
+                className={cn("size-4 transition-transform", isOpen && "rotate-90")}
+              />
+            </span>
+          </SidebarMenuButton>
+        ) : (
+          <SidebarMenuButton
+            render={<Link href={item.href} />}
+            isActive={active}
+            className="relative w-full h-8 !py-0 !pl-8 !pr-2 !flex items-center gap-2"
+          >
+            <span className="min-w-0 truncate text-sm leading-none">{item.label}</span>
+          </SidebarMenuButton>
+        )}
+
+        {hasChildren ? (
+          <SidebarMenuSub
+            open={isOpen}
+            id={`${item.href.slice(1)}-submenu`}
+            className="!px-0 gap-0.5"
+          >
+            {item.children!.map((child) => {
+              const childActive = isItemActive(child, pathname, logsHref);
+
+              return (
+                <SidebarMenuSubItem key={child.href} className="w-full">
+                  <SidebarMenuSubButton
+                    render={<Link href={child.href} />}
+                    isActive={childActive}
+                    className="w-full max-w-none h-7 !py-0 !pl-2 !pr-2 !flex items-center justify-start gap-2 text-left"
+                  >
+                    <span className="min-w-0 truncate text-sm leading-none">{child.label}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        ) : null}
+      </SidebarMenuItem>
+    );
+  }
 
   return (
     <SidebarProvider>
       <ThemePreferenceSync preferences={user.preferences} />
+      <PortalQuickSearchDialog user={user} logsHref={logsHref} />
       <Sidebar variant="floating" collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-3 rounded-xl bg-sidebar-primary/10 p-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-              <SparklesIcon className="size-5" />
-            </div>
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold">
-                Santos Tech
-              </span>
-              <span className="truncate text-xs text-sidebar-foreground/70">
-                Universal Home
-              </span>
+          <div className="overflow-hidden rounded-2xl border border-sidebar-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--sidebar-primary)_18%,transparent),color-mix(in_oklch,var(--sidebar)_92%,black))] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
+                <SparklesIcon className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">Santos Tech</p>
+                <p className="truncate text-xs text-sidebar-foreground/70">
+                  Portal operacional
+                </p>
+              </div>
             </div>
           </div>
         </SidebarHeader>
+
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Navegacao</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {navigation.map((item) => {
-                  const href = item.href === "/logs" ? logsHref : item.href;
-                  const isActive =
-                    item.href === "/logs"
-                      ? pathname === "/logs" || pathname.startsWith("/logs/")
-                      : pathname === item.href;
+          <div className="px-2 py-2">
+            <PortalSearchLauncher variant="sidebar" />
+          </div>
 
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        render={<Link href={href} />}
-                        isActive={isActive}
-                        tooltip={item.label}
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>Jogos</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {gamesNavigation.map((item) => {
-                  const isActive = item.children.some(
-                    (child) => pathname === child.href || pathname.startsWith(`${child.href}/`),
-                  );
-                  const isOpen = isActive || (openGameMenus[item.href] ?? false);
+          <div className="px-2 py-2">
+            <SidebarMenuButton
+              render={<Link href="/home" />}
+              isActive={pathname === "/home"}
+              className="w-full h-10 !py-0 !pl-2 !pr-2 !flex items-center gap-2"
+            >
+              <portalIconMap.home className="size-4 shrink-0 text-sidebar-foreground/70" />
+              <span className="min-w-0 flex-1 truncate text-sm leading-none">Home</span>
+            </SidebarMenuButton>
+          </div>
 
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        aria-expanded={isOpen}
-                        aria-controls={`${item.href.slice(1)}-submenu`}
-                        onClick={() =>
-                          setOpenGameMenus((current) => ({
-                            ...current,
-                            [item.href]: !((current[item.href] ?? false) || false),
-                          }))
-                        }
-                        tooltip={item.label}
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                        <ChevronRightIcon
-                          className={cn("ml-auto size-4 transition-transform", isOpen && "rotate-90")}
-                        />
-                      </SidebarMenuButton>
-                      {isOpen ? (
-                        <SidebarMenuSub id={`${item.href.slice(1)}-submenu`}>
-                          {item.children.map((child) => {
-                            const childActive =
-                              pathname === child.href || pathname.startsWith(`${child.href}/`);
+          <PortalRecentSection userId={user.id} pathname={pathname} logsHref={logsHref} />
 
-                            return (
-                              <SidebarMenuSubItem key={child.href}>
-                                <SidebarMenuSubButton render={<Link href={child.href} />} isActive={childActive}>
-                                  <span>{child.label}</span>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      ) : null}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          {user.role === "admin" ? (
-            <>
-              <SidebarSeparator />
-              <SidebarGroup>
-                <SidebarGroupLabel>Administracao</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        isActive={isAdminSection}
-                        aria-expanded={adminMenuOpen}
-                        aria-controls="admin-sidebar-submenu"
-                        onClick={() => setIsAdminMenuOpen((value) => !value)}
-                        tooltip="Administracao"
-                      >
-                        <BadgeCheckIcon />
-                        <span>Administracao</span>
-                        <ChevronRightIcon
-                          className={cn(
-                            "ml-auto size-4 transition-transform",
-                            adminMenuOpen && "rotate-90",
-                          )}
-                        />
-                      </SidebarMenuButton>
-                      {adminMenuOpen ? (
-                        <SidebarMenuSub id="admin-sidebar-submenu">
-                          {adminNavigation.map((item) => (
-                            <SidebarMenuSubItem key={item.href}>
-                              <SidebarMenuSubButton
-                                render={
-                                  <Link
-                                    href={item.href === "/logs" ? logsHref : item.href}
-                                  />
-                                }
-                                isActive={
-                                  item.href === "/logs"
-                                    ? pathname === "/logs" || pathname.startsWith("/logs/")
-                                    : pathname === item.href
-                                }
-                              >
-                                {item.icon ? <item.icon /> : null}
-                                <span>{item.label}</span>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      ) : null}
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </>
-          ) : null}
+          {visibleSidebarGroups.map((group) => (
+            <SidebarGroup key={group.label}>
+              <Button
+                type="button"
+                variant="ghost"
+                className="mb-1 flex h-8 w-full items-center justify-between gap-2 rounded-md px-2 text-sidebar-foreground/70 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground aria-expanded:bg-sidebar-foreground/10 aria-expanded:text-sidebar-foreground"
+                onClick={() =>
+                  setOpenGroups((current) => ({
+                    ...current,
+                    [group.label]: !(current[group.label] ?? routeOpenGroups[group.label] ?? false),
+                  }))
+                }
+                aria-label={
+                  (openGroups[group.label] ?? routeOpenGroups[group.label] ?? false)
+                    ? "Recolher grupo"
+                    : "Expandir grupo"
+                }
+                aria-expanded={openGroups[group.label] ?? routeOpenGroups[group.label] ?? false}
+              >
+                <SidebarGroupLabel className="flex min-w-0 flex-1 items-center gap-2 px-0">
+                  {(() => {
+                    const GroupIcon = portalIconMap[group.iconKey];
+                    return <GroupIcon className="size-4" />;
+                  })()}
+                  <span className="truncate">{group.label}</span>
+                </SidebarGroupLabel>
+                <ChevronRightIcon
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    (openGroups[group.label] ?? routeOpenGroups[group.label] ?? false) &&
+                      "rotate-90",
+                  )}
+                />
+              </Button>
+              <SidebarGroupContent>
+                <SidebarMenuSub
+                  open={openGroups[group.label] ?? routeOpenGroups[group.label] ?? false}
+                  className="gap-0.5"
+                >
+                  {group.items.map(renderSidebarItem)}
+                </SidebarMenuSub>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+
+          <div className="mx-2 my-2 h-px shrink-0 bg-sidebar-border/60" />
         </SidebarContent>
+
         <SidebarFooter>
           <UserMenu user={user} />
         </SidebarFooter>
       </Sidebar>
+
       <SidebarInset className={cn(lockViewport && "h-screen overflow-hidden")}>
         <div
           className={cn(
@@ -298,10 +329,10 @@ export function AppShell({
             lockViewport && "h-screen min-h-0 overflow-hidden",
           )}
         >
-          <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
             <div
               className={cn(
-                "flex w-full items-center gap-3 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]",
+                "flex w-full items-center gap-4 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
                 fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
               )}
             >
@@ -316,15 +347,14 @@ export function AppShell({
                   <h1 className="text-xl font-semibold md:text-2xl">{title}</h1>
                   <Badge variant="secondary">{user.role.toUpperCase()}</Badge>
                 </div>
-                <p className="truncate text-sm text-muted-foreground">
-                  {description}
-                </p>
+                <p className="truncate text-sm text-muted-foreground">{description}</p>
               </div>
             </div>
           </header>
+
           <main
             className={cn(
-              "flex w-full flex-1 flex-col px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)] md:px-[var(--app-page-padding-x)]",
+              "flex w-full flex-1 flex-col px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
               lockViewport && "min-h-0 overflow-hidden",
               fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
             )}

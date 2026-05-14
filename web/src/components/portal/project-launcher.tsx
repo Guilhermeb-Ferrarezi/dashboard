@@ -4,14 +4,12 @@ import {
   startTransition,
   useDeferredValue,
   useEffect,
-  useEffectEvent,
   useMemo,
   useState,
 } from "react";
 import {
   BellRingIcon,
   BookOpenTextIcon,
-  CommandIcon,
   ExternalLinkIcon,
   HeartIcon,
   LayoutGridIcon,
@@ -23,16 +21,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandShortcut,
-} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,6 +28,8 @@ import { clientApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
 import type { PortalProject } from "@/types/portal";
+import { PortalSearchLauncher } from "@/components/portal/portal-quick-search";
+import { trackPortalRecent } from "@/components/portal/portal-recents";
 
 const iconMap = {
   bolt: ZapIcon,
@@ -86,7 +76,6 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
 
     return storedRecent ? JSON.parse(storedRecent) : [];
   });
-  const [commandOpen, setCommandOpen] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
@@ -96,21 +85,6 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
   useEffect(() => {
     window.localStorage.setItem(recentKey(user.id), JSON.stringify(recent));
   }, [recent, user.id]);
-
-  const onCommandKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-      event.preventDefault();
-      setCommandOpen((current) => !current);
-    }
-  });
-
-  useEffect(() => {
-    window.addEventListener("keydown", onCommandKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", onCommandKeyDown);
-    };
-  }, []);
 
   const orderedRecent = useMemo(() => {
     return recent
@@ -155,6 +129,16 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
       project.id,
       ...current.filter((item) => item !== project.id),
     ].slice(0, 6));
+
+    trackPortalRecent(user.id, {
+      id: `project:${project.id}`,
+      href: project.ssoMode === "shared-ticket" ? project.url : project.url,
+      label: project.name,
+      description: `${project.category} · ${project.audience}`,
+      group: "Projetos",
+      iconKey: "sparkles",
+      kind: "resource",
+    });
 
     try {
       if (project.ssoMode === "shared-ticket") {
@@ -223,18 +207,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
               <TabsTrigger value="recent" className="text-xs">Recentes</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 cursor-pointer gap-2 rounded-xl border-border/50 bg-card/40 backdrop-blur-sm"
-            onClick={() => setCommandOpen(true)}
-          >
-            <CommandIcon className="size-3.5" />
-            <span className="hidden sm:inline">Busca rapida</span>
-            <kbd className="pointer-events-none ml-1 hidden rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              Ctrl K
-            </kbd>
-          </Button>
+          <PortalSearchLauncher variant="compact" className="hidden md:flex" />
         </div>
       </div>
 
@@ -453,29 +426,6 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
         </div>
       </section>
 
-      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
-        <Command>
-          <CommandInput placeholder="Digite o nome de um projeto..." />
-          <CommandList>
-            <CommandEmpty>Nenhum projeto corresponde a busca.</CommandEmpty>
-            <CommandGroup heading="Projetos">
-              {projects.map((project) => (
-                <CommandItem
-                  key={project.id}
-                  value={`${project.name} ${project.category} ${project.tags.join(" ")}`}
-                  onSelect={() => {
-                    setCommandOpen(false);
-                    void launchProject(project);
-                  }}
-                >
-                  <span>{project.name}</span>
-                  <CommandShortcut>{project.category}</CommandShortcut>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </CommandDialog>
     </div>
   );
 }
