@@ -598,10 +598,9 @@ class CodexAppServerClient {
         this.handleSocketFailure(error);
       };
 
-      socket.once("error", handleError);
+      socket.on("error", handleError);
       socket.once("open", () => {
         settled = true;
-        socket.off("error", handleError);
         this.socket = socket;
         resolve();
       });
@@ -1021,6 +1020,10 @@ function createSystemTimelineEntry(
 
 export function attachCodexGateway(server: HttpServer) {
   const wss = new WebSocketServer({ noServer: true });
+
+  wss.on("error", (error) => {
+    console.error("[codex-gateway] erro no websocket server:", error);
+  });
 
   server.on("upgrade", (request, socket, head) => {
     const host =
