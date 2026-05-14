@@ -86,12 +86,12 @@ describe("portal-recents", () => {
 
     const recents = readPortalRecents(userId);
 
-    expect(recents.map((item) => item.id)).toEqual(["/logs", "/vct"]);
-    expect(storage.get(getPortalRecentsKey(userId))).toContain("/logs");
+    expect(recents.map((item) => item.id)).toEqual(["logs", "/vct"]);
+    expect(storage.get(getPortalRecentsKey(userId))).toContain('"id":"logs"');
     expect(storage.get(getPortalRecentsKey(userId))).not.toContain('"home"');
   });
 
-  test("permite fixar um recente sem perder a ordenacao por uso recente", () => {
+  test("permite fixar um recente e mantem o fixado no topo", () => {
     installWindowMock();
     const userId = "user-2";
 
@@ -105,7 +105,7 @@ describe("portal-recents", () => {
       kind: "page",
     });
     trackPortalRecent(userId, {
-      id: "/logs",
+      id: "logs",
       href: "/logs",
       label: "Logs",
       description: "Observabilidade e historico de eventos",
@@ -118,8 +118,39 @@ describe("portal-recents", () => {
 
     const recents = readPortalRecents(userId);
 
-    expect(recents[0]?.id).toBe("/logs");
-    expect(recents[1]?.id).toBe("/vct");
-    expect(recents[1]?.pinned).toBe(true);
+    expect(recents[0]?.id).toBe("/vct");
+    expect(recents[0]?.pinned).toBe(true);
+    expect(recents[1]?.id).toBe("logs");
+  });
+
+  test("colapsa logs raiz e logs de projeto em um unico recente", () => {
+    installWindowMock();
+    const userId = "user-3";
+
+    trackPortalRecent(userId, {
+      id: "/logs",
+      href: "/logs",
+      label: "Logs",
+      description: "Observabilidade e historico de eventos",
+      group: "Operacao",
+      iconKey: "logs",
+      kind: "resource",
+    });
+    trackPortalRecent(userId, {
+      id: "/logs/portal-aluno",
+      href: "/logs/portal-aluno",
+      label: "Logs",
+      description: "Projeto selecionado: portal-aluno",
+      group: "Logs / Portal aluno",
+      iconKey: "logs",
+      kind: "resource",
+    });
+
+    const recents = readPortalRecents(userId);
+
+    expect(recents).toHaveLength(1);
+    expect(recents[0]?.id).toBe("logs");
+    expect(recents[0]?.href).toBe("/logs/portal-aluno");
+    expect(recents[0]?.group).toBe("Logs / Portal aluno");
   });
 });

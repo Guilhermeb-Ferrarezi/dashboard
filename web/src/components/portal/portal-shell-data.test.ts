@@ -9,9 +9,15 @@ describe("portal-shell-data", () => {
     expect(groups.map((group) => group.label)).toEqual([
       "Operacao",
       "Jogos",
+      "Administracao",
     ]);
 
     expect(groups.every((group) => group.iconKey in portalIconMap)).toBe(true);
     expect(groups.some((group) => group.label === "Entrada")).toBe(false);
+    expect(
+      groups
+        .find((group) => group.label === "Administracao")
+        ?.items.map((item) => item.label),
+    ).toEqual(["Usuarios"]);
   });
 });

@@ -7,7 +7,7 @@ import {
   MailIcon,
   SettingsIcon,
   ShieldIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { AccountSettingsDialog } from "@/components/portal/account-settings-dialog";

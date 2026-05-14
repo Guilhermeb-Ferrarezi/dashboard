@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon, ClipboardIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowLeftIcon, ClipboardIcon, RefreshCwIcon } from "@/components/ui/icons";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 

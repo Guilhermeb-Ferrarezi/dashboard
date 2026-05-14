@@ -55,32 +55,6 @@ export const portalProjects: ProjectDefinition[] = [
       sharedSecret: resolveSharedSecret("ADMIN_PORTAL_SSO_SECRET"),
     },
   },
-  {
-    id: "zap",
-    name: "Zap",
-    description: "Ferramentas operacionais para fluxos e automacoes do Zap.",
-    url: process.env.ZAP_URL || "https://zap.santos-tech.com",
-    category: "Automacao",
-    audience: "Operacao",
-    tags: ["zap", "mensageria", "atendimento"],
-    icon: "bolt",
-    status: "beta",
-    ssoMode: "none",
-    featured: true,
-  },
-  {
-    id: "alerts",
-    name: "Alertas",
-    description: "Central de avisos, incidentes e monitoramento rapido.",
-    url: process.env.ALERTS_URL || "https://alerts.santos-tech.com",
-    category: "Monitoramento",
-    audience: "Time",
-    tags: ["alertas", "monitoramento", "avisos"],
-    icon: "bell",
-    status: "beta",
-    ssoMode: "none",
-    featured: false,
-  },
 ];
 
 export function findProjectById(projectId: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircleIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { LoaderCircleIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
 import { clientApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { VctFormacaoSummary } from "@/types/portal";
-import { CalendarIcon, ImageIcon, MailIcon, PhoneIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon, MailIcon, PhoneIcon, UsersIcon } from "@/components/ui/icons";
 import {
   VctFormacaoEditorDialog,
   type FormacaoEditorMode,

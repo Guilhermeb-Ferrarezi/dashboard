@@ -12,7 +12,7 @@ import {
   PanelTopIcon,
   Rows3Icon,
   SunIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 

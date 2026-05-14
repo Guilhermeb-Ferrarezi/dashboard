@@ -1,19 +1,23 @@
-# Usa a imagem oficial do Bun do Oven
-FROM oven/bun:1.1.38
+FROM oven/bun:1.3.11
 
+WORKDIR /app
 
-# Copia package.json e bun.lockb para instalar dependências
-COPY package.json bun.lock* ./
+COPY api/package.json api/bun.lock ./api/
 
-# Instala dependências via Bun
-RUN bun install
+RUN cd /app/api && bun install --frozen-lockfile
+RUN bun install -g @openai/codex
 
-# Copia todo o projeto
 COPY . .
 
-# Expõe a porta do servidor
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV CODEX_HOME=/data/codex-home
+ENV CODEX_WORKSPACE_ROOT=/app
+
+RUN mkdir -p /data/codex-home
+
+WORKDIR /app/api
+
 EXPOSE 4000
 
-
-# Comando para rodar o backend
 CMD ["bun", "run", "src/server.ts"]

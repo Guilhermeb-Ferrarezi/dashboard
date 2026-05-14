@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LoaderCircleIcon, SaveIcon, UploadIcon } from "lucide-react";
+import { LoaderCircleIcon, SaveIcon, UploadIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";

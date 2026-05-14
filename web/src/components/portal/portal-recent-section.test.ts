@@ -20,6 +20,15 @@ describe("portal-recent-section", () => {
     const recentItem = resolvePortalRecentItem("/logs/portal-aluno", "/logs", "Portal aluno");
 
     expect(recentItem?.label).toBe("Logs");
+    expect(recentItem?.id).toBe("logs");
     expect(recentItem?.group).toBe("Logs / Portal aluno");
+  });
+
+  test("usuarios da administracao aparecem no grupo certo", () => {
+    const recentItem = resolvePortalRecentItem("/admin/users", "/logs");
+
+    expect(recentItem?.label).toBe("Usuarios");
+    expect(recentItem?.group).toBe("Administracao");
+    expect(recentItem?.iconKey).toBe("users");
   });
 });

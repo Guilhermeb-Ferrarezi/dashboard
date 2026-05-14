@@ -12,6 +12,7 @@ import logsRoutes from "./routes/logs.routes";
 import ssoRoutes from "./routes/sso.routes";
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
+import codexRoutes from "./routes/codex.routes";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -20,6 +21,7 @@ import {
 import { verifyJWT } from "./middlewares/jwe";
 import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { requireRole } from "./middlewares/role";
+import { attachCodexGateway } from "./lib/codex";
 
 dotenv.config();
 
@@ -171,6 +173,7 @@ app.use("/api/logs", logsRoutes);
 app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
+app.use("/api/codex", codexRoutes);
 
 app.get("/api/user/me", verifyJWT, getCurrentUser);
 app.put("/api/user/profile", verifyJWT, updateCurrentUserProfile);
@@ -214,9 +217,11 @@ async function start() {
     console.log(`Mongo conectado em ${mongoTarget}`);
 
     const port = Number(process.env.PORT) || 4000;
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`Backend rodando: http://localhost:${port}`);
     });
+
+    attachCodexGateway(server);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Falha ao conectar ao Mongo: ${message}`);

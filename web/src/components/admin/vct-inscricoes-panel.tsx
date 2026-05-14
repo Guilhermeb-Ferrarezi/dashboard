@@ -24,7 +24,7 @@ import {
   UserMinusIcon,
   UsersIcon,
   WandSparklesIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";

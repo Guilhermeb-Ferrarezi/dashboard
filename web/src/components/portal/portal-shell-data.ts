@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "@/components/ui/icons";
 import {
   BadgeCheckIcon,
   CrosshairIcon,
@@ -8,7 +8,7 @@ import {
   SparklesIcon,
   ShieldIcon,
   UserRoundIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 export type PortalSidebarItem = {
   href: string;
@@ -153,6 +153,20 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
         }),
       ],
     },
+    {
+      label: "Administracao",
+      iconKey: "admin",
+      items: [
+        portalItem({
+          href: "/admin/users",
+          label: "Usuarios",
+          description: "Base de usuarios e perfis de acesso",
+          icon: ShieldIcon,
+          kind: "resource",
+          keywords: ["usuarios", "admin", "acesso", "perfis"],
+        }),
+      ],
+    },
   ];
 }
 
@@ -205,7 +219,7 @@ export function resolvePortalRecentItem(
 
   if (pathname === "/logs" || pathname.startsWith("/logs/")) {
     return {
-      id: pathname,
+      id: "logs",
       href: pathname,
       label: "Logs",
       description:
@@ -223,7 +237,7 @@ export function resolvePortalRecentItem(
 
   if (pathname === logsHref) {
     return {
-      id: pathname,
+      id: "logs",
       href: pathname,
       label: "Logs",
       description: "Observabilidade e historico de eventos",
@@ -264,6 +278,8 @@ export function resolvePortalRecentItem(
           ? "logs"
           : sidebarItem.icon === UserRoundIcon
             ? "account"
+            : sidebarItem.icon === ShieldIcon
+              ? "users"
             : sidebarItem.icon === CrosshairIcon
               ? "vct"
               : sidebarItem.icon === BadgeCheckIcon

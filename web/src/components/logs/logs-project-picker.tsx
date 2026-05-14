@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ActivityIcon, FolderSearch2Icon } from "lucide-react";
+import { ActivityIcon, FolderSearch2Icon } from "@/components/ui/icons";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";

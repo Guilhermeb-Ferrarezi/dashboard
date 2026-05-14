@@ -8,7 +8,7 @@ import {
   PaletteIcon,
   ShieldIcon,
   UserRoundPenIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { AppearanceSettingsPanel } from "@/components/portal/appearance-settings-panel";

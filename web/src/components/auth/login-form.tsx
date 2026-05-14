@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
-import { KeyRoundIcon, LoaderCircleIcon, User2Icon } from "lucide-react";
+import { KeyRoundIcon, LoaderCircleIcon, User2Icon } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

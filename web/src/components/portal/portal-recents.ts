@@ -8,6 +8,48 @@ const PORTAL_RECENTS_OPEN_EVENT = "portal:quicksearch-open";
 const PORTAL_RECENTS_OPEN_KEY_PREFIX = "portal:recents-open:";
 const MAX_RECENTS = 5;
 
+function isLogsRecentItem(item: Pick<PortalRecentItem, "id" | "href">) {
+  return item.id === "logs" || item.href === "/logs" || item.href.startsWith("/logs/");
+}
+
+function normalizePortalRecentItem(item: PortalRecentItem): PortalRecentItem {
+  if (!isLogsRecentItem(item)) {
+    return item;
+  }
+
+  return {
+    ...item,
+    id: "logs",
+  };
+}
+
+function getPortalRecentId(item: Pick<PortalRecentItem, "id" | "href">) {
+  return isLogsRecentItem(item) ? "logs" : item.id;
+}
+
+function mergePortalRecentItems(items: PortalRecentItem[]) {
+  const merged = new Map<string, PortalRecentItem>();
+
+  for (const item of items) {
+    const normalizedItem = normalizePortalRecentItem(item);
+    const current = merged.get(normalizedItem.id);
+
+    if (!current) {
+      merged.set(normalizedItem.id, normalizedItem);
+      continue;
+    }
+
+    merged.set(normalizedItem.id, {
+      ...current,
+      ...normalizedItem,
+      pinned: current.pinned || normalizedItem.pinned,
+      updatedAt: Math.max(current.updatedAt, normalizedItem.updatedAt),
+    });
+  }
+
+  return [...merged.values()];
+}
+
 export function getPortalRecentsKey(userId: string) {
   return `${PORTAL_RECENTS_KEY_PREFIX}${userId}`;
 }
@@ -37,8 +79,14 @@ export function readPortalRecents(userId: string) {
       return [];
     }
 
-    return parsed.filter(
-      (item) => Boolean(item?.id && item?.href && item?.label) && item.id !== "home",
+    return sortPortalRecents(
+      mergePortalRecentItems(
+        parsed
+          .filter(
+            (item) => Boolean(item?.id && item?.href && item?.label) && item.id !== "home",
+          )
+          .map((item) => normalizePortalRecentItem(item)),
+      ),
     );
   } catch {
     return [];
@@ -48,13 +96,19 @@ export function readPortalRecents(userId: string) {
 function writePortalRecents(userId: string, items: PortalRecentItem[]) {
   window.localStorage.setItem(
     getPortalRecentsKey(userId),
-    JSON.stringify(items.slice(0, MAX_RECENTS)),
+    JSON.stringify(mergePortalRecentItems(items).slice(0, MAX_RECENTS)),
   );
   window.dispatchEvent(new Event(PORTAL_RECENTS_CHANGED_EVENT));
 }
 
 function sortPortalRecents(items: PortalRecentItem[]) {
-  return [...items].sort((left, right) => right.updatedAt - left.updatedAt);
+  return [...items].sort((left, right) => {
+    if (left.pinned !== right.pinned) {
+      return Number(right.pinned) - Number(left.pinned);
+    }
+
+    return right.updatedAt - left.updatedAt;
+  });
 }
 
 export function trackPortalRecent(
@@ -66,14 +120,19 @@ export function trackPortalRecent(
   }
 
   const currentItems = readPortalRecents(userId);
+  const itemId = getPortalRecentId(item);
+  const currentPinned = currentItems.find((current) => current.id === itemId)?.pinned ?? false;
+  const now = Date.now();
   const updatedItems = sortPortalRecents([
     {
-      ...item,
-      pinned:
-        currentItems.find((current) => current.id === item.id)?.pinned ?? false,
-      updatedAt: Date.now(),
+      ...normalizePortalRecentItem({
+        ...item,
+        id: itemId,
+        pinned: currentPinned,
+        updatedAt: now,
+      }),
     },
-    ...currentItems.filter((current) => current.id !== item.id),
+    ...currentItems.filter((current) => current.id !== itemId),
   ]);
 
   writePortalRecents(userId, updatedItems);

@@ -6,8 +6,9 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   Clock3Icon,
+  PinFilledIcon,
   PinIcon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import {
   SidebarGroup,
@@ -96,7 +97,7 @@ export function PortalRecentSection({
       <Button
         type="button"
         variant="ghost"
-        className="mb-1 flex h-8 w-full items-center gap-2 rounded-md px-2 pt-1 text-sidebar-foreground/55 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground aria-expanded:bg-sidebar-foreground/10 aria-expanded:text-sidebar-foreground"
+        className="mb-1 flex h-9 w-full items-center gap-2 rounded-md px-2 pt-1 text-sidebar-foreground/55 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground aria-expanded:bg-sidebar-foreground/10 aria-expanded:text-sidebar-foreground"
         onClick={() => setOpen((current) => !current)}
         aria-label={open ? "Recolher recentes" : "Expandir recentes"}
         aria-expanded={open}
@@ -127,10 +128,10 @@ export function PortalRecentSection({
                   >
                     <Icon className="mt-0.5" />
                     <div className="min-w-0 flex-1 leading-tight">
-                      <span className="block truncate text-sm">
+                      <span className="block truncate text-sm leading-5">
                         {item.label}
                       </span>
-                      <span className="block truncate text-[10px] uppercase tracking-[0.16em] text-sidebar-foreground/45">
+                      <span className="block truncate text-[10px] leading-4 uppercase tracking-[0.16em] text-sidebar-foreground/45">
                         {item.group}
                       </span>
                     </div>
@@ -147,8 +148,12 @@ export function PortalRecentSection({
                       togglePortalRecentPin(userId, item.id);
                     }}
                     aria-label={item.pinned ? "Desafixar recente" : "Fixar recente"}
-                    >
-                    <PinIcon className={cn("size-3.5", item.pinned && "fill-current")} />
+                  >
+                    {item.pinned ? (
+                      <PinFilledIcon className="size-3.5 fill-current" />
+                    ) : (
+                      <PinIcon className="size-3.5" />
+                    )}
                   </button>
                 </SidebarMenuSubItem>
               );

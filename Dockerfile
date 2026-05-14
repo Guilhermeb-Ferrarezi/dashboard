@@ -1,13 +1,23 @@
-# Usando a imagem oficial Bun do Oven
-FROM oven/bun:1.1.38
+FROM oven/bun:1.3.11
 
-RUN bun install
+WORKDIR /app
 
-# Copia o restante do projeto
+COPY api/package.json api/bun.lock ./api/
+
+RUN cd /app/api && bun install --frozen-lockfile
+RUN bun install -g @openai/codex
+
 COPY . .
 
-# Expõe a porta interna que o EasyPanel vai rotear
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV CODEX_HOME=/data/codex-home
+ENV CODEX_WORKSPACE_ROOT=/app
+
+RUN mkdir -p /data/codex-home
+
+WORKDIR /app/api
+
 EXPOSE 4000
 
-# Comando para rodar o backend
-CMD ["bun", "run", "src/server.ts"]
+CMD ["bun", "src/server.ts"]

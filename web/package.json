@@ -3,24 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "vinext dev --port 3001",
+    "build": "vinext build",
+    "start": "vinext start",
+    "lint": "eslint",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "vinext start"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-checkbox": "^1.3.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.38.0",
-    "lucide-react": "^1.8.0",
     "next": "16.2.3",
     "next-themes": "^0.4.6",
-    "react": "19.2.4",
+    "react": "^19.2.6",
     "react-colorful": "^5.7.0",
-    "react-dom": "19.2.4",
+    "react-dom": "^19.2.6",
     "shadcn": "^4.2.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
@@ -31,10 +34,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-rsc": "^0.5.26",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "react-server-dom-webpack": "^19.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vinext": "^0.0.49",
+    "vite": "^8.0.13"
   },
   "ignoreScripts": [
     "sharp",
@@ -43,5 +51,6 @@
   "trustedDependencies": [
     "sharp",
     "unrs-resolver"
-  ]
+  ],
+  "type": "module"
 }

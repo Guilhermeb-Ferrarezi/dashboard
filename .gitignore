@@ -3,6 +3,7 @@ api/.env
 api/dist/
 api/build/
 api/*.log
+.codex-home
 
 web/node_modules/
 web/.env

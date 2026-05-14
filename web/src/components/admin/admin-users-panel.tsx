@@ -7,7 +7,7 @@ import {
   PlusIcon,
   ShieldIcon,
   User2Icon,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

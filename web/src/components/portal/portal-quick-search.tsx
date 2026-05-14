@@ -9,7 +9,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { SearchIcon, type LucideIcon } from "lucide-react";
+import { SearchIcon, type LucideIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import {
