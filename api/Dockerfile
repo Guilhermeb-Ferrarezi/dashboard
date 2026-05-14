@@ -15,7 +15,7 @@ ENV PORT=4000
 ENV CODEX_HOME=/root/.codex
 ENV CODEX_WORKSPACE_ROOT=/app
 
-RUN mkdir -p /data/codex-home
+RUN mkdir -p /root/.codex
 
 EXPOSE 4000
 
