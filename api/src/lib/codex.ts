@@ -1024,6 +1024,10 @@ export function attachCodexGateway(server: HttpServer) {
   });
 
   server.on("upgrade", (request, socket, head) => {
+    socket.on("error", (error) => {
+      console.error("[codex-gateway] erro no socket de upgrade:", error);
+    });
+
     const host =
       request.headers.host || `127.0.0.1:${(server.address() as AddressInfo | null)?.port ?? 80}`;
     const url = new URL(request.url || "/", `http://${host}`);

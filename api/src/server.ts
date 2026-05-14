@@ -25,6 +25,14 @@ import { attachCodexGateway } from "./lib/codex";
 
 dotenv.config();
 
+process.on("uncaughtException", (error) => {
+  console.error("[process] uncaughtException:", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[process] unhandledRejection:", reason);
+});
+
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const baseAllowedOrigins =
