@@ -8,7 +8,7 @@ describe("portal-recent-section", () => {
 
     expect(recentItem).not.toBeNull();
     expect(recentItem?.label).toBe("Inscricoes");
-    expect(recentItem?.group).toBe("Jogos");
+    expect(recentItem?.group).toBe("VCT");
     expect(recentItem?.href).toBe("/vct/inscricoes");
   });
 

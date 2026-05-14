@@ -243,12 +243,16 @@ export function resolvePortalRecentItem(
     ),
   );
 
+  const parentItem = buildPortalSidebarGroups(logsHref)
+    .flatMap((entry) => entry.items)
+    .find((item) => item.children?.some((child) => child.href === sidebarItem.href));
+
   return {
     id: pathname,
     href: pathname,
     label: sidebarItem.label,
     description: sidebarItem.description,
-    group: group?.label ?? "Navegacao",
+    group: parentItem?.label ?? group?.label ?? "Navegacao",
     iconKey:
       sidebarItem.icon === LayoutDashboardIcon
         ? "home"
