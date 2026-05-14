@@ -607,6 +607,9 @@ class CodexAppServerClient {
       });
     });
 
+    this.socket!.on("error", (error) => {
+      this.handleSocketFailure(error);
+    });
     this.socket!.on("message", (data) => {
       const raw =
         typeof data === "string"
