@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CodexMarkdown } from "@/components/portal/codex-markdown";
-import { codexClientApi } from "@/lib/codex-api";
+import { clientApi } from "@/lib/api";
 import { getCodexWebSocketUrl, formatCodexTimestamp } from "@/lib/codex";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
@@ -565,13 +565,13 @@ export function CodexDrawer({
   }, [historySearch, threads]);
 
   async function refreshAccount() {
-    const response = await codexClientApi<{ ok: true; account: CodexAccountStatus }>("/codex/account");
+    const response = await clientApi<{ ok: true; account: CodexAccountStatus }>("/codex/account");
     setAccount(response.account);
     return response.account;
   }
 
   async function refreshThreads() {
-    const response = await codexClientApi<{ ok: true; threads: CodexThreadSummary[] }>("/codex/threads");
+    const response = await clientApi<{ ok: true; threads: CodexThreadSummary[] }>("/codex/threads");
     setThreads(response.threads);
     setCurrentThread((current) =>
       current
@@ -584,7 +584,7 @@ export function CodexDrawer({
     setLoadingThread(true);
 
     try {
-      const response = await codexClientApi<{ ok: true } & CodexThreadDetail>(`/codex/threads/${threadId}`);
+      const response = await clientApi<{ ok: true } & CodexThreadDetail>(`/codex/threads/${threadId}`);
       setCurrentThread(response.thread);
       setTimeline(response.timeline);
     } catch (error) {
@@ -598,7 +598,7 @@ export function CodexDrawer({
 
   async function logout() {
     try {
-      await codexClientApi("/codex/account/logout", { method: "POST" });
+      await clientApi("/codex/account/logout", { method: "POST" });
       setAccount((current) =>
         current
           ? { ...current, connected: false, email: null, planType: null, sharedAccountLabel: null }
