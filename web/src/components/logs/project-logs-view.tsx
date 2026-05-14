@@ -232,10 +232,13 @@ export function ProjectLogsView({ projectId }: { projectId: string }) {
     window.localStorage.setItem(LAST_LOGS_PROJECT_ID_KEY, projectId);
     window.dispatchEvent(
       new CustomEvent("logs:last-project-changed", {
-        detail: { projectId },
+        detail: {
+          projectId,
+          projectName: selectedProject?.name ?? projectId,
+        },
       }),
     );
-  }, [projectId]);
+  }, [projectId, selectedProject?.name]);
 
   useEffect(() => {
     let ignore = false;

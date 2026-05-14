@@ -439,6 +439,11 @@ export function PortalSearchLauncher({
   className?: string;
   variant?: "header" | "sidebar" | "compact";
 }) {
+  const label =
+    variant === "sidebar"
+      ? "Quick search..."
+      : "Buscar paginas, projetos, usuarios e logs";
+
   return (
     <button
       type="button"
@@ -454,7 +459,7 @@ export function PortalSearchLauncher({
     >
       <SearchIcon className="size-4 shrink-0 opacity-70" />
       <span className="min-w-0 flex-1 truncate">
-        Buscar paginas, projetos, usuarios e logs
+        {label}
       </span>
       <kbd className="hidden shrink-0 rounded-md border border-border/60 bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
         Ctrl K

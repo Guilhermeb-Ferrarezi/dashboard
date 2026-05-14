@@ -185,6 +185,7 @@ export function buildPortalSearchText(item: PortalSidebarItem) {
 export function resolvePortalRecentItem(
   pathname: string,
   logsHref: string,
+  logsProjectName?: string | null,
 ): Omit<PortalRecentItem, "pinned" | "updatedAt"> | null {
   if (pathname === "/home") {
     return null;
@@ -211,7 +212,10 @@ export function resolvePortalRecentItem(
         pathname === "/logs"
           ? "Observabilidade e historico de eventos"
           : `Projeto selecionado: ${pathname.split("/").at(-1) ?? "ativo"}`,
-      group: "Operacao",
+      group:
+        pathname === "/logs" || !logsProjectName
+          ? "Operacao"
+          : `Logs / ${logsProjectName}`,
       iconKey: "logs",
       kind: "resource",
     };

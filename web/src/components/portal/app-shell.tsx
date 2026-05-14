@@ -94,12 +94,15 @@ export function AppShell({
     const lastProjectId = window.localStorage.getItem("logs:last-project-id");
     return lastProjectId ? `/logs/${lastProjectId}` : "/logs";
   });
+  const [logsProjectName, setLogsProjectName] = useState<string | null>(null);
 
   useEffect(() => {
     function handleLastProjectChanged(event: Event) {
-      const customEvent = event as CustomEvent<{ projectId?: string }>;
+      const customEvent = event as CustomEvent<{ projectId?: string; projectName?: string }>;
       const projectId = customEvent.detail?.projectId;
+      const projectName = customEvent.detail?.projectName ?? null;
       setLogsHref(projectId ? `/logs/${projectId}` : "/logs");
+      setLogsProjectName(projectId ? projectName : null);
     }
 
     window.addEventListener(
@@ -114,6 +117,12 @@ export function AppShell({
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (pathname === "/logs") {
+      setLogsProjectName(null);
+    }
+  }, [pathname]);
 
   const sidebarGroups = useMemo(() => buildPortalSidebarGroups(logsHref), [logsHref]);
 
@@ -267,7 +276,12 @@ export function AppShell({
             </SidebarMenuButton>
           </div>
 
-          <PortalRecentSection userId={user.id} pathname={pathname} logsHref={logsHref} />
+          <PortalRecentSection
+            userId={user.id}
+            pathname={pathname}
+            logsHref={logsHref}
+            logsProjectName={logsProjectName}
+          />
 
           {visibleSidebarGroups.map((group) => (
             <SidebarGroup key={group.label}>

@@ -37,6 +37,7 @@ interface PortalRecentSectionProps {
   userId: string;
   pathname: string;
   logsHref: string;
+  logsProjectName?: string | null;
   className?: string;
 }
 
@@ -44,6 +45,7 @@ export function PortalRecentSection({
   userId,
   pathname,
   logsHref,
+  logsProjectName,
   className,
 }: PortalRecentSectionProps) {
   const [open, setOpen] = useState(false);
@@ -60,8 +62,8 @@ export function PortalRecentSection({
   }, [open, userId]);
 
   const recentItem = useMemo(
-    () => resolvePortalRecentItem(pathname, logsHref),
-    [logsHref, pathname],
+    () => resolvePortalRecentItem(pathname, logsHref, logsProjectName),
+    [logsHref, logsProjectName, pathname],
   );
 
   useEffect(() => {
