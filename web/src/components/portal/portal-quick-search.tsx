@@ -331,19 +331,23 @@ function mapPortalUsers(users: PortalUserSummary[]): SearchResult[] {
   }));
 }
 
-function mapLogsProjects(projects: LogsProject[]): SearchResult[] {
-  return projects.map((project) => ({
+export function buildLogsProjectSearchResult(project: LogsProject): SearchResult {
+  return {
     id: `logs:${project.id}`,
     label: project.name,
     description: project.slug,
     value: [project.name, project.slug, project.apiKey, String(project.totalLogs ?? "")].join(" "),
     group: "Logs",
     contextPath: "Logs",
-    breadcrumb: project.name,
+    breadcrumb: `Logs > ${project.name}`,
     kind: "resource",
     href: `/logs/${project.id}`,
     iconKey: "logs",
-  }));
+  };
+}
+
+function mapLogsProjects(projects: LogsProject[]): SearchResult[] {
+  return projects.map((project) => buildLogsProjectSearchResult(project));
 }
 
 function mapRecentResults(recents: ReturnType<typeof readPortalRecents>): SearchResult[] {

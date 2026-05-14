@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   buildStaticSearchResults,
+  buildLogsProjectSearchResult,
   filterPortalSearchResults,
 } from "./portal-quick-search";
 
@@ -96,5 +97,18 @@ describe("portal-quick-search", () => {
     const child = results.find((item) => item.breadcrumb === "VCT > Inscricoes");
 
     expect(parent?.iconKey).toBe(child?.iconKey);
+  });
+
+  test("os projetos de logs aparecem com breadcrumb hierarquico", () => {
+    const result = buildLogsProjectSearchResult({
+      id: "portal-aluno",
+      name: "Portal aluno",
+      slug: "portal-aluno",
+      apiKey: "abc",
+      totalLogs: 12,
+    });
+
+    expect(result.breadcrumb).toBe("Logs > Portal aluno");
+    expect(result.group).toBe("Logs");
   });
 });
