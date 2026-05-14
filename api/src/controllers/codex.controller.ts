@@ -6,9 +6,51 @@ import {
   logoutCodexAccount,
   readCodexThreadForUser,
 } from "../lib/codex";
+import type {
+  CodexAccountStatus,
+  CodexThreadSummary,
+} from "../lib/codex";
+
+const DISCONNECTED_CODEX_ACCOUNT: CodexAccountStatus = {
+  connected: false,
+  authMode: null,
+  requiresOpenaiAuth: true,
+  planType: null,
+  email: null,
+  sharedAccountLabel: null,
+};
+
+export async function resolveCodexAccountStatus(
+  fetchAccountStatus: typeof getCodexAccountStatus = getCodexAccountStatus,
+) {
+  try {
+    return await fetchAccountStatus();
+  } catch (error) {
+    console.warn(
+      "[codex-controller] Falha ao carregar o status do Codex. Retornando estado desconectado.",
+      error,
+    );
+    return DISCONNECTED_CODEX_ACCOUNT;
+  }
+}
+
+export async function resolveCodexThreadList(
+  userId: string,
+  fetchThreadList: typeof listCodexThreadsForUser = listCodexThreadsForUser,
+): Promise<CodexThreadSummary[]> {
+  try {
+    return await fetchThreadList(userId);
+  } catch (error) {
+    console.warn(
+      "[codex-controller] Falha ao carregar threads do Codex. Retornando lista vazia.",
+      error,
+    );
+    return [];
+  }
+}
 
 export async function getCodexAccount(_req: Request, res: Response) {
-  const account = await getCodexAccountStatus();
+  const account = await resolveCodexAccountStatus();
   return res.json({ ok: true, account });
 }
 
@@ -24,7 +66,7 @@ export async function listCodexThreads(req: Request, res: Response) {
     return res.status(401).json({ message: "Missing token" });
   }
 
-  const threads = await listCodexThreadsForUser(userId);
+  const threads = await resolveCodexThreadList(userId);
   return res.json({ ok: true, threads });
 }
 
