@@ -441,7 +441,7 @@ export function PortalSearchLauncher({
 }) {
   const label =
     variant === "sidebar"
-      ? "Quick search..."
+      ? "Busca rapida"
       : "Buscar paginas, projetos, usuarios e logs";
 
   return (
@@ -631,7 +631,7 @@ export function PortalQuickSearchDialog({
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      title="Busca global"
+      title="Busca rapida"
       description="Pesquisar paginas, recursos e comandos do portal"
       className="!max-w-none w-[min(92vw,760px)] border border-white/10 bg-[#0b0b0b] shadow-[0_32px_96px_rgba(0,0,0,0.6)]"
     >
@@ -641,7 +641,7 @@ export function PortalQuickSearchDialog({
             <CommandInput
               value={query}
               onValueChange={setQuery}
-              placeholder="Search pages, projects, users, logs and actions..."
+              placeholder="Buscar paginas, projetos, usuarios, logs e acoes..."
               className="h-10 text-[0.95rem] text-zinc-100 placeholder:text-zinc-500"
             />
           </div>
@@ -655,7 +655,7 @@ export function PortalQuickSearchDialog({
             <>
               {goToResults.length ? (
                 <>
-                  <CommandGroup heading="Go to" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
+                  <CommandGroup heading="Ir para" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
                     {goToResults.map((item) => {
                       const Icon = portalIconMap[item.iconKey];
 
@@ -687,7 +687,7 @@ export function PortalQuickSearchDialog({
               {actionResults.length ? (
                 <>
                   <CommandSeparator />
-                  <CommandGroup heading="Suggested commands" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
+                  <CommandGroup heading="Comandos sugeridos" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
                     {actionResults.map((item) => {
                       const Icon = portalIconMap[item.iconKey];
 
@@ -721,7 +721,7 @@ export function PortalQuickSearchDialog({
               {askAiResult ? (
                 <>
                   <CommandSeparator />
-                  <CommandGroup heading="Ask AI" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
+                  <CommandGroup heading="Pergunte ao AI" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
                     <CommandItem
                       key={askAiResult.id}
                       value={askAiResult.value}
@@ -749,11 +749,11 @@ export function PortalQuickSearchDialog({
           <div className="flex items-center gap-2">
             <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↑</kbd>
             <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↓</kbd>
-            <span>to navigate</span>
+            <span>para navegar</span>
           </div>
           <div className="flex items-center gap-2">
             <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↵</kbd>
-            <span>to select</span>
+            <span>para selecionar</span>
           </div>
         </div>
       </Command>
