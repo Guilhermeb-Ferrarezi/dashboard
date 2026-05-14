@@ -13,6 +13,10 @@ const DISCONNECTED_CODEX_ACCOUNT: CodexAccountStatus = {
   planType: null,
   email: null,
   sharedAccountLabel: null,
+  codexAccessTokenActive: false,
+  codexAccessTokenRequired: true,
+  codexAccessBlockedReason:
+    "Crie um token de acesso do Codex nas configuracoes do admin.",
 };
 
 export async function GET(request: Request) {

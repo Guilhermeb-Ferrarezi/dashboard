@@ -40,6 +40,7 @@ interface CodexDrawerProps {
   user: SessionUser;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRequestOpenSettings: () => void;
 }
 
 type CodexSocketEvent =
@@ -60,6 +61,10 @@ type CodexSocketEvent =
   | { type: "filePatchUpdated"; threadId: string | null; turnId: string | null; itemId: string | null; changes: Array<{ path: string; kind: string; diff: string }> }
   | { type: "itemCompleted"; threadId: string | null; entry: CodexTimelineEntry }
   | { type: "error"; message: string };
+
+export function isCodexAccessBlocked(account: CodexAccountStatus | null) {
+  return Boolean(account && !account.codexAccessTokenActive);
+}
 
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
@@ -215,7 +220,12 @@ function ensureFileChangeEntry(
   );
 }
 
-export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
+export function CodexDrawer({
+  user,
+  open,
+  onOpenChange,
+  onRequestOpenSettings,
+}: CodexDrawerProps) {
   const [account, setAccount] = useState<CodexAccountStatus | null>(null);
   const [threads, setThreads] = useState<CodexThreadSummary[]>([]);
   const [currentThread, setCurrentThread] = useState<CodexThreadSummary | null>(null);
@@ -240,8 +250,10 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyClosing, setHistoryClosing] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  const [accessRefreshTick, setAccessRefreshTick] = useState(0);
 
   const connected = Boolean(account?.connected);
+  const accessBlocked = isCodexAccessBlocked(account);
 
   function showAsyncError(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
@@ -281,7 +293,19 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
   }
 
   useEffect(() => {
-    if (!open || user.role !== "admin") {
+    function handleCodexAccessUpdated() {
+      setAccessRefreshTick((current) => current + 1);
+    }
+
+    window.addEventListener("codex-access-updated", handleCodexAccessUpdated);
+
+    return () => {
+      window.removeEventListener("codex-access-updated", handleCodexAccessUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || user.role !== "admin" || account === null || accessBlocked) {
       return;
     }
 
@@ -420,7 +444,7 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
       activeTurnIdRef.current = null;
       setDeviceLogin(null);
     };
-  }, [open, user.role]);
+  }, [accessBlocked, account, accessRefreshTick, open, user.role]);
 
   useEffect(() => {
     if (!open || user.role !== "admin") {
@@ -429,12 +453,25 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
 
     setLoading(true);
 
-    Promise.all([refreshAccount(), refreshThreads()])
+    refreshAccount()
+      .then((nextAccount) => {
+        if (!nextAccount.codexAccessTokenActive) {
+          setThreads([]);
+          setCurrentThread(null);
+          setTimeline([]);
+          setActiveTurnId(null);
+          setSending(false);
+          setDeviceLogin(null);
+          return null;
+        }
+
+        return refreshThreads();
+      })
       .catch((error) => {
         showAsyncError(error, "Nao foi possivel carregar o painel do Codex.");
       })
       .finally(() => setLoading(false));
-  }, [open, user.role]);
+  }, [accessRefreshTick, open, user.role]);
 
   useEffect(() => {
     timelineRef.current?.scrollTo({
@@ -481,6 +518,7 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
   async function refreshAccount() {
     const response = await clientApi<{ ok: true; account: CodexAccountStatus }>("/codex/account");
     setAccount(response.account);
+    return response.account;
   }
 
   async function refreshThreads() {
@@ -588,6 +626,42 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
 
   if (user.role !== "admin") {
     return null;
+  }
+
+  if (accessBlocked) {
+    return (
+      <div ref={drawerRef} className="flex h-full min-h-0 min-w-0 w-full items-center justify-center overflow-hidden bg-background p-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <Shield className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-destructive">
+                Codex bloqueado
+              </p>
+              <h2 className="text-lg font-semibold">Crie um token de acesso</h2>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm text-muted-foreground">
+            {account?.codexAccessBlockedReason ??
+              "O Codex precisa de um token ativo desse admin para liberar as requisicoes no portal."}
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button type="button" className="gap-2" onClick={onRequestOpenSettings}>
+              <Shield className="size-4" />
+              Abrir configuracoes
+            </Button>
+            <Button type="button" variant="outline" className="gap-2" onClick={() => void refreshAccount()}>
+              <ArrowCounterClockwise className="size-4" />
+              Atualizar estado
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -858,7 +932,7 @@ export function CodexDrawer({ user, open, onOpenChange }: CodexDrawerProps) {
                 }}
                 placeholder="Como posso ajudar?"
                 rows={3}
-                className="h-20 max-h-20 w-full resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="h-10 max-h-20 w-full resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 disabled={!connected || sending}
               />
 

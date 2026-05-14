@@ -5,6 +5,9 @@ export interface CodexAccountStatus {
   planType: string | null;
   email: string | null;
   sharedAccountLabel: string | null;
+  codexAccessTokenActive: boolean;
+  codexAccessTokenRequired: boolean;
+  codexAccessBlockedReason: string | null;
 }
 
 export interface CodexThreadSummary {

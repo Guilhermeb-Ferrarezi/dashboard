@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   resolveCodexAccountStatus,
+  resolveCodexAccountStatusForAdmin,
   resolveCodexThreadList,
 } from "./codex.controller";
 
@@ -18,6 +19,43 @@ describe("codex controller fallbacks", () => {
       planType: null,
       email: null,
       sharedAccountLabel: null,
+      codexAccessTokenActive: false,
+      codexAccessTokenRequired: true,
+      codexAccessBlockedReason:
+        "Crie um token de acesso do Codex nas configuracoes do admin.",
+    });
+  });
+
+  test("bloqueia o Codex quando o admin nao possui token ativo", async () => {
+    let called = false;
+
+    const account = await resolveCodexAccountStatusForAdmin(
+      "admin-1",
+      async () => {
+        called = true;
+        throw new Error("nao deveria ser chamado");
+      },
+      async () => ({
+        codexAccessTokenActive: false,
+        codexAccessTokenRequired: true,
+        codexAccessBlockedReason:
+          "Crie um token de acesso do Codex nas configuracoes do admin.",
+        activeToken: null,
+      }),
+    );
+
+    expect(called).toBe(false);
+    expect(account).toEqual({
+      connected: false,
+      authMode: null,
+      requiresOpenaiAuth: true,
+      planType: null,
+      email: null,
+      sharedAccountLabel: null,
+      codexAccessTokenActive: false,
+      codexAccessTokenRequired: true,
+      codexAccessBlockedReason:
+        "Crie um token de acesso do Codex nas configuracoes do admin.",
     });
   });
 

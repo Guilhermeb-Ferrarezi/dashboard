@@ -106,6 +106,8 @@ export function AppShell({
     return lastProjectId ? `/logs/${lastProjectId}` : "/logs";
   });
   const [logsProjectName, setLogsProjectName] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"account" | "preferences" | "session" | "codex">("account");
   const [codexOpen, setCodexOpen] = useState(false);
   const [codexWidth, setCodexWidth] = useState(() => {
     if (typeof window === "undefined") {
@@ -399,7 +401,16 @@ export function AppShell({
         </SidebarContent>
 
         <SidebarFooter>
-          <UserMenu user={user} />
+          <UserMenu
+            user={user}
+            settingsOpen={settingsOpen}
+            settingsSection={settingsSection}
+            onOpenSettings={() => {
+              setSettingsSection("account");
+              setSettingsOpen(true);
+            }}
+            onSettingsOpenChange={setSettingsOpen}
+          />
         </SidebarFooter>
       </Sidebar>
 
@@ -505,6 +516,10 @@ export function AppShell({
                     user={user}
                     open={codexOpen}
                     onOpenChange={setCodexOpen}
+                    onRequestOpenSettings={() => {
+                      setSettingsSection("codex");
+                      setSettingsOpen(true);
+                    }}
                   />
                 ) : null}
               </aside>

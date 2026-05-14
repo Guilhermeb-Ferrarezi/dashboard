@@ -8,6 +8,7 @@ import WebSocket, { WebSocketServer } from "ws";
 
 import type { AuthUserPayload } from "../types/express";
 import { CodexThreadSession } from "../models/CodexThreadSession";
+import { resolveCodexAccessState } from "./codex-access";
 
 type JsonRpcId = string | number;
 
@@ -87,6 +88,9 @@ export type CodexAccountStatus = {
   planType: string | null;
   email: string | null;
   sharedAccountLabel: string | null;
+  codexAccessTokenActive: boolean;
+  codexAccessTokenRequired: boolean;
+  codexAccessBlockedReason: string | null;
 };
 
 export type CodexThreadSummary = {
@@ -851,6 +855,9 @@ export async function getCodexAccountStatus() {
         account?.type === "chatgpt" && account.email
           ? `Conta compartilhada: ${account.email}`
           : null,
+      codexAccessTokenActive: true,
+      codexAccessTokenRequired: true,
+      codexAccessBlockedReason: null,
     };
   });
 }
@@ -1054,214 +1061,241 @@ export function attachCodexGateway(server: HttpServer) {
   wss.on("connection", (browserSocket: WebSocket, _request: IncomingMessage, user: AuthUserPayload) => {
     const codexClient = new CodexAppServerClient();
     let currentThreadId: string | null = null;
+    let socketClosed = false;
 
     browserSocket.on("error", (error) => {
       console.error("[codex-browser-socket] erro:", error);
     });
 
-    codexClient
-      .connect()
-      .then(() => {
-        sendBrowserEvent(browserSocket, {
-          type: "ready",
-          workspaceRoot: resolveWorkspaceRoot(),
-          executionMode: "workspace-write",
-        });
+    browserSocket.on("close", () => {
+      socketClosed = true;
+      codexClient.close();
+    });
 
-        codexClient.onNotification(async ({ method, params }) => {
-          try {
-            switch (method) {
-              case "account/login/completed": {
-                const success = Boolean(params.success);
-                sendBrowserEvent(browserSocket, {
-                  type: "deviceLoginCompleted",
-                  loginId: params.loginId ?? null,
-                  success,
-                  error: params.error ?? null,
-                });
-                break;
-              }
-              case "account/updated": {
-                const status = await getCodexAccountStatus();
-                sendBrowserEvent(browserSocket, {
-                  type: "accountUpdated",
-                  account: status,
-                });
-                break;
-              }
-              case "thread/started": {
-                const thread = params.thread as CodexThread | undefined;
+    void (async () => {
+      const accessState = await resolveCodexAccessState(user.id);
 
-                if (thread) {
-                  await syncThreadOwnership(user.id, thread);
-                  currentThreadId = thread.id;
-                  sendBrowserEvent(browserSocket, {
-                    type: "threadCreated",
-                    thread: summarizeThread(thread),
-                  });
-                }
-                break;
-              }
-              case "turn/started": {
-                const turn = params.turn as CodexTurn | undefined;
-                currentThreadId = typeof params.threadId === "string" ? params.threadId : currentThreadId;
-                sendBrowserEvent(browserSocket, {
-                  type: "turnStarted",
-                  threadId: params.threadId ?? null,
-                  turnId: turn?.id ?? null,
-                });
-                break;
-              }
-              case "turn/completed": {
-                const turn = params.turn as CodexTurn | undefined;
-                sendBrowserEvent(browserSocket, {
-                  type: "turnCompleted",
-                  threadId: params.threadId ?? null,
-                  turnId: turn?.id ?? null,
-                  status: turn?.status ?? "completed",
-                });
-                break;
-              }
-              case "item/autoApprovalReview/completed": {
-                const threadId =
-                  typeof params.threadId === "string" ? params.threadId : currentThreadId;
-                const turnId =
-                  typeof params.turnId === "string" ? params.turnId : "unknown-turn";
-                const status =
-                  typeof params.status === "string" ? params.status : "completed";
-
-                sendBrowserEvent(browserSocket, {
-                  type: "autoApproval",
-                  threadId,
-                  entry: createSystemTimelineEntry(
-                    `auto-approval:${turnId}:${Date.now()}`,
-                    turnId,
-                    "Autoaprovacao concluida para a etapa atual.",
-                    status,
-                  ),
-                });
-                break;
-              }
-              case "serverRequest/resolved": {
-                const threadId =
-                  typeof params.threadId === "string" ? params.threadId : currentThreadId;
-                const requestId =
-                  typeof params.requestId === "string" || typeof params.requestId === "number"
-                    ? String(params.requestId)
-                    : `request-${Date.now()}`;
-
-                sendBrowserEvent(browserSocket, {
-                  type: "autoApproval",
-                  threadId,
-                  entry: createSystemTimelineEntry(
-                    `approval-request:${requestId}`,
-                    "approvals",
-                    "Aprovacao automatica respondida pelo gateway do Codex.",
-                    "completed",
-                  ),
-                });
-                break;
-              }
-              case "item/agentMessage/delta": {
-                sendBrowserEvent(browserSocket, {
-                  type: "assistantDelta",
-                  threadId: params.threadId ?? currentThreadId,
-                  turnId: params.turnId ?? null,
-                  itemId: params.itemId ?? null,
-                  delta: params.delta ?? "",
-                });
-                break;
-              }
-              case "item/commandExecution/outputDelta": {
-                sendBrowserEvent(browserSocket, {
-                  type: "commandOutputDelta",
-                  threadId: params.threadId ?? currentThreadId,
-                  turnId: params.turnId ?? null,
-                  itemId: params.itemId ?? null,
-                  delta: params.delta ?? "",
-                });
-                break;
-              }
-              case "item/fileChange/patchUpdated": {
-                sendBrowserEvent(browserSocket, {
-                  type: "filePatchUpdated",
-                  threadId: params.threadId ?? currentThreadId,
-                  turnId: params.turnId ?? null,
-                  itemId: params.itemId ?? null,
-                  changes: params.changes ?? [],
-                });
-                break;
-              }
-              case "item/completed": {
-                const threadId =
-                  typeof params.threadId === "string" ? params.threadId : currentThreadId;
-                const turnId =
-                  typeof params.turnId === "string" ? params.turnId : "unknown-turn";
-                const item = params.item as CodexThreadItem | undefined;
-
-                if (!item) {
-                  break;
-                }
-
-                const entry =
-                  serializeTimelineItem(turnId, item) ??
-                  createSystemTimelineEntry(
-                    item.id,
-                    turnId,
-                    `Item concluido: ${item.type}.`,
-                    "completed",
-                  );
-
-                sendBrowserEvent(browserSocket, {
-                  type: "itemCompleted",
-                  threadId,
-                  entry,
-                });
-                break;
-              }
-              case "error": {
-                sendBrowserEvent(browserSocket, {
-                  type: "error",
-                  message:
-                    (params.message as string | undefined) ||
-                    "Falha na sessao Codex.",
-                });
-                break;
-              }
-              case "warning":
-              case "guardianWarning": {
-                sendBrowserEvent(browserSocket, {
-                  type: "error",
-                  message:
-                    (params.message as string | undefined) ||
-                    "O Codex reportou um aviso durante a execucao.",
-                });
-                break;
-              }
-              default:
-                break;
-            }
-          } catch (error) {
-            sendBrowserEvent(browserSocket, {
-              type: "error",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Falha ao processar evento do Codex.",
-            });
-          }
-        });
-      })
-      .catch((error) => {
+      if (!accessState.codexAccessTokenActive) {
         sendBrowserEvent(browserSocket, {
           type: "error",
           message:
-            error instanceof Error
-              ? error.message
-              : "Nao foi possivel conectar ao Codex.",
+            accessState.codexAccessBlockedReason ??
+            "Crie um token de acesso do Codex nas configuracoes do admin.",
         });
         browserSocket.close();
+        return;
+      }
+
+      await codexClient.connect();
+
+      if (socketClosed) {
+        codexClient.close();
+        return;
+      }
+
+      sendBrowserEvent(browserSocket, {
+        type: "ready",
+        workspaceRoot: resolveWorkspaceRoot(),
+        executionMode: "workspace-write",
       });
+
+      codexClient.onNotification(async ({ method, params }) => {
+        try {
+          switch (method) {
+            case "account/login/completed": {
+              const success = Boolean(params.success);
+              sendBrowserEvent(browserSocket, {
+                type: "deviceLoginCompleted",
+                loginId: params.loginId ?? null,
+                success,
+                error: params.error ?? null,
+              });
+              break;
+            }
+            case "account/updated": {
+              const status = await getCodexAccountStatus();
+              const nextAccessState = await resolveCodexAccessState(user.id);
+              sendBrowserEvent(browserSocket, {
+                type: "accountUpdated",
+                account: {
+                  ...status,
+                  ...nextAccessState,
+                },
+              });
+              break;
+            }
+            case "thread/started": {
+              const thread = params.thread as CodexThread | undefined;
+
+              if (thread) {
+                await syncThreadOwnership(user.id, thread);
+                currentThreadId = thread.id;
+                sendBrowserEvent(browserSocket, {
+                  type: "threadCreated",
+                  thread: summarizeThread(thread),
+                });
+              }
+              break;
+            }
+            case "turn/started": {
+              const turn = params.turn as CodexTurn | undefined;
+              currentThreadId = typeof params.threadId === "string" ? params.threadId : currentThreadId;
+              sendBrowserEvent(browserSocket, {
+                type: "turnStarted",
+                threadId: params.threadId ?? null,
+                turnId: turn?.id ?? null,
+              });
+              break;
+            }
+            case "turn/completed": {
+              const turn = params.turn as CodexTurn | undefined;
+              sendBrowserEvent(browserSocket, {
+                type: "turnCompleted",
+                threadId: params.threadId ?? null,
+                turnId: turn?.id ?? null,
+                status: turn?.status ?? "completed",
+              });
+              break;
+            }
+            case "item/autoApprovalReview/completed": {
+              const threadId =
+                typeof params.threadId === "string" ? params.threadId : currentThreadId;
+              const turnId =
+                typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const status =
+                typeof params.status === "string" ? params.status : "completed";
+
+              sendBrowserEvent(browserSocket, {
+                type: "autoApproval",
+                threadId,
+                entry: createSystemTimelineEntry(
+                  `auto-approval:${turnId}:${Date.now()}`,
+                  turnId,
+                  "Autoaprovacao concluida para a etapa atual.",
+                  status,
+                ),
+              });
+              break;
+            }
+            case "serverRequest/resolved": {
+              const threadId =
+                typeof params.threadId === "string" ? params.threadId : currentThreadId;
+              const requestId =
+                typeof params.requestId === "string" || typeof params.requestId === "number"
+                  ? String(params.requestId)
+                  : `request-${Date.now()}`;
+
+              sendBrowserEvent(browserSocket, {
+                type: "autoApproval",
+                threadId,
+                entry: createSystemTimelineEntry(
+                  `approval-request:${requestId}`,
+                  "approvals",
+                  "Aprovacao automatica respondida pelo gateway do Codex.",
+                  "completed",
+                ),
+              });
+              break;
+            }
+            case "item/agentMessage/delta": {
+              sendBrowserEvent(browserSocket, {
+                type: "assistantDelta",
+                threadId: params.threadId ?? currentThreadId,
+                turnId: params.turnId ?? null,
+                itemId: params.itemId ?? null,
+                delta: params.delta ?? "",
+              });
+              break;
+            }
+            case "item/commandExecution/outputDelta": {
+              sendBrowserEvent(browserSocket, {
+                type: "commandOutputDelta",
+                threadId: params.threadId ?? currentThreadId,
+                turnId: params.turnId ?? null,
+                itemId: params.itemId ?? null,
+                delta: params.delta ?? "",
+              });
+              break;
+            }
+            case "item/fileChange/patchUpdated": {
+              sendBrowserEvent(browserSocket, {
+                type: "filePatchUpdated",
+                threadId: params.threadId ?? currentThreadId,
+                turnId: params.turnId ?? null,
+                itemId: params.itemId ?? null,
+                changes: params.changes ?? [],
+              });
+              break;
+            }
+            case "item/completed": {
+              const threadId =
+                typeof params.threadId === "string" ? params.threadId : currentThreadId;
+              const turnId =
+                typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const item = params.item as CodexThreadItem | undefined;
+
+              if (!item) {
+                break;
+              }
+
+              const entry =
+                serializeTimelineItem(turnId, item) ??
+                createSystemTimelineEntry(
+                  item.id,
+                  turnId,
+                  `Item concluido: ${item.type}.`,
+                  "completed",
+                );
+
+              sendBrowserEvent(browserSocket, {
+                type: "itemCompleted",
+                threadId,
+                entry,
+              });
+              break;
+            }
+            case "error": {
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message:
+                  (params.message as string | undefined) ||
+                  "Falha na sessao Codex.",
+              });
+              break;
+            }
+            case "warning":
+            case "guardianWarning": {
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message:
+                  (params.message as string | undefined) ||
+                  "O Codex reportou um aviso durante a execucao.",
+              });
+              break;
+            }
+            default:
+              break;
+          }
+        } catch (error) {
+          sendBrowserEvent(browserSocket, {
+            type: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Falha ao processar evento do Codex.",
+          });
+        }
+      });
+    })().catch((error) => {
+      sendBrowserEvent(browserSocket, {
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel conectar ao Codex.",
+      });
+      browserSocket.close();
+    });
 
     browserSocket.on("message", async (raw: WebSocket.RawData) => {
       try {
@@ -1395,8 +1429,5 @@ export function attachCodexGateway(server: HttpServer) {
       }
     });
 
-    browserSocket.on("close", () => {
-      codexClient.close();
-    });
   });
 }

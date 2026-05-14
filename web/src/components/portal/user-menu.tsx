@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   LogOutIcon,
   MailIcon,
@@ -10,7 +9,6 @@ import {
 } from "@/components/ui/icons";
 import { toast } from "sonner";
 
-import { AccountSettingsDialog } from "@/components/portal/account-settings-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +21,24 @@ import {
 import { clientApi } from "@/lib/api";
 import type { SessionUser } from "@/lib/session";
 
-export function UserMenu({ user }: { user: SessionUser }) {
+import { AccountSettingsDialog } from "@/components/portal/account-settings-dialog";
+
+interface UserMenuProps {
+  user: SessionUser;
+  settingsOpen: boolean;
+  settingsSection: "account" | "preferences" | "session" | "codex";
+  onOpenSettings: () => void;
+  onSettingsOpenChange: (open: boolean) => void;
+}
+
+export function UserMenu({
+  user,
+  settingsOpen,
+  settingsSection,
+  onOpenSettings,
+  onSettingsOpenChange,
+}: UserMenuProps) {
   const router = useRouter();
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function handleLogout() {
     try {
@@ -95,7 +108,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
               </div>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+            <DropdownMenuItem onClick={onOpenSettings}>
               <SettingsIcon />
               Configuracoes
             </DropdownMenuItem>
@@ -111,7 +124,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
           variant="ghost"
           size="icon-sm"
           className="shrink-0 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"
-          onClick={() => setSettingsOpen(true)}
+          onClick={onOpenSettings}
         >
           <SettingsIcon />
           <span className="sr-only">Configuracoes</span>
@@ -120,7 +133,8 @@ export function UserMenu({ user }: { user: SessionUser }) {
       <AccountSettingsDialog
         user={user}
         open={settingsOpen}
-        onOpenChange={setSettingsOpen}
+        onOpenChange={onSettingsOpenChange}
+        initialSection={settingsSection}
         onLogout={handleLogout}
       />
     </>

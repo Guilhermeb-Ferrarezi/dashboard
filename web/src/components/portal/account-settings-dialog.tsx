@@ -1,6 +1,12 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useState,
+  type ComponentType,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   LoaderCircleIcon,
@@ -12,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 import { AppearanceSettingsPanel } from "@/components/portal/appearance-settings-panel";
+import { CodexAccessPanel } from "@/components/portal/codex-access-panel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,38 +37,48 @@ interface AccountSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLogout: () => Promise<void>;
+  initialSection?: SettingsSection;
 }
 
-type SettingsSection = "account" | "preferences" | "session";
-
-const settingsSections: Array<{
-  id: SettingsSection;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = [
-  { id: "account", label: "Minha conta", icon: UserRoundPenIcon },
-  { id: "preferences", label: "Preferencias", icon: PaletteIcon },
-  { id: "session", label: "Sessao", icon: ShieldIcon },
-];
+type SettingsSection = "account" | "preferences" | "session" | "codex";
 
 export function AccountSettingsDialog({
   user,
   open,
   onOpenChange,
   onLogout,
+  initialSection = "account",
 }: AccountSettingsDialogProps) {
   const router = useRouter();
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email ?? "");
   const [pending, setPending] = useState(false);
   const [activeSection, setActiveSection] = useState<SettingsSection>("account");
+  const settingsSections = [
+    { id: "account", label: "Minha conta", icon: UserRoundPenIcon },
+    { id: "preferences", label: "Preferencias", icon: PaletteIcon },
+    ...(user.role === "admin"
+      ? [{ id: "codex", label: "Acesso Codex", icon: ShieldIcon }]
+      : []),
+    { id: "session", label: "Sessao", icon: ShieldIcon },
+  ] as Array<{
+    id: SettingsSection;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+  }>;
 
   useEffect(() => {
     setUsername(user.username);
     setEmail(user.email ?? "");
   }, [user.email, user.username]);
 
-  async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (open) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection, open]);
+
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
 
@@ -169,6 +186,8 @@ export function AccountSettingsDialog({
                   ? "Minha conta"
                   : activeSection === "preferences"
                     ? "Preferencias"
+                    : activeSection === "codex"
+                      ? "Acesso Codex"
                     : "Sessao"}
               </DialogTitle>
               <DialogDescription>
@@ -176,6 +195,8 @@ export function AccountSettingsDialog({
                   ? "Dados basicos usados no portal."
                   : activeSection === "preferences"
                     ? "Tema, aparencia e conforto visual."
+                    : activeSection === "codex"
+                      ? "Crie e revogue o token privado do Codex para este admin."
                     : "Controle de acesso da sessao atual."}
               </DialogDescription>
             </DialogHeader>
@@ -244,6 +265,12 @@ export function AccountSettingsDialog({
               {activeSection === "preferences" ? (
                 <div className="mx-auto max-w-3xl">
                   <AppearanceSettingsPanel preferences={user.preferences} framed={false} />
+                </div>
+              ) : null}
+
+              {activeSection === "codex" && user.role === "admin" ? (
+                <div className="mx-auto max-w-4xl">
+                  <CodexAccessPanel />
                 </div>
               ) : null}
 
