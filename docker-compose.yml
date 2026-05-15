@@ -35,7 +35,6 @@ services:
       REDIS_URL: redis://redis:6379
       CODEX_HOME: /data/codex-home
       CODEX_WORKSPACE_ROOT: /app
-      CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX: "1"
     volumes:
       - ./:/app
       - ./.codex-home:/data/codex-home

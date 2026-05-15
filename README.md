@@ -21,7 +21,8 @@ No `web`, use `NEXT_PUBLIC_API_URL` para o browser e `API_INTERNAL_URL` para o S
 docker compose up -d --build
 ```
 
-- A API sobe com `CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX=1` para funcionar em container com sandbox externo.
+- A API agora sobe com bypass de sandbox interna por padrão, para evitar falhas com `bwrap` em container ou workspace já sandboxado.
+- Se quiser reativar o comportamento sem bypass, defina `CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX=0`.
 - O `CODEX_HOME` fica persistido em `./.codex-home`.
 - No boot, o container copia `AGENTS.override.md` e `openapi.yaml` para `CODEX_HOME` para guiar o Codex com a API do projeto.
 - O compose também sobe Mongo e Redis locais para o stack completo.

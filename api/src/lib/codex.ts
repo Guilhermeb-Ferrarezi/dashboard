@@ -151,9 +151,18 @@ const CODEX_APP_SERVER_URL =
   process.env.CODEX_APP_SERVER_URL?.trim() || `ws://127.0.0.1:${CODEX_APP_SERVER_PORT}`;
 const APP_SERVER_START_TIMEOUT_MS = 20_000;
 const CLIENT_SOCKET_OPEN_STATE = 1;
-const CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX = /^(1|true|yes)$/i.test(
-  process.env.CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX?.trim() || "",
-);
+
+function readBypassSandboxFlag() {
+  const raw = process.env.CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX?.trim();
+
+  if (!raw) {
+    return true;
+  }
+
+  return /^(1|true|yes)$/i.test(raw);
+}
+
+const CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX = readBypassSandboxFlag();
 
 let appServerProcess: ReturnType<typeof spawn> | null = null;
 let appServerStartPromise: Promise<void> | null = null;
