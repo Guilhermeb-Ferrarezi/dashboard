@@ -356,7 +356,13 @@ function flattenUserMessage(content: CodexUserInput[]) {
     .trim();
 }
 
+export function buildCodexTimelineEntryId(turnId: string, itemId: string) {
+  return `${turnId}:${itemId}`;
+}
+
 function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTimelineEntry | null {
+  const entryId = buildCodexTimelineEntryId(turnId, item.id);
+
   switch (item.type) {
     case "error": {
       const text =
@@ -364,7 +370,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? ((item as { message?: unknown }).message as string)
           : "Erro do Codex.";
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text,
         status: "error",
@@ -377,7 +383,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         ? ((item as { content: CodexUserInput[] }).content)
         : [];
       return {
-        id: item.id,
+        id: entryId,
         kind: "user",
         text: flattenUserMessage(content),
         turnId,
@@ -390,7 +396,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { text: string }).text
           : "";
       return {
-        id: item.id,
+        id: entryId,
         kind: "assistant",
         text,
         turnId,
@@ -402,7 +408,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { text: string }).text
           : "";
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text,
         status: "plan",
@@ -417,7 +423,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         ? ((item as { content: string[] }).content)
         : [];
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text: [...summary, ...content].join("\n").trim(),
         status: "reasoning",
@@ -447,7 +453,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
             ? ((item as { exit_code?: unknown }).exit_code as number)
           : null;
       return {
-        id: item.id,
+        id: entryId,
         kind: "command",
         command,
         output,
@@ -466,7 +472,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { status: string }).status
           : "completed";
       return {
-        id: item.id,
+        id: entryId,
         kind: "file-change",
         changes,
         status,
@@ -484,7 +490,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { status: string }).status
           : "completed";
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text: `Ferramenta dinamica executada: ${tool}.`,
         status,
@@ -506,7 +512,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { status: string }).status
           : "completed";
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text: `Ferramenta MCP executada: ${server} / ${tool}.`,
         status,
@@ -520,7 +526,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           ? (item as { query: string }).query
           : "consulta";
       return {
-        id: item.id,
+        id: entryId,
         kind: "system",
         text: `Busca web: ${query}.`,
         status: "completed",
@@ -1506,7 +1512,7 @@ function createSystemTimelineEntry(
   status: string,
 ): CodexTimelineEntry {
   return {
-    id: itemId,
+    id: buildCodexTimelineEntryId(turnId, itemId),
     kind: "system",
     text,
     status,
@@ -2147,31 +2153,37 @@ export function attachCodexGateway(server: HttpServer) {
               break;
             }
             case "item/agentMessage/delta": {
+              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "assistantDelta",
                 threadId: params.threadId ?? currentThreadId,
-                turnId: params.turnId ?? null,
-                itemId: params.itemId ?? null,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
                 delta: params.delta ?? "",
               });
               break;
             }
             case "item/commandExecution/outputDelta": {
+              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "commandOutputDelta",
                 threadId: params.threadId ?? currentThreadId,
-                turnId: params.turnId ?? null,
-                itemId: params.itemId ?? null,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
                 delta: params.delta ?? "",
               });
               break;
             }
             case "item/fileChange/patchUpdated": {
+              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "filePatchUpdated",
                 threadId: params.threadId ?? currentThreadId,
-                turnId: params.turnId ?? null,
-                itemId: params.itemId ?? null,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
                 changes: params.changes ?? [],
               });
               break;
