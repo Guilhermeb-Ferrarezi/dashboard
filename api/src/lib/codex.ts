@@ -11,6 +11,11 @@ import WebSocket, { WebSocketServer } from "ws";
 
 import type { AuthUserPayload } from "../types/express";
 import { type ICodexThreadSession, CodexThreadSession } from "../models/CodexThreadSession";
+import {
+  buildCodexAgentRuntimeState,
+  buildCodexOperationalPrompt,
+  shouldRequestCodexConfirmation,
+} from "./codex-agent-runtime";
 import { resolveCodexAccessState } from "./codex-access";
 
 type JsonRpcId = string | number;
@@ -141,6 +146,7 @@ type CodexSocketIncomingMessage =
   | { type: "cancelDeviceLogin"; loginId: string }
   | { type: "loadThread"; threadId: string }
   | { type: "sendPrompt"; threadId?: string | null; prompt: string }
+  | { type: "confirmPrompt"; requestId: string; accepted: boolean }
   | { type: "interrupt"; threadId: string; turnId: string };
 
 type AppServerNotificationHandler = (payload: {
@@ -1532,6 +1538,14 @@ export function attachCodexGateway(server: HttpServer) {
     wss.on("connection", (browserSocket: WebSocket, _request: IncomingMessage, user: AuthUserPayload) => {
       let currentThreadId: string | null = null;
       let socketClosed = false;
+      const pendingConfirmations = new Map<
+        string,
+        {
+          threadId: string | null;
+          prompt: string;
+        }
+      >();
+      const confirmedPrompts = new Set<string>();
 
       browserSocket.on("error", (error) => {
         console.error("[codex-browser-socket] erro:", error);
@@ -1563,8 +1577,7 @@ export function attachCodexGateway(server: HttpServer) {
 
         sendBrowserEvent(browserSocket, {
           type: "ready",
-          workspaceRoot: resolveWorkspaceRoot(),
-          executionMode: "exec",
+          ...buildCodexAgentRuntimeState(resolveWorkspaceRoot(), "exec"),
         });
 
         sendBrowserEvent(browserSocket, {
@@ -1616,6 +1629,26 @@ export function attachCodexGateway(server: HttpServer) {
               }
 
               let threadId = payload.threadId?.trim() || null;
+              const confirmationKey = `${threadId ?? "new"}:${prompt}`;
+              const alreadyConfirmed = confirmedPrompts.delete(confirmationKey);
+              const classification = shouldRequestCodexConfirmation(prompt);
+
+              if (classification.requiresConfirmation && !alreadyConfirmed) {
+                const requestId = `prompt-confirmation:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+                pendingConfirmations.set(requestId, {
+                  threadId,
+                  prompt,
+                });
+
+                sendBrowserEvent(browserSocket, {
+                  type: "confirmationRequested",
+                  requestId,
+                  prompt,
+                  riskLevel: classification.riskLevel,
+                  reasons: classification.reasons,
+                });
+                break;
+              }
 
               if (threadId) {
                 await ensureOwnedThread(user.id, threadId);
@@ -1627,7 +1660,7 @@ export function attachCodexGateway(server: HttpServer) {
               const result = await runCodexExecSession({
                 cwd: resolveWorkspaceRoot(),
                 threadId,
-                prompt,
+                prompt: buildCodexOperationalPrompt(prompt),
                 onJsonLine: (event) => {
                   if (event.type === "thread.started") {
                     const rawThreadId = (event as { thread_id?: unknown }).thread_id;
@@ -1770,6 +1803,46 @@ export function attachCodexGateway(server: HttpServer) {
               currentThreadId = threadId;
               break;
             }
+            case "confirmPrompt": {
+              const pending = pendingConfirmations.get(payload.requestId);
+
+              if (!pending) {
+                sendBrowserEvent(browserSocket, {
+                  type: "error",
+                  message: "Confirmacao nao encontrada.",
+                });
+                break;
+              }
+
+              pendingConfirmations.delete(payload.requestId);
+
+              if (!payload.accepted) {
+                sendBrowserEvent(browserSocket, {
+                  type: "confirmationResolved",
+                  requestId: payload.requestId,
+                  accepted: false,
+                });
+                break;
+              }
+
+              sendBrowserEvent(browserSocket, {
+                type: "confirmationResolved",
+                requestId: payload.requestId,
+                accepted: true,
+              });
+
+              confirmedPrompts.add(`${pending.threadId ?? "new"}:${pending.prompt}`);
+
+              browserSocket.emit(
+                "message",
+                Buffer.from(JSON.stringify({
+                  type: "sendPrompt",
+                  threadId: pending.threadId,
+                  prompt: pending.prompt,
+                })),
+              );
+              break;
+            }
             case "interrupt": {
               sendBrowserEvent(browserSocket, {
                 type: "error",
@@ -1848,6 +1921,58 @@ export function attachCodexGateway(server: HttpServer) {
     const codexClient = new CodexAppServerClient();
     let currentThreadId: string | null = null;
     let socketClosed = false;
+    const pendingConfirmations = new Map<
+      string,
+      {
+        threadId: string | null;
+        prompt: string;
+      }
+    >();
+
+    async function executePrompt(threadIdInput: string | null, prompt: string) {
+      let threadId = threadIdInput?.trim() || null;
+      const operationalPrompt = buildCodexOperationalPrompt(prompt);
+
+      if (threadId) {
+        await ensureOwnedThread(user.id, threadId);
+        await codexClient.request("thread/resume", {
+          threadId,
+          cwd: resolveWorkspaceRoot(),
+          approvalPolicy: "never",
+          sandbox: buildWorkspaceWritePolicy(),
+        });
+      } else {
+        const created = await codexClient.request<{ thread: CodexThread }>("thread/start", {
+          cwd: resolveWorkspaceRoot(),
+          approvalPolicy: "never",
+          sandbox: buildWorkspaceWritePolicy(),
+        });
+        threadId = created.thread.id;
+        currentThreadId = threadId;
+        await syncThreadOwnership(user.id, created.thread);
+
+        sendBrowserEvent(browserSocket, {
+          type: "threadCreated",
+          thread: summarizeThread(created.thread),
+        });
+      }
+
+      await touchThreadOwnership(user.id, threadId);
+
+      sendBrowserEvent(browserSocket, {
+        type: "userPromptAccepted",
+        threadId,
+        prompt,
+      });
+
+      await codexClient.request("turn/start", {
+        threadId,
+        input: [{ type: "text", text: operationalPrompt }],
+        cwd: resolveWorkspaceRoot(),
+        approvalPolicy: "never",
+        sandboxPolicy: buildWorkspaceWritePolicy(),
+      });
+    }
 
     console.info("[codex-gateway] browser socket connected", {
       userId: user.id,
@@ -1901,8 +2026,7 @@ export function attachCodexGateway(server: HttpServer) {
       console.info("[codex-gateway] sending ready", { userId: user.id });
       sendBrowserEvent(browserSocket, {
         type: "ready",
-        workspaceRoot: resolveWorkspaceRoot(),
-        executionMode: "workspace-write",
+        ...buildCodexAgentRuntimeState(resolveWorkspaceRoot(), "workspace-write"),
       });
 
       codexClient.onNotification(async ({ method, params }) => {
@@ -2170,47 +2294,57 @@ export function attachCodexGateway(server: HttpServer) {
               throw new Error("Prompt vazio.");
             }
 
-            let threadId = payload.threadId?.trim() || null;
+            const classification = shouldRequestCodexConfirmation(prompt);
 
-            if (threadId) {
-              await ensureOwnedThread(user.id, threadId);
-              await codexClient.request("thread/resume", {
-                threadId,
-                cwd: resolveWorkspaceRoot(),
-                approvalPolicy: "never",
-                sandbox: buildWorkspaceWritePolicy(),
+            if (classification.requiresConfirmation) {
+              const requestId = `prompt-confirmation:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+              pendingConfirmations.set(requestId, {
+                threadId: payload.threadId?.trim() || null,
+                prompt,
               });
-            } else {
-              const created = await codexClient.request<{ thread: CodexThread }>("thread/start", {
-                cwd: resolveWorkspaceRoot(),
-                approvalPolicy: "never",
-                sandbox: buildWorkspaceWritePolicy(),
-              });
-              threadId = created.thread.id;
-              currentThreadId = threadId;
-              await syncThreadOwnership(user.id, created.thread);
 
               sendBrowserEvent(browserSocket, {
-                type: "threadCreated",
-                thread: summarizeThread(created.thread),
+                type: "confirmationRequested",
+                requestId,
+                prompt,
+                riskLevel: classification.riskLevel,
+                reasons: classification.reasons,
               });
+              break;
             }
 
-            await touchThreadOwnership(user.id, threadId);
+            await executePrompt(payload.threadId?.trim() || null, prompt);
+            break;
+          }
+          case "confirmPrompt": {
+            const pending = pendingConfirmations.get(payload.requestId);
+
+            if (!pending) {
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message: "Confirmacao nao encontrada.",
+              });
+              break;
+            }
+
+            pendingConfirmations.delete(payload.requestId);
+
+            if (!payload.accepted) {
+              sendBrowserEvent(browserSocket, {
+                type: "confirmationResolved",
+                requestId: payload.requestId,
+                accepted: false,
+              });
+              break;
+            }
 
             sendBrowserEvent(browserSocket, {
-              type: "userPromptAccepted",
-              threadId,
-              prompt,
+              type: "confirmationResolved",
+              requestId: payload.requestId,
+              accepted: true,
             });
 
-            await codexClient.request("turn/start", {
-              threadId,
-              input: [{ type: "text", text: prompt }],
-              cwd: resolveWorkspaceRoot(),
-              approvalPolicy: "never",
-              sandboxPolicy: buildWorkspaceWritePolicy(),
-            });
+            await executePrompt(pending.threadId, pending.prompt);
             break;
           }
           case "interrupt": {

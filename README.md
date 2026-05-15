@@ -15,6 +15,20 @@ Em desenvolvimento, o backend tenta `MONGO_FALLBACK_HOST=localhost` automaticame
 
 No `web`, use `NEXT_PUBLIC_API_URL` para o browser e `API_INTERNAL_URL` para o SSR quando o servidor nao puder acessar a URL publica do painel.
 
+O painel do Codex agora expõe um modo de agente com fontes declaradas explicitamente:
+
+- contexto da conversa
+- documentacao do projeto
+- OpenAPI local
+- workspace do projeto
+- web e docs publicas
+
+Quando o agente sinaliza uma acao de risco, o drawer pede confirmacao antes de continuar.
+
+A escolha de ferramentas segue a regra: precisao primeiro, completude depois e velocidade apenas como desempate. Respostas que combinam fontes devem ser organizadas por etapas do problema, e nao por lista de ferramentas usadas. Quando faltam dados para identificar o alvo correto, o agente deve perguntar antes de agir.
+
+O runtime de ferramentas fica em `GET /api/codex/tools` e `POST /api/codex/tools/:toolId/run`. Cada ferramenta possui schema fixo de parâmetros; chamadas de escrita por `execute_internal_api` retornam pedido de confirmação quando `confirmed` nao foi enviado.
+
 ## Docker Compose
 
 ```bash

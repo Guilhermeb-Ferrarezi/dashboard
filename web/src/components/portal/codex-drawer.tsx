@@ -26,12 +26,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CodexMarkdown } from "@/components/portal/codex-markdown";
+import { CodexAgentStatus } from "@/components/portal/codex-agent-status";
+import { CodexConfirmationDialog } from "@/components/portal/codex-confirmation-dialog";
 import { clientApi } from "@/lib/api";
 import { getCodexWebSocketUrl, formatCodexTimestamp } from "@/lib/codex";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
 import type {
+  CodexAgentCapabilities,
   CodexAccountStatus,
+  CodexConfirmationRequest,
   CodexThreadDetail,
   CodexThreadSummary,
   CodexTimelineEntry,
@@ -45,7 +49,12 @@ interface CodexDrawerProps {
 }
 
 type CodexSocketEvent =
-  | { type: "ready"; workspaceRoot: string; executionMode: string }
+  | {
+      type: "ready";
+      workspaceRoot: string;
+      executionMode: string;
+      capabilities: CodexAgentCapabilities;
+    }
   | { type: "deviceLoginStarted"; loginId: string; verificationUrl: string; userCode: string }
   | { type: "deviceLoginCompleted"; loginId: string | null; success: boolean; error: string | null }
   | { type: "deviceLoginCancelled"; loginId: string }
@@ -61,6 +70,8 @@ type CodexSocketEvent =
   | { type: "commandOutputDelta"; threadId: string | null; turnId: string | null; itemId: string | null; delta: string }
   | { type: "filePatchUpdated"; threadId: string | null; turnId: string | null; itemId: string | null; changes: Array<{ path: string; kind: string; diff: string }> }
   | { type: "itemCompleted"; threadId: string | null; entry: CodexTimelineEntry }
+  | { type: "confirmationRequested"; requestId: string; prompt: string; riskLevel: "low" | "elevated" | "high"; reasons: string[] }
+  | { type: "confirmationResolved"; requestId: string; accepted: boolean }
   | { type: "error"; message: string };
 
 export function isCodexAccessBlocked(account: CodexAccountStatus | null) {
@@ -116,7 +127,7 @@ function appendOptimisticUserEntry(
   threadId: string,
   prompt: string,
   turnId: string | null,
-) {
+): CodexTimelineEntry[] {
   const optimisticId = `optimistic-user:${threadId}:${prompt}`;
   const existing = list.find((item) => item.id === optimisticId);
 
@@ -132,7 +143,7 @@ function appendOptimisticUserEntry(
       text: prompt,
       status: "pending",
       turnId: turnId ?? `pending:${threadId}`,
-    },
+    } as CodexTimelineEntry,
   ];
 }
 
@@ -141,7 +152,7 @@ function ensureAssistantEntry(
   itemId: string,
   turnId: string,
   delta: string,
-) {
+) : CodexTimelineEntry[] {
   const existing = list.find((item) => item.id === itemId && item.kind === "assistant");
 
   if (!existing || existing.kind !== "assistant") {
@@ -152,7 +163,7 @@ function ensureAssistantEntry(
         kind: "assistant",
         text: delta,
         turnId,
-      },
+      } as CodexTimelineEntry,
     ];
   }
 
@@ -168,7 +179,7 @@ function ensureCommandEntry(
   itemId: string,
   turnId: string,
   delta: string,
-) {
+) : CodexTimelineEntry[] {
   const existing = list.find((item) => item.id === itemId && item.kind === "command");
 
   if (!existing || existing.kind !== "command") {
@@ -182,7 +193,7 @@ function ensureCommandEntry(
         status: "inProgress",
         exitCode: null,
         turnId,
-      },
+      } as CodexTimelineEntry,
     ];
   }
 
@@ -198,7 +209,7 @@ function ensureFileChangeEntry(
   itemId: string,
   turnId: string,
   changes: Array<{ path: string; kind: string; diff: string }>,
-) {
+) : CodexTimelineEntry[] {
   const existing = list.find((item) => item.id === itemId && item.kind === "file-change");
 
   if (!existing || existing.kind !== "file-change") {
@@ -210,7 +221,7 @@ function ensureFileChangeEntry(
         changes,
         status: "inProgress",
         turnId,
-      },
+      } as CodexTimelineEntry,
     ];
   }
 
@@ -285,6 +296,8 @@ export function CodexDrawer({
   const [sending, setSending] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<CodexAgentCapabilities | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<CodexConfirmationRequest | null>(null);
   const [deviceLogin, setDeviceLogin] = useState<{
     loginId: string;
     verificationUrl: string;
@@ -307,6 +320,21 @@ export function CodexDrawer({
   function showAsyncError(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     toast.error(message);
+  }
+
+  function sendConfirmationDecision(requestId: string, accepted: boolean) {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      toast.error("Socket do Codex ainda nao esta pronto.");
+      return;
+    }
+
+    socketRef.current.send(
+      JSON.stringify({
+        type: "confirmPrompt",
+        requestId,
+        accepted,
+      }),
+    );
   }
 
   function openHistoryMenu() {
@@ -368,6 +396,7 @@ export function CodexDrawer({
       switch (payload.type) {
         case "ready":
           setWorkspaceRoot(payload.workspaceRoot);
+          setCapabilities(payload.capabilities);
           break;
         case "deviceLoginStarted":
           setDeviceLogin(payload);
@@ -432,38 +461,66 @@ export function CodexDrawer({
           );
           setDraft("");
           break;
-        case "assistantDelta":
+        case "assistantDelta": {
           if (!payload.itemId || !payload.turnId) {
             break;
           }
+          const assistantItemId = payload.itemId;
+          const assistantTurnId = payload.turnId;
           setTimeline((current) =>
-            ensureAssistantEntry(current, payload.itemId, payload.turnId, payload.delta),
+            ensureAssistantEntry(current, assistantItemId, assistantTurnId, payload.delta),
           );
           break;
-        case "commandOutputDelta":
+        }
+        case "commandOutputDelta": {
           if (!payload.itemId || !payload.turnId) {
             break;
           }
+          const commandItemId = payload.itemId;
+          const commandTurnId = payload.turnId;
           setTimeline((current) =>
-            ensureCommandEntry(current, payload.itemId, payload.turnId, payload.delta),
+            ensureCommandEntry(current, commandItemId, commandTurnId, payload.delta),
           );
           break;
-        case "filePatchUpdated":
+        }
+        case "filePatchUpdated": {
           if (!payload.itemId || !payload.turnId) {
             break;
           }
+          const filePatchItemId = payload.itemId;
+          const filePatchTurnId = payload.turnId;
           setTimeline((current) =>
-            ensureFileChangeEntry(current, payload.itemId, payload.turnId, payload.changes),
+            ensureFileChangeEntry(current, filePatchItemId, filePatchTurnId, payload.changes),
           );
           break;
-        case "itemCompleted":
+        }
+        case "itemCompleted": {
+          const itemCompletedEntry = payload.entry as CodexTimelineEntry;
           setTimeline((current) => {
             const next =
-              payload.entry.kind === "user"
-                ? removeOptimisticUserEntries(current, payload.entry.text, payload.threadId)
+              itemCompletedEntry.kind === "user"
+                ? removeOptimisticUserEntries(current, itemCompletedEntry.text, payload.threadId)
                 : current;
-            return mergeTimelineEntry(next, payload.entry);
+            return mergeTimelineEntry(next, itemCompletedEntry);
           });
+          break;
+        }
+        case "confirmationRequested":
+          setPendingConfirmation({
+            requestId: payload.requestId,
+            prompt: payload.prompt,
+            riskLevel: payload.riskLevel,
+            reasons: payload.reasons,
+          });
+          setSending(false);
+          break;
+        case "confirmationResolved":
+          setPendingConfirmation((current) =>
+            current?.requestId === payload.requestId ? null : current,
+          );
+          if (!payload.accepted) {
+            toast.info("Ação cancelada.");
+          }
           break;
         case "error":
           setSending(false);
@@ -491,6 +548,7 @@ export function CodexDrawer({
       setActiveTurnId(null);
       activeTurnIdRef.current = null;
       setDeviceLogin(null);
+      setPendingConfirmation(null);
     };
   }, [accessBlocked, accessRefreshTick, loading, open, user.role]);
 
@@ -510,6 +568,8 @@ export function CodexDrawer({
           setActiveTurnId(null);
           setSending(false);
           setDeviceLogin(null);
+          setCapabilities(null);
+          setPendingConfirmation(null);
           return null;
         }
 
@@ -617,6 +677,11 @@ export function CodexDrawer({
   }
 
   function sendPrompt(promptOverride?: string) {
+    if (pendingConfirmation) {
+      toast.info("Existe uma confirmacao pendente.");
+      return;
+    }
+
     const prompt = (promptOverride ?? draft).trim();
 
     if (!prompt) {
@@ -636,6 +701,25 @@ export function CodexDrawer({
         prompt,
       }),
     );
+  }
+
+  function approvePendingConfirmation() {
+    if (!pendingConfirmation) {
+      return;
+    }
+
+    setSending(true);
+    sendConfirmationDecision(pendingConfirmation.requestId, true);
+  }
+
+  function denyPendingConfirmation() {
+    if (!pendingConfirmation) {
+      return;
+    }
+
+    sendConfirmationDecision(pendingConfirmation.requestId, false);
+    setPendingConfirmation(null);
+    setSending(false);
   }
 
   function interruptTurn() {
@@ -714,6 +798,18 @@ export function CodexDrawer({
 
   return (
     <div ref={drawerRef} className="flex h-full min-h-0 min-w-0 w-full flex-col overflow-hidden bg-background">
+      <CodexConfirmationDialog
+        request={pendingConfirmation}
+        open={Boolean(pendingConfirmation)}
+        onOpenChange={(next) => {
+          if (!next && pendingConfirmation) {
+            denyPendingConfirmation();
+          }
+        }}
+        onApprove={approvePendingConfirmation}
+        onDeny={denyPendingConfirmation}
+      />
+
       <div className="px-2 py-1.5">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <div ref={historyMenuRef} className="relative min-w-0 flex-1">
@@ -838,6 +934,10 @@ export function CodexDrawer({
           </div>
         </div>
       ) : null}
+
+      <div className="px-3 py-2">
+        <CodexAgentStatus capabilities={capabilities} workspaceRoot={workspaceRoot} />
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
           <section

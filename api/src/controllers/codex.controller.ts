@@ -7,6 +7,10 @@ import {
   readCodexThreadForUser,
 } from "../lib/codex";
 import {
+  listCodexRuntimeTools,
+  runCodexRuntimeTool,
+} from "../lib/codex-tool-runtime";
+import {
   CODEX_ACCESS_BLOCKED_REASON,
   resolveCodexAccessState,
 } from "../lib/codex-access";
@@ -161,5 +165,36 @@ export async function readCodexThread(req: Request, res: Response) {
     }
 
     return res.status(500).json({ message });
+  }
+}
+
+export function listCodexTools(_req: Request, res: Response) {
+  return res.json({ ok: true, tools: listCodexRuntimeTools() });
+}
+
+export async function runCodexTool(req: Request, res: Response) {
+  const toolId = Array.isArray(req.params.toolId)
+    ? req.params.toolId[0]
+    : req.params.toolId;
+
+  if (!toolId) {
+    return res.status(400).json({ message: "Ferramenta nao informada." });
+  }
+
+  try {
+    const result = await runCodexRuntimeTool(toolId, req.body?.params ?? {}, {
+      workspaceRoot: process.cwd().endsWith("/api")
+        ? process.cwd().replace(/\/api$/u, "")
+        : process.cwd(),
+      cookieHeader: req.headers.cookie,
+      confirmed: Boolean(req.body?.confirmed),
+    });
+
+    return res.json({ ok: true, result });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      message: error instanceof Error ? error.message : "Falha ao executar ferramenta.",
+    });
   }
 }

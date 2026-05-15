@@ -2,9 +2,11 @@ import { Router } from "express";
 
 import {
   getCodexAccount,
+  listCodexTools,
   listCodexThreads,
   logoutCodex,
   readCodexThread,
+  runCodexTool,
 } from "../controllers/codex.controller";
 import { requireCodexAccessToken } from "../middlewares/codex-access";
 import { verifyJWT } from "../middlewares/jwe";
@@ -16,6 +18,8 @@ router.use(verifyJWT, requireRole("admin"));
 router.use(requireCodexAccessToken);
 router.get("/account", getCodexAccount);
 router.post("/account/logout", logoutCodex);
+router.get("/tools", listCodexTools);
+router.post("/tools/:toolId/run", runCodexTool);
 router.get("/threads", listCodexThreads);
 router.get("/threads/:threadId", readCodexThread);
 

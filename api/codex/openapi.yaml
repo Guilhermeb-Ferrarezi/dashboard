@@ -87,6 +87,19 @@ components:
         lastUsedAt:
           type: string
           nullable: true
+    CodexRuntimeTool:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+        requiresConfirmation:
+          type: boolean
 paths:
   /codex/account:
     get:
@@ -132,6 +145,50 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/CodexThreadSummary"
+  /codex/tools:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List fixed Codex runtime tools
+      responses:
+        "200":
+          description: Tool list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tools:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CodexRuntimeTool"
+  /codex/tools/{toolId}/run:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Run a fixed Codex runtime tool
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                params:
+                  type: object
+                confirmed:
+                  type: boolean
+      responses:
+        "200":
+          description: Tool run result
   /codex/threads/{threadId}:
     get:
       security:
