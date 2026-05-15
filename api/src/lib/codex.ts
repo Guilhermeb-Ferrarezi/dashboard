@@ -151,6 +151,9 @@ const CODEX_APP_SERVER_URL =
   process.env.CODEX_APP_SERVER_URL?.trim() || `ws://127.0.0.1:${CODEX_APP_SERVER_PORT}`;
 const APP_SERVER_START_TIMEOUT_MS = 20_000;
 const CLIENT_SOCKET_OPEN_STATE = 1;
+const CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX = /^(1|true|yes)$/i.test(
+  process.env.CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX?.trim() || "",
+);
 
 let appServerProcess: ReturnType<typeof spawn> | null = null;
 let appServerStartPromise: Promise<void> | null = null;
@@ -178,6 +181,24 @@ function resolveCodexHome() {
   }
 
   return path.join(resolveWorkspaceRoot(), ".codex-home");
+}
+
+export function buildCodexAppServerArgs(forceBypass = CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX) {
+  const args = [
+    "app-server",
+    "--listen",
+    CODEX_APP_SERVER_URL,
+    "-c",
+    'cli_auth_credentials_store="file"',
+    "-c",
+    'forced_login_method="chatgpt"',
+  ];
+
+  if (forceBypass) {
+    return ["--dangerously-bypass-approvals-and-sandbox", ...args];
+  }
+
+  return args;
 }
 
 export function getCodexWorkspaceRoot() {
@@ -454,15 +475,7 @@ async function startCodexAppServer() {
 
   const child = spawn(
     "codex",
-    [
-      "app-server",
-      "--listen",
-      CODEX_APP_SERVER_URL,
-      "-c",
-      'cli_auth_credentials_store="file"',
-      "-c",
-      'forced_login_method="chatgpt"',
-    ],
+    buildCodexAppServerArgs(),
     {
       cwd: resolveWorkspaceRoot(),
       env,
