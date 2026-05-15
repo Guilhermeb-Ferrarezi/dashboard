@@ -22,6 +22,39 @@ function languageFromClassName(className: string | undefined) {
   return match?.[1] ?? null;
 }
 
+export function inferCodexCodeLanguage(code: string, explicitLanguage: string | null) {
+  if (explicitLanguage) {
+    return explicitLanguage;
+  }
+
+  const trimmed = code.trim();
+
+  if (/^(GET|POST|PUT|PATCH|DELETE)\s+\/\S+/u.test(trimmed)) {
+    return "http";
+  }
+
+  if (
+    trimmed.startsWith("/bin/sh")
+    || trimmed.startsWith("bun ")
+    || trimmed.startsWith("node ")
+    || trimmed.startsWith("curl ")
+    || trimmed.startsWith("git ")
+  ) {
+    return "bash";
+  }
+
+  return null;
+}
+
+export function shouldRenderCompactCodexLiteral(code: string, explicitLanguage: string | null) {
+  if (explicitLanguage) {
+    return false;
+  }
+
+  const trimmed = code.trim();
+  return Boolean(trimmed && !trimmed.includes("\n") && trimmed.length <= 48);
+}
+
 function CodeBlock({
   inline,
   className,
@@ -33,6 +66,15 @@ function CodeBlock({
 }) {
   const language = languageFromClassName(className);
   const code = Array.isArray(children) ? children.join("") : String(children);
+  const inferredLanguage = inferCodexCodeLanguage(code, language);
+
+  if (!inline && shouldRenderCompactCodexLiteral(code, language)) {
+    return (
+      <code className="rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 font-mono text-[0.92em] text-foreground">
+        {code.trim()}
+      </code>
+    );
+  }
 
   if (inline) {
     return (
@@ -45,7 +87,7 @@ function CodeBlock({
   return (
     <div className="my-3 overflow-hidden rounded-2xl border border-border/70 bg-[#0e1117] shadow-[0_1px_0_rgba(255,255,255,0.02)]">
       <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-white/5 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        <span>{language ?? "code"}</span>
+        <span>{inferredLanguage ?? "code"}</span>
         <span className="text-[10px] tracking-[0.18em] text-muted-foreground/80">codex</span>
       </div>
       <pre className="overflow-x-auto p-3 text-[12px] leading-6 text-slate-200">

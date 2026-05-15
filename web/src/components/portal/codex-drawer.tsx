@@ -134,6 +134,10 @@ export function summarizeCodexCommand(command: string) {
   return "Executando verificação técnica...";
 }
 
+export function isCodexReasoningEntry(entry: CodexTimelineEntry) {
+  return entry.kind === "system" && entry.status === "reasoning";
+}
+
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
     (left, right) => right.updatedAt - left.updatedAt,
@@ -369,6 +373,7 @@ export function CodexDrawer({
   const [historySearch, setHistorySearch] = useState("");
   const [accessRefreshTick, setAccessRefreshTick] = useState(0);
   const [expandedCommandIds, setExpandedCommandIds] = useState<Set<string>>(() => new Set());
+  const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(() => new Set());
   const [executionMode, setExecutionMode] = useState<string | null>(null);
 
   const connected = Boolean(account?.connected);
@@ -430,6 +435,20 @@ export function CodexDrawer({
 
   function toggleCommandDetails(entryId: string) {
     setExpandedCommandIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(entryId)) {
+        next.delete(entryId);
+      } else {
+        next.add(entryId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleReasoningDetails(entryId: string) {
+    setExpandedReasoningIds((current) => {
       const next = new Set(current);
 
       if (next.has(entryId)) {
@@ -1073,6 +1092,34 @@ export function CodexDrawer({
                     <CodexMarkdown className="text-sm leading-7">
                       {entry.text}
                     </CodexMarkdown>
+                  </div>
+                );
+              }
+
+              if (isCodexReasoningEntry(entry)) {
+                const expanded = expandedReasoningIds.has(entry.id);
+
+                return (
+                  <div key={entry.id} className="rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 text-left"
+                      onClick={() => toggleReasoningDetails(entry.id)}
+                      aria-expanded={expanded}
+                    >
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CaretDown className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
+                        <span>Pensamento</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Expandir</span>
+                    </button>
+                    {expanded ? (
+                      <div className="mt-2 px-0.5">
+                        <CodexMarkdown tone="muted" className="text-sm leading-7">
+                          {entry.text}
+                        </CodexMarkdown>
+                      </div>
+                    ) : null}
                   </div>
                 );
               }

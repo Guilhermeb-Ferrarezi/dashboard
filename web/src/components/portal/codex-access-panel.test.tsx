@@ -7,6 +7,7 @@ import {
   formatCodexErrorMessage,
   isCodexAccessBlocked,
   appendOptimisticUserEntry,
+  isCodexReasoningEntry,
   removeOptimisticUserEntries,
   summarizeCodexCommand,
 } from "./codex-drawer";
@@ -102,5 +103,15 @@ describe("codex access panel", () => {
       text: "quais sao os nomes dos times inscritos",
     });
     expect(cleaned).toHaveLength(0);
+  });
+
+  test("identifica itens de reasoning para renderizacao expansivel", () => {
+    expect(isCodexReasoningEntry({
+      id: "reasoning-1",
+      kind: "system",
+      text: "vou validar o endpoint antes",
+      status: "reasoning",
+      turnId: "turn-1",
+    })).toBe(true);
   });
 });
