@@ -33,5 +33,6 @@ This file is injected into `CODEX_HOME` on every container start.
 2. Verify that the route is documented in the OpenAPI file before using it.
 3. Verify which token/header the endpoint expects.
 4. Call the API with the injected token.
-5. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
-6. If the route exists only in code, stop and report that it must be added to the OpenAPI contract before the agent can use it.
+5. The system provides a managed `CODEX_ACCESS_TOKEN` for protected internal calls; do not depend on the browser session cookie.
+6. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
+7. If the route exists only in code, stop and report that it must be added to the OpenAPI contract before the agent can use it.

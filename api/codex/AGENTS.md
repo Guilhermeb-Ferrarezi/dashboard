@@ -43,6 +43,7 @@ This file is injected into `CODEX_HOME` on every container start.
 - For business state, prefer a documented internal API endpoint over workspace, shell, or database access.
 - For endpoint or payload shape, validate against OpenAPI before any internal API read or write.
 - If a route exists in the codebase but is missing from the OpenAPI file, do not use it. Report that it must be added to `openapi.yaml` before the agent can call it.
+- The system provides a managed `CODEX_ACCESS_TOKEN` for protected internal calls; use it instead of expecting the browser session cookie.
 - Do not use shell, ad hoc scripts, or indirect database access as the primary path for business reads.
 - When several sources apply, combine them by problem-solving step rather than by source name.
 

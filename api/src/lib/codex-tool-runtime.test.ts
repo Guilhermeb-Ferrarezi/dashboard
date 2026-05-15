@@ -98,12 +98,19 @@ describe("codex tool runtime", () => {
 
   test("permite path interno documentado no OpenAPI", async () => {
     const originalFetch = globalThis.fetch;
+    const originalToken = process.env.CODEX_ACCESS_TOKEN;
 
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ ok: true, inscricoes: [] }), {
+    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
+
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toBeDefined();
+      const headers = new Headers(init?.headers);
+      expect(headers.get("authorization")).toBe("Bearer codex_service_token");
+      return new Response(JSON.stringify({ ok: true, inscricoes: [] }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      })) as typeof fetch;
+      });
+    }) as typeof fetch;
 
     try {
       const result = await runCodexRuntimeTool(
@@ -116,6 +123,7 @@ describe("codex tool runtime", () => {
       expect(result.summary).toBe("Chamada GET /vct/inscricoes?modalidade=valorant executada com sucesso.");
     } finally {
       globalThis.fetch = originalFetch;
+      process.env.CODEX_ACCESS_TOKEN = originalToken;
     }
   });
 

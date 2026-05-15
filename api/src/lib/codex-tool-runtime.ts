@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { resolveCodexServiceToken } from "./codex-service-token";
+
 export type CodexToolSchemaProperty = {
   type: "string" | "number" | "boolean" | "object";
   description: string;
@@ -322,6 +324,7 @@ async function executeInternalApi(params: Record<string, unknown>, context: Code
     method,
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${resolveCodexServiceToken()}`,
       ...(context.cookieHeader ? { Cookie: context.cookieHeader } : {}),
     },
     body: method === "GET" ? undefined : JSON.stringify(params.body ?? {}),

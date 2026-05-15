@@ -38,6 +38,7 @@ export function buildCodexOperationalPrompt(userPrompt: string) {
     "- Use apenas ferramentas registradas; não invente nome de ferramenta ou parâmetro.",
     "- Ferramentas registradas e seus schemas:",
     tools,
+    "- O sistema fornece automaticamente um `CODEX_ACCESS_TOKEN` de serviço para chamadas internas protegidas; use esse token em vez de depender do cookie do navegador.",
     "- Consultas de negocio devem usar endpoint interno documentado no OpenAPI.",
     "- Nao use shell, comando ad hoc ou acesso indireto a banco para responder dado de negocio.",
     "- Se a rota existir no codigo, mas nao estiver no OpenAPI, pare e informe que ela precisa entrar no contrato antes do uso pelo agente.",
