@@ -1,0 +1,69 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: santos-tech-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: santos-tech-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: santos-tech-api
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - redis
+    ports:
+      - "127.0.0.1:4000:4000"
+    env_file:
+      - ./api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3001
+      ALLOWED_ORIGINS: http://localhost:3001,http://localhost:3000
+      MONGO_URI: mongodb://mongo:27017/santos-tech-home
+      REDIS_URL: redis://redis:6379
+      CODEX_HOME: /data/codex-home
+      CODEX_WORKSPACE_ROOT: /app
+      CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX: "1"
+    volumes:
+      - ./:/app
+      - ./.codex-home:/data/codex-home
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor=unconfined
+      - seccomp=unconfined
+    stdin_open: true
+    tty: true
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: santos-tech-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3001:3000"
+    env_file:
+      - ./web/.env
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      API_INTERNAL_URL: http://api:4000/api
+
+volumes:
+  mongo_data:
+  redis_data:

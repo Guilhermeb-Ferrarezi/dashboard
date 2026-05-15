@@ -14,3 +14,14 @@ Se a API estiver rodando direto no host, use `localhost` no `MONGO_URI`. Hostnam
 Em desenvolvimento, o backend tenta `MONGO_FALLBACK_HOST=localhost` automaticamente quando o hostname configurado para o Mongo nao pode ser resolvido.
 
 No `web`, use `NEXT_PUBLIC_API_URL` para o browser e `API_INTERNAL_URL` para o SSR quando o servidor nao puder acessar a URL publica do painel.
+
+## Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+- A API sobe com `CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX=1` para funcionar em container com sandbox externo.
+- O `CODEX_HOME` fica persistido em `./.codex-home`.
+- O compose também sobe Mongo e Redis locais para o stack completo.
+- As portas do `web` e da `api` ficam presas em `127.0.0.1`, então não ficam abertas para fora da VPS.
