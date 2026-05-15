@@ -1,13 +1,16 @@
+import * as fsSync from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import readline from "node:readline";
 import type { IncomingMessage } from "node:http";
 import type { AddressInfo, Server as HttpServer } from "node:net";
 import jwt from "jsonwebtoken";
 import WebSocket, { WebSocketServer } from "ws";
 
 import type { AuthUserPayload } from "../types/express";
-import { CodexThreadSession } from "../models/CodexThreadSession";
+import { type ICodexThreadSession, CodexThreadSession } from "../models/CodexThreadSession";
 import { resolveCodexAccessState } from "./codex-access";
 
 type JsonRpcId = string | number;
@@ -163,6 +166,8 @@ function readBypassSandboxFlag() {
 }
 
 const CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX = readBypassSandboxFlag();
+const CODEX_USE_EXEC_WORKFLOW =
+  !/^(0|false|no)$/i.test(process.env.CODEX_USE_EXEC_WORKFLOW?.trim() || "");
 
 let appServerProcess: ReturnType<typeof spawn> | null = null;
 let appServerStartPromise: Promise<void> | null = null;
@@ -182,6 +187,27 @@ function resolveWorkspaceRoot() {
   return path.basename(cwd) === "api" ? path.resolve(cwd, "..") : cwd;
 }
 
+function findCodexAuthHome() {
+  const candidates = [
+    process.env.CODEX_HOME?.trim(),
+    "/root/.codex",
+    process.env.HOME ? path.join(process.env.HOME, ".codex") : null,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    const authPath = path.join(candidate, "auth.json");
+    if (fsSync.existsSync(authPath)) {
+      if (path.basename(candidate) === ".codex") {
+        return { home: path.dirname(candidate), codexHome: candidate };
+      }
+
+      return { home: candidate, codexHome: path.join(candidate, ".codex") };
+    }
+  }
+
+  return null;
+}
+
 function resolveCodexHome() {
   const configured = process.env.CODEX_HOME?.trim();
 
@@ -190,6 +216,52 @@ function resolveCodexHome() {
   }
 
   return path.join(resolveWorkspaceRoot(), ".codex-home");
+}
+
+function resolveCodexAuthEnv() {
+  const codexHome = findCodexAuthHome();
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+  };
+
+  if (codexHome) {
+    env.CODEX_HOME = codexHome.codexHome;
+    env.HOME = codexHome.home;
+  }
+
+  return env;
+}
+
+function getCodexBinary() {
+  return process.env.CODEX_BIN?.trim() || "codex";
+}
+
+function parseCodexLoginStatus(output: string) {
+  const normalized = output.toLowerCase();
+
+  if (!/logged in/.test(normalized)) {
+    return {
+      connected: false,
+      authMode: null,
+      requiresOpenaiAuth: true,
+      planType: null,
+      email: null,
+      sharedAccountLabel: null,
+    };
+  }
+
+  return {
+    connected: true,
+    authMode: normalized.includes("chatgpt") ? "chatgpt" : "apiKey",
+    requiresOpenaiAuth: false,
+    planType: null,
+    email: null,
+    sharedAccountLabel: null,
+  };
+}
+
+function isCodexExecWorkflowEnabled() {
+  return CODEX_USE_EXEC_WORKFLOW;
 }
 
 export function buildCodexAppServerArgs(
@@ -265,6 +337,20 @@ function flattenUserMessage(content: CodexUserInput[]) {
 
 function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTimelineEntry | null {
   switch (item.type) {
+    case "error": {
+      const text =
+        typeof (item as { message?: unknown }).message === "string"
+          ? ((item as { message?: unknown }).message as string)
+          : "Erro do Codex.";
+      return {
+        id: item.id,
+        kind: "system",
+        text,
+        status: "error",
+        turnId,
+      };
+    }
+    case "user_message":
     case "userMessage": {
       const content = Array.isArray((item as { content?: unknown }).content)
         ? ((item as { content: CodexUserInput[] }).content)
@@ -276,6 +362,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "agent_message":
     case "agentMessage": {
       const text =
         typeof (item as { text?: unknown }).text === "string"
@@ -316,6 +403,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "command_execution":
     case "commandExecution": {
       const command =
         typeof (item as { command?: unknown }).command === "string"
@@ -323,7 +411,9 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           : "";
       const output =
         typeof (item as { aggregatedOutput?: unknown }).aggregatedOutput === "string"
-          ? (item as { aggregatedOutput: string }).aggregatedOutput
+          ? ((item as { aggregatedOutput?: unknown }).aggregatedOutput as string)
+          : typeof (item as { aggregated_output?: unknown }).aggregated_output === "string"
+            ? ((item as { aggregated_output?: unknown }).aggregated_output as string)
           : "";
       const status =
         typeof (item as { status?: unknown }).status === "string"
@@ -331,7 +421,9 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
           : "completed";
       const exitCode =
         typeof (item as { exitCode?: unknown }).exitCode === "number"
-          ? (item as { exitCode: number }).exitCode
+          ? ((item as { exitCode?: unknown }).exitCode as number)
+          : typeof (item as { exit_code?: unknown }).exit_code === "number"
+            ? ((item as { exit_code?: unknown }).exit_code as number)
           : null;
       return {
         id: item.id,
@@ -343,6 +435,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "file_change":
     case "fileChange": {
       const changes = Array.isArray((item as { changes?: unknown }).changes)
         ? ((item as { changes: CodexFileChange[] }).changes)
@@ -359,6 +452,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "dynamic_tool_call":
     case "dynamicToolCall": {
       const tool =
         typeof (item as { tool?: unknown }).tool === "string"
@@ -376,6 +470,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "mcp_tool_call":
     case "mcpToolCall": {
       const server =
         typeof (item as { server?: unknown }).server === "string"
@@ -397,6 +492,7 @@ function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTime
         turnId,
       };
     }
+    case "web_search":
     case "webSearch": {
       const query =
         typeof (item as { query?: unknown }).query === "string"
@@ -441,6 +537,307 @@ function serializeThreadDetail(thread: CodexThread, session?: { lastOpenedAt?: D
   return {
     thread: summarizeThread(thread, session),
     timeline,
+  };
+}
+
+type CodexExecEvent = {
+  type: string;
+  [key: string]: unknown;
+};
+
+type CodexExecRunResult = {
+  threadId: string | null;
+  turnId: string | null;
+  message: string;
+  timelineEntries: CodexTimelineEntry[];
+  status: string | null;
+};
+
+function getTimelineSnapshot(session: { timeline?: unknown[] | null } | null | undefined) {
+  return Array.isArray(session?.timeline) ? (session!.timeline as CodexTimelineEntry[]) : [];
+}
+
+function createTimelineEntriesFromItem(turnId: string, item: CodexThreadItem | CodexExecEvent) {
+  const entry = serializeTimelineItem(turnId, item as CodexThreadItem);
+  return entry ? [entry] : [];
+}
+
+async function appendTimelineEntries(
+  userId: string,
+  threadId: string,
+  entries: CodexTimelineEntry[],
+  patch?: Partial<Pick<ICodexThreadSession, "name" | "preview" | "status">>,
+) {
+  const session = await CodexThreadSession.findOne({ userId, threadId });
+
+  if (!session) {
+    await CodexThreadSession.create({
+      userId,
+      threadId,
+      timeline: entries,
+      ...patch,
+    });
+    return;
+  }
+
+  const currentTimeline = getTimelineSnapshot(session);
+  const merged = new Map<string, CodexTimelineEntry>();
+
+  for (const entry of currentTimeline) {
+    merged.set(entry.id, entry);
+  }
+
+  for (const entry of entries) {
+    merged.set(entry.id, entry);
+  }
+
+  session.timeline = Array.from(merged.values());
+
+  if (patch?.name !== undefined) {
+    session.name = patch.name;
+  }
+
+  if (patch?.preview !== undefined) {
+    session.preview = patch.preview;
+  }
+
+  if (patch?.status !== undefined) {
+    session.status = patch.status;
+  }
+
+  session.lastOpenedAt = new Date();
+  await session.save();
+}
+
+async function upsertThreadSummary(
+  userId: string,
+  threadId: string,
+  patch: Partial<Pick<ICodexThreadSession, "name" | "preview" | "status">>,
+) {
+  const session = await CodexThreadSession.findOne({ userId, threadId });
+
+  if (!session) {
+    await CodexThreadSession.create({
+      userId,
+      threadId,
+      timeline: [],
+      ...patch,
+      lastOpenedAt: new Date(),
+    });
+    return;
+  }
+
+  if (patch.name !== undefined) {
+    session.name = patch.name;
+  }
+
+  if (patch.preview !== undefined) {
+    session.preview = patch.preview;
+  }
+
+  if (patch.status !== undefined) {
+    session.status = patch.status;
+  }
+
+  session.lastOpenedAt = new Date();
+  await session.save();
+}
+
+async function runCodexProcess(
+  args: string[],
+  prompt?: string,
+) {
+  const codexHome = findCodexAuthHome();
+  const child = spawn(getCodexBinary(), args, {
+    cwd: resolveWorkspaceRoot(),
+    env: {
+      ...resolveCodexAuthEnv(),
+      ...(codexHome ? { CODEX_HOME: codexHome.codexHome, HOME: codexHome.home } : {}),
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  let stdout = "";
+  let stderr = "";
+
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk.toString();
+  });
+
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+
+  if (prompt !== undefined) {
+    child.stdin.end(`${prompt}\n`);
+  } else {
+    child.stdin.end();
+  }
+
+  const completion = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+
+  return { child, stdout, stderr, ...completion };
+}
+
+async function runCodexLoginStatus() {
+  const result = await runCodexProcess(["login", "status"]);
+  const details = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n");
+
+  const base = result.code !== 0 && !details
+    ? {
+        connected: false,
+        authMode: null,
+        requiresOpenaiAuth: true,
+        planType: null,
+        email: null,
+        sharedAccountLabel: null,
+      }
+    : parseCodexLoginStatus(details);
+
+  return {
+    ...base,
+    codexAccessTokenActive: true,
+    codexAccessTokenRequired: true,
+    codexAccessBlockedReason: null,
+  };
+}
+
+async function runCodexLogout() {
+  await runCodexProcess(["logout"]);
+}
+
+async function runCodexExecSession(params: {
+  cwd: string;
+  prompt: string;
+  threadId?: string | null;
+  onJsonLine?: (event: CodexExecEvent) => void;
+}) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "santos-home-codex-"));
+  const outputPath = path.join(tempDir, "last-message.txt");
+  const args = params.threadId
+    ? [
+        "exec",
+        "resume",
+        "--json",
+        "--output-last-message",
+        outputPath,
+        "--skip-git-repo-check",
+        "--dangerously-bypass-approvals-and-sandbox",
+        params.threadId,
+      ]
+    : [
+        "exec",
+        "--json",
+        "--output-last-message",
+        outputPath,
+        "--cd",
+        params.cwd,
+        "--skip-git-repo-check",
+        "--dangerously-bypass-approvals-and-sandbox",
+      ];
+
+  const codexHome = findCodexAuthHome();
+  const child = spawn(getCodexBinary(), args, {
+    cwd: resolveWorkspaceRoot(),
+    env: {
+      ...resolveCodexAuthEnv(),
+      ...(codexHome ? { CODEX_HOME: codexHome.codexHome, HOME: codexHome.home } : {}),
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  const jsonLines = readline.createInterface({
+    input: child.stdout,
+    crlfDelay: Infinity,
+  });
+  let stdout = "";
+  let stderr = "";
+  const timelineEntries: CodexTimelineEntry[] = [];
+  let threadId: string | null = params.threadId ?? null;
+  let turnId: string | null = null;
+  let finalStatus: string | null = null;
+
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+
+  jsonLines.on("line", (line) => {
+    stdout += `${line}\n`;
+
+    let event: CodexExecEvent;
+
+    try {
+      event = JSON.parse(line) as CodexExecEvent;
+    } catch {
+      return;
+    }
+
+    params.onJsonLine?.(event);
+
+    const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+    const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+
+    if (event.type === "thread.started" && typeof rawThreadId === "string") {
+      threadId = rawThreadId;
+      return;
+    }
+
+    if (event.type === "turn.started") {
+      turnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+      return;
+    }
+
+    if (event.type === "turn.completed") {
+      finalStatus = "completed";
+      return;
+    }
+
+    if (event.type === "item.completed") {
+      const item = event.item as CodexThreadItem | undefined;
+      const eventTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId ?? "turn";
+
+      if (!item || !item.type) {
+        return;
+      }
+
+      const entries = createTimelineEntriesFromItem(eventTurnId, item);
+      timelineEntries.push(...entries);
+    }
+  });
+
+  child.stdin.end(`${params.prompt}\n`);
+
+  const completion = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+
+  jsonLines.close();
+
+  const lastMessage = await fs.readFile(outputPath, "utf8").catch(() => "");
+  const message = lastMessage.trim() || stdout.trim();
+
+  if (completion.code !== 0) {
+    const details = [stderr.trim(), stdout.trim()].filter(Boolean).join("\n");
+    throw new Error(
+      details
+        ? `Codex exec encerrou com code=${completion.code}${completion.signal ? ` (${completion.signal})` : ""}:\n${details}`
+        : `Codex exec encerrou com code=${completion.code}${completion.signal ? ` (${completion.signal})` : ""}`,
+    );
+  }
+
+  return {
+    threadId,
+    turnId,
+    message,
+    timelineEntries,
+    status: finalStatus,
+    stdout,
+    stderr,
+    ...completion,
   };
 }
 
@@ -861,6 +1258,10 @@ async function touchThreadOwnership(userId: string, threadId: string) {
 }
 
 export async function getCodexAccountStatus() {
+  if (isCodexExecWorkflowEnabled()) {
+    return runCodexLoginStatus();
+  }
+
   return withCodexClient<CodexAccountStatus>(async (client) => {
     const [{ account, requiresOpenaiAuth }, auth] = await Promise.all([
       client.request<{
@@ -890,6 +1291,11 @@ export async function getCodexAccountStatus() {
 }
 
 export async function logoutCodexAccount() {
+  if (isCodexExecWorkflowEnabled()) {
+    await runCodexLogout();
+    return { ok: true };
+  }
+
   return withCodexClient(async (client) => {
     await client.request("account/logout");
     return { ok: true };
@@ -897,6 +1303,22 @@ export async function logoutCodexAccount() {
 }
 
 export async function listCodexThreadsForUser(userId: string) {
+  if (isCodexExecWorkflowEnabled()) {
+    const sessions = await CodexThreadSession.find({ userId })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    return sessions.map((session) => ({
+      id: session.threadId,
+      title: (session.name?.trim() || session.preview?.trim() || "Nova conversa").slice(0, 80),
+      preview: (session.preview?.trim() || "Sem resumo ainda.").slice(0, 160),
+      updatedAt: session.updatedAt ? new Date(session.updatedAt as unknown as string | Date).getTime() : Date.now(),
+      createdAt: session.createdAt ? new Date(session.createdAt as unknown as string | Date).getTime() : Date.now(),
+      status: session.status || "idle",
+      lastOpenedAt: session.lastOpenedAt ? new Date(session.lastOpenedAt).toISOString() : null,
+    })) as CodexThreadSummary[];
+  }
+
   const sessions = await CodexThreadSession.find({ userId })
     .sort({ updatedAt: -1 })
     .lean();
@@ -936,6 +1358,23 @@ export async function readCodexThreadForUser(userId: string, threadId: string) {
 
   if (!session) {
     throw new Error("Thread nao pertence a este admin.");
+  }
+
+  if (isCodexExecWorkflowEnabled()) {
+    const timeline = getTimelineSnapshot(session).map((entry) => entry as CodexTimelineEntry);
+
+    return {
+      thread: {
+        id: session.threadId,
+        title: session.name?.trim() || session.preview?.trim() || "Nova conversa",
+        preview: session.preview?.trim() || "Sem resumo ainda.",
+        updatedAt: session.updatedAt ? new Date(session.updatedAt as unknown as string | Date).getTime() : Date.now(),
+        createdAt: session.createdAt ? new Date(session.createdAt as unknown as string | Date).getTime() : Date.now(),
+        status: session.status || "idle",
+        lastOpenedAt: session.lastOpenedAt?.toISOString() ?? null,
+      },
+      timeline,
+    } satisfies CodexThreadDetail;
   }
 
   return withCodexClient<CodexThreadDetail>(async (client) => {
@@ -1055,6 +1494,310 @@ function createSystemTimelineEntry(
 }
 
 export function attachCodexGateway(server: HttpServer) {
+  if (isCodexExecWorkflowEnabled()) {
+    const wss = new WebSocketServer({ noServer: true });
+
+    wss.on("error", (error) => {
+      console.error("[codex-gateway] erro no websocket server:", error);
+    });
+
+    server.on("upgrade", (request, socket, head) => {
+      socket.on("error", (error: unknown) => {
+        console.error("[codex-gateway] erro no socket de upgrade:", error);
+      });
+
+      const host =
+        request.headers.host || `127.0.0.1:${(server.address() as AddressInfo | null)?.port ?? 80}`;
+      const url = new URL(request.url || "/", `http://${host}`);
+
+      if (url.pathname !== CODEX_WS_PATH) {
+        return;
+      }
+
+      let user: AuthUserPayload;
+
+      try {
+        user = authenticateAdminSocket(request);
+      } catch (error) {
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+
+      wss.handleUpgrade(request, socket, head, (websocket) => {
+        wss.emit("connection", websocket, request, user);
+      });
+    });
+
+    wss.on("connection", (browserSocket: WebSocket, _request: IncomingMessage, user: AuthUserPayload) => {
+      let currentThreadId: string | null = null;
+      let socketClosed = false;
+
+      browserSocket.on("error", (error) => {
+        console.error("[codex-browser-socket] erro:", error);
+      });
+
+      browserSocket.on("close", () => {
+        socketClosed = true;
+      });
+
+      void (async () => {
+        const accessState = await resolveCodexAccessState(user.id);
+
+        if (!accessState.codexAccessTokenActive) {
+          sendBrowserEvent(browserSocket, {
+            type: "error",
+            message:
+              accessState.codexAccessBlockedReason ??
+              "Crie um token de acesso do Codex nas configuracoes do admin.",
+          });
+          browserSocket.close();
+          return;
+        }
+
+        const account = await getCodexAccountStatus();
+
+        if (socketClosed) {
+          return;
+        }
+
+        sendBrowserEvent(browserSocket, {
+          type: "ready",
+          workspaceRoot: resolveWorkspaceRoot(),
+          executionMode: "exec",
+        });
+
+        sendBrowserEvent(browserSocket, {
+          type: "accountUpdated",
+          account: {
+            ...account,
+            ...accessState,
+          },
+        });
+      })().catch((error) => {
+        sendBrowserEvent(browserSocket, {
+          type: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Nao foi possivel conectar ao Codex.",
+        });
+        browserSocket.close();
+      });
+
+      browserSocket.on("message", async (raw: WebSocket.RawData) => {
+        try {
+          const payload = JSON.parse(raw.toString()) as CodexSocketIncomingMessage;
+
+          switch (payload.type) {
+            case "startDeviceLogin":
+            case "cancelDeviceLogin": {
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message: "O fluxo de login nao e usado no modo exec.",
+              });
+              break;
+            }
+            case "loadThread": {
+              const detail = await readCodexThreadForUser(user.id, payload.threadId);
+              currentThreadId = payload.threadId;
+              sendBrowserEvent(browserSocket, {
+                type: "threadLoaded",
+                thread: detail.thread,
+                timeline: detail.timeline,
+              });
+              break;
+            }
+            case "sendPrompt": {
+              const prompt = payload.prompt.trim();
+
+              if (!prompt) {
+                throw new Error("Prompt vazio.");
+              }
+
+              let threadId = payload.threadId?.trim() || null;
+
+              if (threadId) {
+                await ensureOwnedThread(user.id, threadId);
+              }
+
+              const collectedEntries: CodexTimelineEntry[] = [];
+              let turnId: string | null = null;
+
+              const result = await runCodexExecSession({
+                cwd: resolveWorkspaceRoot(),
+                threadId,
+                prompt,
+                onJsonLine: (event) => {
+                  if (event.type === "thread.started") {
+                    const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                    const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : null;
+
+                    if (nextThreadId) {
+                      threadId = nextThreadId;
+                      currentThreadId = nextThreadId;
+
+                      if (!payload.threadId) {
+                        sendBrowserEvent(browserSocket, {
+                          type: "threadCreated",
+                          thread: {
+                            id: nextThreadId,
+                            title: prompt.slice(0, 80) || "Nova conversa",
+                            preview: prompt.slice(0, 160) || "Sem resumo ainda.",
+                            updatedAt: Date.now(),
+                            createdAt: Date.now(),
+                            status: "active",
+                            lastOpenedAt: null,
+                          } satisfies CodexThreadSummary,
+                        });
+                      }
+                    }
+                    return;
+                  }
+
+                  if (event.type === "turn.started") {
+                    const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                    const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                    const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
+                    turnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+
+                    if (nextThreadId) {
+                      threadId = nextThreadId;
+                      currentThreadId = nextThreadId;
+                    }
+
+                    if (!threadId) {
+                      return;
+                    }
+
+                    sendBrowserEvent(browserSocket, {
+                      type: "turnStarted",
+                      threadId,
+                      turnId,
+                    });
+
+                    sendBrowserEvent(browserSocket, {
+                      type: "userPromptAccepted",
+                      threadId,
+                      prompt,
+                    });
+
+                    const userEntry: CodexTimelineEntry = {
+                      id: `user:${threadId}:${turnId ?? Date.now()}`,
+                      kind: "user",
+                      text: prompt,
+                      status: "completed",
+                      turnId: turnId ?? `turn:${Date.now()}`,
+                    };
+
+                    collectedEntries.push(userEntry);
+                    sendBrowserEvent(browserSocket, {
+                      type: "itemCompleted",
+                      threadId,
+                      entry: userEntry,
+                    });
+                    return;
+                  }
+
+                  if (event.type === "turn.completed") {
+                    const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                    const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                    const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
+                    const completedTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+
+                    if (nextThreadId) {
+                      threadId = nextThreadId;
+                      currentThreadId = nextThreadId;
+                    }
+
+                    sendBrowserEvent(browserSocket, {
+                      type: "turnCompleted",
+                      threadId,
+                      turnId: completedTurnId,
+                      status: "completed",
+                    });
+                    return;
+                  }
+
+                  if (event.type === "item.completed") {
+                    const item = event.item as CodexThreadItem | undefined;
+                    const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                    const eventTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId ?? "turn";
+
+                    if (!item || !threadId) {
+                      return;
+                    }
+
+                    const entry = serializeTimelineItem(eventTurnId, item);
+
+                    if (!entry) {
+                      return;
+                    }
+
+                    collectedEntries.push(entry);
+                    sendBrowserEvent(browserSocket, {
+                      type: "itemCompleted",
+                      threadId,
+                      entry,
+                    });
+                  }
+                },
+              });
+
+              if (!threadId) {
+                threadId = result.threadId;
+              }
+
+              if (!threadId) {
+                throw new Error("O Codex nao retornou uma thread.");
+              }
+
+              const assistantPreviewEntry = [...collectedEntries]
+                .reverse()
+                .find((entry) => entry.kind === "assistant");
+              const assistantPreview =
+                assistantPreviewEntry && "text" in assistantPreviewEntry
+                  ? assistantPreviewEntry.text
+                  : result.message || prompt;
+
+              await upsertThreadSummary(user.id, threadId, {
+                name: payload.threadId ? undefined : prompt.slice(0, 80) || "Nova conversa",
+                preview: assistantPreview.slice(0, 160),
+                status: result.status ?? "completed",
+              });
+
+              await appendTimelineEntries(user.id, threadId, collectedEntries);
+              currentThreadId = threadId;
+              break;
+            }
+            case "interrupt": {
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message: "Interrupcao nao suportada no modo exec.",
+              });
+              break;
+            }
+            default:
+              sendBrowserEvent(browserSocket, {
+                type: "error",
+                message: "Evento desconhecido do drawer Codex.",
+              });
+          }
+        } catch (error) {
+          sendBrowserEvent(browserSocket, {
+            type: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Falha ao processar evento do drawer Codex.",
+          });
+        }
+      });
+    });
+
+    return;
+  }
+
   const wss = new WebSocketServer({ noServer: true });
 
   wss.on("error", (error) => {

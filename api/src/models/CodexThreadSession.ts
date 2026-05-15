@@ -7,6 +7,7 @@ export interface ICodexThreadSession extends Document {
   name?: string | null;
   preview?: string | null;
   status?: string | null;
+  timeline?: unknown[];
   lastOpenedAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -19,6 +20,7 @@ const CodexThreadSessionSchema = new Schema<ICodexThreadSession>(
     name: { type: String, default: null },
     preview: { type: String, default: null },
     status: { type: String, default: null },
+    timeline: { type: [Schema.Types.Mixed], default: [] },
     lastOpenedAt: { type: Date, default: null },
   },
   { timestamps: true },
