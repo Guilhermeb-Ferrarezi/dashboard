@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildTokenStatusText } from "./codex-access-panel";
-import { canStartCodexDeviceLogin, canUseCodexChat, isCodexAccessBlocked } from "./codex-drawer";
+import {
+  canStartCodexDeviceLogin,
+  canUseCodexChat,
+  formatCodexErrorMessage,
+  isCodexAccessBlocked,
+} from "./codex-drawer";
 
 describe("codex access panel", () => {
   test("mostra o estado gerenciado quando nao existe token manual ativo", () => {
@@ -60,5 +65,13 @@ describe("codex access panel", () => {
         "exec",
       ),
     ).toBe(true);
+  });
+
+  test("mostra mensagem amigavel quando o limite do codex acaba", () => {
+    expect(
+      formatCodexErrorMessage("Codex exec encerrou com code=1: usage limit reached for this account"),
+    ).toBe(
+      "O limite de uso do Codex foi atingido. Aguarde a renovacao do limite ou conecte outra conta com acesso disponivel.",
+    );
   });
 });

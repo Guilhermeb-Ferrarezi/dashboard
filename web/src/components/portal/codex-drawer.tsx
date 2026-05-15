@@ -91,6 +91,23 @@ export function canUseCodexChat(
   return Boolean(account?.connected || executionMode === "exec");
 }
 
+export function formatCodexErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("usage limit")
+    || normalized.includes("rate limit")
+    || normalized.includes("quota")
+    || normalized.includes("limit reached")
+    || normalized.includes("limit exceeded")
+    || normalized.includes("too many requests")
+  ) {
+    return "O limite de uso do Codex foi atingido. Aguarde a renovacao do limite ou conecte outra conta com acesso disponivel.";
+  }
+
+  return message;
+}
+
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
     (left, right) => right.updatedAt - left.updatedAt,
@@ -552,7 +569,7 @@ export function CodexDrawer({
           break;
         case "error":
           setSending(false);
-          toast.error(payload.message);
+          toast.error(formatCodexErrorMessage(payload.message));
           break;
         default:
           break;
