@@ -1837,19 +1837,34 @@ export function attachCodexGateway(server: HttpServer) {
     let currentThreadId: string | null = null;
     let socketClosed = false;
 
+    console.info("[codex-gateway] browser socket connected", {
+      userId: user.id,
+      role: user.role,
+    });
+
     browserSocket.on("error", (error) => {
       console.error("[codex-browser-socket] erro:", error);
     });
 
-    browserSocket.on("close", () => {
+    browserSocket.on("close", (code, reason) => {
       socketClosed = true;
+      console.info("[codex-gateway] browser socket closed", {
+        userId: user.id,
+        code,
+        reason: reason.toString(),
+      });
       codexClient.close();
     });
 
     void (async () => {
+      console.info("[codex-gateway] resolving access state", { userId: user.id });
       const accessState = await resolveCodexAccessState(user.id);
 
       if (!accessState.codexAccessTokenActive) {
+        console.info("[codex-gateway] access blocked", {
+          userId: user.id,
+          reason: accessState.codexAccessBlockedReason ?? null,
+        });
         sendBrowserEvent(browserSocket, {
           type: "error",
           message:
@@ -1860,13 +1875,18 @@ export function attachCodexGateway(server: HttpServer) {
         return;
       }
 
+      console.info("[codex-gateway] connecting codex client", { userId: user.id });
       await codexClient.connect();
 
       if (socketClosed) {
+        console.info("[codex-gateway] browser socket already closed after codex connect", {
+          userId: user.id,
+        });
         codexClient.close();
         return;
       }
 
+      console.info("[codex-gateway] sending ready", { userId: user.id });
       sendBrowserEvent(browserSocket, {
         type: "ready",
         workspaceRoot: resolveWorkspaceRoot(),
@@ -1875,6 +1895,10 @@ export function attachCodexGateway(server: HttpServer) {
 
       codexClient.onNotification(async ({ method, params }) => {
         try {
+          console.info("[codex-gateway] codex notification", {
+            userId: user.id,
+            method,
+          });
           switch (method) {
             case "account/login/completed": {
               const success = Boolean(params.success);
@@ -2061,6 +2085,10 @@ export function attachCodexGateway(server: HttpServer) {
         }
       });
     })().catch((error) => {
+      console.error("[codex-gateway] failed to connect codex", {
+        userId: user.id,
+        error,
+      });
       sendBrowserEvent(browserSocket, {
         type: "error",
         message:
