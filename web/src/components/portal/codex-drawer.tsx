@@ -26,7 +26,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CodexMarkdown } from "@/components/portal/codex-markdown";
-import { CodexAgentStatus } from "@/components/portal/codex-agent-status";
 import { CodexConfirmationDialog } from "@/components/portal/codex-confirmation-dialog";
 import { clientApi } from "@/lib/api";
 import { getCodexWebSocketUrl, formatCodexTimestamp } from "@/lib/codex";
@@ -295,8 +294,6 @@ export function CodexDrawer({
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
-  const [workspaceRoot, setWorkspaceRoot] = useState<string | null>(null);
-  const [capabilities, setCapabilities] = useState<CodexAgentCapabilities | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<CodexConfirmationRequest | null>(null);
   const [deviceLogin, setDeviceLogin] = useState<{
     loginId: string;
@@ -395,8 +392,6 @@ export function CodexDrawer({
 
       switch (payload.type) {
         case "ready":
-          setWorkspaceRoot(payload.workspaceRoot);
-          setCapabilities(payload.capabilities);
           break;
         case "deviceLoginStarted":
           setDeviceLogin(payload);
@@ -568,7 +563,6 @@ export function CodexDrawer({
           setActiveTurnId(null);
           setSending(false);
           setDeviceLogin(null);
-          setCapabilities(null);
           setPendingConfirmation(null);
           return null;
         }
@@ -934,10 +928,6 @@ export function CodexDrawer({
           </div>
         </div>
       ) : null}
-
-      <div className="px-3 py-2">
-        <CodexAgentStatus capabilities={capabilities} workspaceRoot={workspaceRoot} />
-      </div>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
           <section
