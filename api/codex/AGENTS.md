@@ -5,7 +5,8 @@ This file is injected into `CODEX_HOME` on every container start.
 ## How to use the API
 
 - Read `${CODEX_HOME}/openapi.yaml` before making requests.
-- Use the Codex access token from `CODEX_ACCESS_TOKEN` when calling protected endpoints.
+- In exec mode, use `CODEX_INTERNAL_API_TOKEN` when calling protected endpoints.
+- Use `CODEX_INTERNAL_API_URL` as the internal API base URL in exec mode.
 - Send the token as either `Authorization: Bearer <token>` or `X-Codex-Access-Token: <token>`.
 - Do not log, print, or hardcode the token.
 
@@ -43,8 +44,8 @@ This file is injected into `CODEX_HOME` on every container start.
 - For business state, prefer a documented internal API endpoint over workspace, shell, or database access.
 - For endpoint or payload shape, validate against OpenAPI before any internal API read or write.
 - If a route exists in the codebase but is missing from the OpenAPI file, do not use it. Report that it must be added to `openapi.yaml` before the agent can call it.
-- The system provides a managed `CODEX_ACCESS_TOKEN` for protected internal calls; use it instead of expecting the browser session cookie.
-- Do not use shell, ad hoc scripts, or indirect database access as the primary path for business reads.
+- The system provides a managed `CODEX_INTERNAL_API_TOKEN` for protected internal calls in exec mode; use it instead of expecting the browser session cookie.
+- Do not use indirect database access as the primary path for business reads.
 - When several sources apply, combine them by problem-solving step rather than by source name.
 
 ## Confirmation rule
@@ -73,7 +74,7 @@ This file is injected into `CODEX_HOME` on every container start.
 1. Read the OpenAPI file.
 2. Verify that the target route is documented in the OpenAPI file.
 3. Verify which token/header the endpoint expects.
-4. Call the API with the injected token.
+4. Call the API with `Authorization: Bearer $CODEX_INTERNAL_API_TOKEN`.
 5. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
 6. If the route exists only in code, stop and report that it must be formalized in OpenAPI first.
 7. If the UI asks for confirmation, do not continue until the decision is resolved.

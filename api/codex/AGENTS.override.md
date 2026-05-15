@@ -5,7 +5,8 @@ This file is injected into `CODEX_HOME` on every container start.
 ## How to use the API
 
 - Read `${CODEX_HOME}/openapi.yaml` before making requests.
-- Use the Codex access token from `CODEX_ACCESS_TOKEN` when calling protected endpoints.
+- In exec mode, use `CODEX_INTERNAL_API_TOKEN` when calling protected endpoints.
+- Use `CODEX_INTERNAL_API_URL` as the internal API base URL in exec mode.
 - Send the token as either `Authorization: Bearer <token>` or `X-Codex-Access-Token: <token>`.
 - Do not log, print, or hardcode the token.
 
@@ -32,7 +33,7 @@ This file is injected into `CODEX_HOME` on every container start.
 1. Read the OpenAPI file.
 2. Verify that the route is documented in the OpenAPI file before using it.
 3. Verify which token/header the endpoint expects.
-4. Call the API with the injected token.
-5. The system provides a managed `CODEX_ACCESS_TOKEN` for protected internal calls; do not depend on the browser session cookie.
+4. Call the API with `Authorization: Bearer $CODEX_INTERNAL_API_TOKEN`.
+5. The system provides a managed `CODEX_INTERNAL_API_TOKEN` for protected internal calls in exec mode; do not depend on the browser session cookie.
 6. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
 7. If the route exists only in code, stop and report that it must be added to the OpenAPI contract before the agent can use it.

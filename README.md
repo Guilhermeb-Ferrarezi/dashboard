@@ -31,7 +31,7 @@ O runtime de ferramentas fica em `GET /api/codex/tools` e `POST /api/codex/tools
 
 O agente agora opera em modo estrito para dado de negocio: consultas e acoes internas devem usar endpoints documentados em `api/codex/openapi.yaml`. Se a rota existir no codigo, mas nao estiver no OpenAPI, o agente deve parar e informar que o contrato precisa ser atualizado antes do uso. Shell, script ad hoc e acesso indireto a banco nao valem como caminho primario para resposta operacional.
 
-O backend provisiona automaticamente um `CODEX_ACCESS_TOKEN` de serviço para o agente. Essa credencial delegada e a que o processo do Codex usa para chamar APIs internas protegidas; ela nao depende do cookie da sessao do navegador.
+O backend provisiona automaticamente um token delegado de serviço para o agente. Internamente ele continua sendo resolvido a partir de `CODEX_ACCESS_TOKEN`, mas o processo `codex exec` recebe essa credencial pelos nomes `CODEX_INTERNAL_API_TOKEN` e `CODEX_INTERNAL_API_URL`, para poder consultar a API protegida sem depender do cookie da sessao do navegador e sem conflitar com o JWT interno do proprio CLI.
 
 ## Docker Compose
 
