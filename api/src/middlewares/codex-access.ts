@@ -1,108 +1,17 @@
 import type { NextFunction, Request, Response } from "express";
 
-import {
-  authenticateAdminAccessToken,
-  getActiveAdminAccessToken,
-  type AdminAccessTokenSummary,
-} from "../lib/admin-access-token";
 import { resolveCodexServiceToken } from "../lib/codex-service-token";
 
-function readCodexAccessToken(req: Request) {
-  const cookieToken = req.cookies?.codex_access_token;
-
-  if (typeof cookieToken === "string" && cookieToken.trim()) {
-    return cookieToken.trim();
-  }
-
-  const headerToken = req.headers["x-codex-access-token"];
-
-  if (typeof headerToken === "string" && headerToken.trim()) {
-    return headerToken.trim();
-  }
-
-  const authHeader = req.headers.authorization;
-
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice("Bearer ".length).trim();
-  }
-
-  return null;
-}
-
 export function requireCodexAccessToken(req: Request, res: Response, next: NextFunction) {
-  const adminId = req.user?.id;
-
-  if (!adminId) {
+  if (!req.user?.id) {
     return res.status(401).json({ message: "Missing token" });
   }
 
-  if (resolveCodexServiceToken()) {
-    const tokenValue = readCodexAccessToken(req);
-
-    if (!tokenValue) {
-      next();
-      return;
-    }
-
-    return getActiveAdminAccessToken(adminId, "codex")
-      .then((token: AdminAccessTokenSummary | null) => {
-        if (!token) {
-          next();
-          return null;
-        }
-
-        return authenticateAdminAccessToken(adminId, "codex", tokenValue)
-          .then((authenticatedToken: AdminAccessTokenSummary | null) => {
-            req.codexAccessToken = authenticatedToken ?? token;
-            next();
-            return null;
-          })
-          .catch((error) => {
-            console.error("[codex-access] erro ao autenticar token:", error);
-            return res.status(500).json({
-              message: "Falha ao validar o token de acesso do Codex.",
-            });
-          });
-      })
-      .catch((error) => {
-        console.error("[codex-access] erro ao carregar token ativo:", error);
-        return res.status(500).json({
-          message: "Falha ao validar o token de acesso do Codex.",
-        });
-      });
+  if (!resolveCodexServiceToken()) {
+    return res.status(503).json({
+      message: "Codex sem credencial delegada ativa no servidor.",
+    });
   }
 
-  return getActiveAdminAccessToken(adminId, "codex")
-    .then((token: AdminAccessTokenSummary | null) => {
-      if (!token) {
-        return res.status(403).json({ message: "Codex sem credencial ativa." });
-      }
-
-      const tokenValue = readCodexAccessToken(req);
-
-      if (!tokenValue) {
-        req.codexAccessToken = token;
-        next();
-        return null;
-      }
-
-      return authenticateAdminAccessToken(adminId, "codex", tokenValue)
-        .then((authenticatedToken: AdminAccessTokenSummary | null) => {
-          req.codexAccessToken = authenticatedToken ?? token;
-          next();
-          return null;
-        })
-        .catch((error) => {
-          console.error("[codex-access] erro ao autenticar token:", error);
-          return res.status(500).json({
-            message: "Falha ao validar o token de acesso do Codex.",
-          });
-        });
-    })
-    .catch((error) => {
-      console.error("[codex-access] erro ao carregar token ativo:", error);
-      return res.status(500).json({
-        message: "Falha ao validar o token de acesso do Codex.",
-      });
-    });
+  next();
 }

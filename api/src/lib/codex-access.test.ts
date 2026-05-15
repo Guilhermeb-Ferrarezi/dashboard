@@ -6,7 +6,7 @@ describe("codex access state", () => {
   test("habilita quando existe token delegado do sistema", async () => {
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
 
-    const state = await resolveCodexAccessState("admin-1", async () => null);
+    const state = await resolveCodexAccessState("admin-1");
 
     expect(state).toEqual({
       codexAccessTokenActive: true,
@@ -18,36 +18,16 @@ describe("codex access state", () => {
     delete process.env.CODEX_ACCESS_TOKEN;
   });
 
-  test("continua expondo token manual ativo quando ele existe", async () => {
-    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
+  test("nao exige token manual quando o usuario existe", async () => {
+    delete process.env.CODEX_ACCESS_TOKEN;
 
-    const state = await resolveCodexAccessState("admin-1", async () => ({
-      id: "token-1",
-      adminId: "admin-1",
-      type: "codex",
-      label: "Codex",
-      revokedAt: null,
-      lastUsedAt: null,
-      createdAt: "2024-01-01T00:00:00.000Z",
-      updatedAt: "2024-01-02T00:00:00.000Z",
-    }));
+    const state = await resolveCodexAccessState("admin-1");
 
     expect(state).toEqual({
       codexAccessTokenActive: true,
       codexAccessTokenRequired: false,
       codexAccessBlockedReason: null,
-      activeToken: {
-        id: "token-1",
-        adminId: "admin-1",
-        type: "codex",
-        label: "Codex",
-        revokedAt: null,
-        lastUsedAt: null,
-        createdAt: "2024-01-01T00:00:00.000Z",
-        updatedAt: "2024-01-02T00:00:00.000Z",
-      },
+      activeToken: null,
     });
-
-    delete process.env.CODEX_ACCESS_TOKEN;
   });
 });
