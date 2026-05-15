@@ -6,6 +6,7 @@ import {
   canUseCodexChat,
   formatCodexErrorMessage,
   isCodexAccessBlocked,
+  summarizeCodexCommand,
 } from "./codex-drawer";
 
 describe("codex access panel", () => {
@@ -72,6 +73,15 @@ describe("codex access panel", () => {
       formatCodexErrorMessage("Codex exec encerrou com code=1: usage limit reached for this account"),
     ).toBe(
       "O limite de uso do Codex foi atingido. Aguarde a renovacao do limite ou conecte outra conta com acesso disponivel.",
+    );
+  });
+
+  test("resume comandos tecnicos em texto curto para o fluxo normal", () => {
+    expect(summarizeCodexCommand("/bin/sh -lc 'sed -n \"1,260p\" /app/codex/openapi.yaml'")).toBe(
+      "Validando contrato da API...",
+    );
+    expect(summarizeCodexCommand("/bin/sh -lc 'bun - <<BUN fetch(\"http://127.0.0.1:4000/api/vct/times\") BUN'")).toBe(
+      "Executando chamadas de API...",
     );
   });
 });

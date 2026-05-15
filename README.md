@@ -33,6 +33,8 @@ O agente agora opera em modo estrito para dado de negocio: consultas e acoes int
 
 O backend provisiona automaticamente um token delegado de serviço para o agente. Internamente ele continua sendo resolvido a partir de `CODEX_ACCESS_TOKEN`, mas o processo `codex exec` recebe essa credencial pelos nomes `CODEX_INTERNAL_API_TOKEN` e `CODEX_INTERNAL_API_URL`, para poder consultar a API protegida sem depender do cookie da sessao do navegador e sem conflitar com o JWT interno do proprio CLI.
 
+No frontend, o drawer do Codex oculta por padrao os comandos tecnicos completos e mostra apenas status curtos de atividade. Se quiser exibir todos os blocos tecnicos no chat, defina `NEXT_PUBLIC_CODEX_SHOW_TECHNICAL_DETAILS=true` no ambiente do `web`.
+
 ## Docker Compose
 
 ```bash

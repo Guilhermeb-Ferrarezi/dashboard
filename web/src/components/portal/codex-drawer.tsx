@@ -40,6 +40,10 @@ import type {
   CodexTimelineEntry,
 } from "@/types/codex";
 
+const SHOW_CODEx_TECHNICAL_DETAILS =
+  process.env.NEXT_PUBLIC_CODEX_SHOW_TECHNICAL_DETAILS === "1"
+  || process.env.NEXT_PUBLIC_CODEX_SHOW_TECHNICAL_DETAILS === "true";
+
 interface CodexDrawerProps {
   user: SessionUser;
   open: boolean;
@@ -106,6 +110,28 @@ export function formatCodexErrorMessage(message: string) {
   }
 
   return message;
+}
+
+export function summarizeCodexCommand(command: string) {
+  const normalized = command.toLowerCase();
+
+  if (normalized.includes("openapi")) {
+    return "Validando contrato da API...";
+  }
+
+  if (normalized.includes("/codex/tools")) {
+    return "Consultando ferramentas disponíveis...";
+  }
+
+  if (normalized.includes("/api/") || normalized.includes("/vct/")) {
+    return "Executando chamadas de API...";
+  }
+
+  if (normalized.includes("rg ") || normalized.includes("grep ") || normalized.includes("find ") || normalized.includes("ls ")) {
+    return "Verificando arquivos do projeto...";
+  }
+
+  return "Executando verificação técnica...";
 }
 
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
@@ -1050,6 +1076,19 @@ export function CodexDrawer({
               }
 
               if (entry.kind === "command") {
+                if (!SHOW_CODEx_TECHNICAL_DETAILS) {
+                  if (entry.status !== "inProgress") {
+                    return null;
+                  }
+
+                  return (
+                    <div key={entry.id} className="flex items-center gap-2 px-0.5 py-1 text-sm text-muted-foreground">
+                      <Spinner className="size-4 animate-spin" />
+                      <span>{summarizeCodexCommand(entry.command)}</span>
+                    </div>
+                  );
+                }
+
                 const expanded = expandedCommandIds.has(entry.id);
 
                 return (
