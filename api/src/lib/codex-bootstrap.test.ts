@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { buildCodexAppServerArgs } from "./codex";
+import { buildCodexAppServerArgs, resolveCodexAuthEnv } from "./codex";
 
 describe("codex bootstrap args", () => {
   test("adiciona bypass por padrão", () => {
@@ -45,5 +45,16 @@ describe("codex bootstrap args", () => {
       "-c",
       'forced_login_method="chatgpt"',
     ]);
+  });
+
+  test("nao repassa o token interno para o processo codex", () => {
+    const originalToken = process.env.CODEX_ACCESS_TOKEN;
+    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
+
+    const env = resolveCodexAuthEnv();
+
+    expect(env.CODEX_ACCESS_TOKEN).toBeUndefined();
+
+    process.env.CODEX_ACCESS_TOKEN = originalToken;
   });
 });

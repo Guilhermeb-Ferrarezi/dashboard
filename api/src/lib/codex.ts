@@ -17,7 +17,6 @@ import {
   shouldRequestCodexConfirmation,
 } from "./codex-agent-runtime";
 import { resolveCodexAccessState } from "./codex-access";
-import { resolveCodexServiceToken } from "./codex-service-token";
 
 type JsonRpcId = string | number;
 
@@ -225,18 +224,18 @@ function resolveCodexHome() {
   return path.join(resolveWorkspaceRoot(), ".codex-home");
 }
 
-function resolveCodexAuthEnv() {
+export function resolveCodexAuthEnv() {
   const codexHome = findCodexAuthHome();
   const env: NodeJS.ProcessEnv = {
     ...process.env,
   };
 
+  delete env.CODEX_ACCESS_TOKEN;
+
   if (codexHome) {
     env.CODEX_HOME = codexHome.codexHome;
     env.HOME = codexHome.home;
   }
-
-  env.CODEX_ACCESS_TOKEN = resolveCodexServiceToken();
 
   return env;
 }
@@ -891,7 +890,6 @@ async function startCodexAppServer() {
   const env = {
     ...process.env,
     CODEX_HOME: codexHome,
-    CODEX_ACCESS_TOKEN: resolveCodexServiceToken(),
   };
 
   const child = spawn(
