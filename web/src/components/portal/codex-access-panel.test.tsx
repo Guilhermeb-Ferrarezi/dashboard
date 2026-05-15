@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildTokenStatusText } from "./codex-access-panel";
-import { isCodexAccessBlocked } from "./codex-drawer";
+import { canStartCodexDeviceLogin, isCodexAccessBlocked } from "./codex-drawer";
 
 describe("codex access panel", () => {
   test("mostra o estado gerenciado quando nao existe token manual ativo", () => {
@@ -21,6 +21,25 @@ describe("codex access panel", () => {
         codexAccessTokenRequired: false,
         codexAccessBlockedReason: null,
       }),
+    ).toBe(false);
+  });
+
+  test("nao oferece device login no modo exec", () => {
+    expect(
+      canStartCodexDeviceLogin(
+        {
+          connected: false,
+          authMode: null,
+          requiresOpenaiAuth: true,
+          planType: null,
+          email: null,
+          sharedAccountLabel: null,
+          codexAccessTokenActive: true,
+          codexAccessTokenRequired: false,
+          codexAccessBlockedReason: null,
+        },
+        "exec",
+      ),
     ).toBe(false);
   });
 });

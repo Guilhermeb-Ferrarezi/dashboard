@@ -77,6 +77,13 @@ export function isCodexAccessBlocked(account: CodexAccountStatus | null) {
   return Boolean(account?.codexAccessTokenRequired && !account.codexAccessTokenActive);
 }
 
+export function canStartCodexDeviceLogin(
+  account: CodexAccountStatus | null,
+  executionMode: string | null,
+) {
+  return Boolean(account?.requiresOpenaiAuth && executionMode && executionMode !== "exec");
+}
+
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
     (left, right) => right.updatedAt - left.updatedAt,
@@ -311,9 +318,11 @@ export function CodexDrawer({
   const [historySearch, setHistorySearch] = useState("");
   const [accessRefreshTick, setAccessRefreshTick] = useState(0);
   const [expandedCommandIds, setExpandedCommandIds] = useState<Set<string>>(() => new Set());
+  const [executionMode, setExecutionMode] = useState<string | null>(null);
 
   const connected = Boolean(account?.connected);
   const accessBlocked = isCodexAccessBlocked(account);
+  const allowDeviceLogin = canStartCodexDeviceLogin(account, executionMode);
 
   function showAsyncError(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
@@ -407,6 +416,7 @@ export function CodexDrawer({
 
       switch (payload.type) {
         case "ready":
+          setExecutionMode(payload.executionMode);
           break;
         case "deviceLoginStarted":
           setDeviceLogin(payload);
@@ -953,17 +963,22 @@ export function CodexDrawer({
               <div className="py-1 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2 text-foreground">
                   <Shield className="size-4 text-primary" />
-                  Conecte a conta compartilhada para liberar o agente.
+                  {allowDeviceLogin
+                    ? "Conecte a conta compartilhada para liberar o agente."
+                    : "O agente nao usa login compartilhado neste modo."}
                 </div>
                 <p className="mt-2">
-                  O login usa device auth do ChatGPT. Depois disso, qualquer admin
-                  pode abrir conversas separadas, mas a conta Codex do servidor continua a mesma.
+                  {allowDeviceLogin
+                    ? "O login usa device auth do ChatGPT. Depois disso, qualquer admin pode abrir conversas separadas, mas a conta Codex do servidor continua a mesma."
+                    : "O modo exec usa a configuracao local do servidor. Se o Codex continuar desconectado, o ajuste precisa ser feito no runtime do backend, nao por este botao."}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" className="gap-2" onClick={startDeviceLogin}>
-                    <Play className="size-3.5" />
-                    Conectar ChatGPT
-                  </Button>
+                  {allowDeviceLogin ? (
+                    <Button type="button" size="sm" className="gap-2" onClick={startDeviceLogin}>
+                      <Play className="size-3.5" />
+                      Conectar ChatGPT
+                    </Button>
+                  ) : null}
                   <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => void refreshThreads()}>
                     <ArrowCounterClockwise className="size-3.5" />
                     Atualizar
