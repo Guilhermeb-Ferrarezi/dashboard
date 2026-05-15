@@ -474,9 +474,8 @@ export function CodexDrawer({
       }
     };
 
-    socket.onerror = () => {
-      setSending(false);
-      toast.error("Falha de conexao com o chat Codex.");
+    socket.onerror = (event) => {
+      console.error("[codex-drawer] websocket error", event);
     };
 
     socket.onclose = () => {
