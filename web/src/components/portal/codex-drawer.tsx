@@ -84,6 +84,13 @@ export function canStartCodexDeviceLogin(
   return Boolean(account?.requiresOpenaiAuth && executionMode && executionMode !== "exec");
 }
 
+export function canUseCodexChat(
+  account: CodexAccountStatus | null,
+  executionMode: string | null,
+) {
+  return Boolean(account?.connected || executionMode === "exec");
+}
+
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
     (left, right) => right.updatedAt - left.updatedAt,
@@ -323,6 +330,7 @@ export function CodexDrawer({
   const connected = Boolean(account?.connected);
   const accessBlocked = isCodexAccessBlocked(account);
   const allowDeviceLogin = canStartCodexDeviceLogin(account, executionMode);
+  const canChat = canUseCodexChat(account, executionMode);
 
   function showAsyncError(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
@@ -959,7 +967,7 @@ export function CodexDrawer({
             ref={timelineRef}
             className="min-h-0 space-y-2 overflow-y-auto px-3 py-2"
           >
-            {!connected ? (
+            {!canChat ? (
               <div className="py-1 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2 text-foreground">
                   <Shield className="size-4 text-primary" />
@@ -987,14 +995,14 @@ export function CodexDrawer({
               </div>
             ) : null}
 
-            {connected && loadingThread ? (
+            {canChat && loadingThread ? (
               <div className="flex items-center gap-2 px-0.5 py-1 text-sm text-muted-foreground">
                 <Spinner className="size-4 animate-spin" />
                 Carregando conversa...
               </div>
             ) : null}
 
-            {connected && !loadingThread && timeline.length === 0 ? (
+            {canChat && !loadingThread && timeline.length === 0 ? (
               <div className="px-2 py-2 text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">Nenhuma mensagem ainda.</p>
                 <p className="mt-2">
@@ -1123,7 +1131,7 @@ export function CodexDrawer({
                 placeholder="Como posso ajudar?"
                 rows={3}
                 className="h-10 max-h-20 w-full resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                disabled={!connected || sending}
+                disabled={!canChat || sending}
               />
 
               <div className="flex items-center justify-between gap-2">
@@ -1164,7 +1172,7 @@ export function CodexDrawer({
                     size="icon-sm"
                     className="rounded-full bg-primary/90 text-primary-foreground"
                     onClick={() => sendPrompt()}
-                    disabled={!connected || sending}
+                    disabled={!canChat || sending}
                   >
                     {sending ? <Spinner className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
                     <span className="sr-only">Enviar</span>

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildTokenStatusText } from "./codex-access-panel";
-import { canStartCodexDeviceLogin, isCodexAccessBlocked } from "./codex-drawer";
+import { canStartCodexDeviceLogin, canUseCodexChat, isCodexAccessBlocked } from "./codex-drawer";
 
 describe("codex access panel", () => {
   test("mostra o estado gerenciado quando nao existe token manual ativo", () => {
@@ -41,5 +41,24 @@ describe("codex access panel", () => {
         "exec",
       ),
     ).toBe(false);
+  });
+
+  test("permite usar o chat no modo exec mesmo sem conta compartilhada conectada", () => {
+    expect(
+      canUseCodexChat(
+        {
+          connected: false,
+          authMode: null,
+          requiresOpenaiAuth: true,
+          planType: null,
+          email: null,
+          sharedAccountLabel: null,
+          codexAccessTokenActive: true,
+          codexAccessTokenRequired: false,
+          codexAccessBlockedReason: null,
+        },
+        "exec",
+      ),
+    ).toBe(true);
   });
 });
