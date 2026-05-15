@@ -1010,6 +1010,10 @@ async function ensureOwnedThread(userId: string, threadId: string) {
 }
 
 function buildWorkspaceWritePolicy() {
+  if (CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX) {
+    return { type: "dangerFullAccess" as const };
+  }
+
   return {
     type: "workspaceWrite",
     writableRoots: [resolveWorkspaceRoot()],
@@ -1391,13 +1395,13 @@ export function attachCodexGateway(server: HttpServer) {
                 threadId,
                 cwd: resolveWorkspaceRoot(),
                 approvalPolicy: "never",
-                sandbox: "workspace-write",
+                sandbox: buildWorkspaceWritePolicy(),
               });
             } else {
               const created = await codexClient.request<{ thread: CodexThread }>("thread/start", {
                 cwd: resolveWorkspaceRoot(),
                 approvalPolicy: "never",
-                sandbox: "workspace-write",
+                sandbox: buildWorkspaceWritePolicy(),
               });
               threadId = created.thread.id;
               currentThreadId = threadId;
