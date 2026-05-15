@@ -6,8 +6,11 @@ import {
   canUseCodexChat,
   formatCodexErrorMessage,
   isCodexAccessBlocked,
+  appendOptimisticUserEntry,
+  removeOptimisticUserEntries,
   summarizeCodexCommand,
 } from "./codex-drawer";
+import type { CodexTimelineEntry } from "@/types/codex";
 
 describe("codex access panel", () => {
   test("mostra o estado gerenciado quando nao existe token manual ativo", () => {
@@ -83,5 +86,21 @@ describe("codex access panel", () => {
     expect(summarizeCodexCommand("/bin/sh -lc 'bun - <<BUN fetch(\"http://127.0.0.1:4000/api/vct/times\") BUN'")).toBe(
       "Executando chamadas de API...",
     );
+  });
+
+  test("mantem a mensagem do usuario imediatamente e remove o placeholder pending quando a confirmacao chega", () => {
+    const list = appendOptimisticUserEntry([], null, "quais sao os nomes dos times inscritos", null);
+    const cleaned = removeOptimisticUserEntries(
+      list as CodexTimelineEntry[],
+      "quais sao os nomes dos times inscritos",
+      "thread-1",
+    );
+
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      kind: "user",
+      text: "quais sao os nomes dos times inscritos",
+    });
+    expect(cleaned).toHaveLength(0);
   });
 });

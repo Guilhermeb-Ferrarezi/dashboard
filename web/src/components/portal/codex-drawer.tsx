@@ -152,7 +152,7 @@ function mergeTimelineEntry(list: CodexTimelineEntry[], entry: CodexTimelineEntr
   return next;
 }
 
-function removeOptimisticUserEntries(
+export function removeOptimisticUserEntries(
   list: CodexTimelineEntry[],
   text: string,
   threadId?: string | null,
@@ -170,7 +170,7 @@ function removeOptimisticUserEntries(
       return true;
     }
 
-    if (!threadId) {
+    if (!threadId || item.id.startsWith("optimistic-user:pending:")) {
       return false;
     }
 
@@ -178,13 +178,14 @@ function removeOptimisticUserEntries(
   });
 }
 
-function appendOptimisticUserEntry(
+export function appendOptimisticUserEntry(
   list: CodexTimelineEntry[],
-  threadId: string,
+  threadId: string | null,
   prompt: string,
   turnId: string | null,
 ): CodexTimelineEntry[] {
-  const optimisticId = `optimistic-user:${threadId}:${prompt}`;
+  const optimisticThreadId = threadId || "pending";
+  const optimisticId = `optimistic-user:${optimisticThreadId}:${prompt}`;
   const existing = list.find((item) => item.id === optimisticId);
 
   if (existing && existing.kind === "user") {
@@ -522,14 +523,6 @@ export function CodexDrawer({
           setTimeline((current) => mergeTimelineEntry(current, payload.entry));
           break;
         case "userPromptAccepted":
-          setTimeline((current) =>
-            appendOptimisticUserEntry(
-              current,
-              payload.threadId,
-              payload.prompt,
-              activeTurnIdRef.current,
-            ),
-          );
           setDraft("");
           break;
         case "assistantDelta": {
@@ -764,6 +757,15 @@ export function CodexDrawer({
     }
 
     setSending(true);
+    setTimeline((current) =>
+      appendOptimisticUserEntry(
+        current,
+        currentThread?.id ?? null,
+        prompt,
+        activeTurnIdRef.current,
+      ),
+    );
+    setDraft("");
     socketRef.current.send(
       JSON.stringify({
         type: "sendPrompt",
