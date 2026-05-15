@@ -310,6 +310,7 @@ export function CodexDrawer({
   const [historyClosing, setHistoryClosing] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
   const [accessRefreshTick, setAccessRefreshTick] = useState(0);
+  const [expandedCommandIds, setExpandedCommandIds] = useState<Set<string>>(() => new Set());
 
   const connected = Boolean(account?.connected);
   const accessBlocked = isCodexAccessBlocked(account);
@@ -364,6 +365,20 @@ export function CodexDrawer({
     }
 
     openHistoryMenu();
+  }
+
+  function toggleCommandDetails(entryId: string) {
+    setExpandedCommandIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(entryId)) {
+        next.delete(entryId);
+      } else {
+        next.add(entryId);
+      }
+
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -995,24 +1010,36 @@ export function CodexDrawer({
               }
 
               if (entry.kind === "command") {
+                const expanded = expandedCommandIds.has(entry.id);
+
                 return (
-                  <div key={entry.id} className="rounded-xl border border-sky-500/20 bg-sky-500/8 p-3">
+                  <div key={entry.id} className="rounded-xl border border-sky-500/15 bg-sky-500/5 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-300">
-                        Comando
-                      </p>
+                      <button
+                        type="button"
+                        className="flex min-w-0 items-center gap-2 text-left text-xs font-medium uppercase tracking-[0.16em] text-sky-300 transition hover:text-sky-200"
+                        onClick={() => toggleCommandDetails(entry.id)}
+                        aria-expanded={expanded}
+                      >
+                        <CaretDown className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
+                        <span className="truncate">Consulta técnica</span>
+                      </button>
                       <Badge className="border border-sky-500/20 bg-sky-500/10 text-sky-300">
                         {entry.status}
                       </Badge>
                     </div>
-                    <code className="mt-2 block overflow-x-auto whitespace-pre-wrap rounded-lg border border-border/60 bg-background/70 px-2.5 py-2 text-xs leading-6 text-foreground">
-                      {entry.command}
-                    </code>
-                    <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-border/60 bg-background/70 px-2.5 py-2.5 text-xs leading-6 text-muted-foreground">
-                      <code className="block whitespace-pre-wrap break-words">
-                        {entry.output || "Sem saida registrada."}
-                      </code>
-                    </pre>
+                    {expanded ? (
+                      <>
+                        <code className="mt-2 block overflow-x-auto whitespace-pre-wrap rounded-lg border border-border/60 bg-background/70 px-2.5 py-2 text-xs leading-6 text-foreground">
+                          {entry.command}
+                        </code>
+                        <pre className="mt-2 max-h-56 overflow-auto rounded-lg border border-border/60 bg-background/70 px-2.5 py-2.5 text-xs leading-6 text-muted-foreground">
+                          <code className="block whitespace-pre-wrap break-words">
+                            {entry.output || "Sem saida registrada."}
+                          </code>
+                        </pre>
+                      </>
+                    ) : null}
                   </div>
                 );
               }
