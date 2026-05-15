@@ -23,5 +23,6 @@ docker compose up -d --build
 
 - A API sobe com `CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX=1` para funcionar em container com sandbox externo.
 - O `CODEX_HOME` fica persistido em `./.codex-home`.
+- No boot, o container copia `AGENTS.override.md` e `openapi.yaml` para `CODEX_HOME` para guiar o Codex com a API do projeto.
 - O compose também sobe Mongo e Redis locais para o stack completo.
 - As portas do `web` e da `api` ficam presas em `127.0.0.1`, então não ficam abertas para fora da VPS.

@@ -4,7 +4,9 @@ import { buildCodexAppServerArgs } from "./codex";
 
 describe("codex bootstrap args", () => {
   test("não adiciona bypass por padrão", () => {
-    expect(buildCodexAppServerArgs(false)).toEqual([
+    expect(buildCodexAppServerArgs(false, "/app")).toEqual([
+      "-C",
+      "/app",
       "app-server",
       "--listen",
       "ws://127.0.0.1:4545",
@@ -16,8 +18,10 @@ describe("codex bootstrap args", () => {
   });
 
   test("adiciona bypass quando solicitado", () => {
-    expect(buildCodexAppServerArgs(true)).toEqual([
+    expect(buildCodexAppServerArgs(true, "/app")).toEqual([
       "--dangerously-bypass-approvals-and-sandbox",
+      "-C",
+      "/app",
       "app-server",
       "--listen",
       "ws://127.0.0.1:4545",

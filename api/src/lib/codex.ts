@@ -183,8 +183,13 @@ function resolveCodexHome() {
   return path.join(resolveWorkspaceRoot(), ".codex-home");
 }
 
-export function buildCodexAppServerArgs(forceBypass = CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX) {
+export function buildCodexAppServerArgs(
+  forceBypass = CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX,
+  workspaceRoot = resolveWorkspaceRoot(),
+) {
   const args = [
+    "-C",
+    workspaceRoot,
     "app-server",
     "--listen",
     CODEX_APP_SERVER_URL,

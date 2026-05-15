@@ -1,0 +1,180 @@
+openapi: 3.0.3
+info:
+  title: Santos Tech Home API
+  version: 1.0.0
+  description: >
+    Minimal OpenAPI surface for the Codex container. The live Codex chat also
+    uses a websocket endpoint that is documented in the codebase, but this file
+    focuses on the HTTP endpoints the agent should call directly.
+servers:
+  - url: http://127.0.0.1:4000/api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    ThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema:
+        type: string
+    TokenId:
+      name: tokenId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CodexAccountStatus:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        authMode:
+          type: string
+          nullable: true
+        requiresOpenaiAuth:
+          type: boolean
+        planType:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        sharedAccountLabel:
+          type: string
+          nullable: true
+        codexAccessTokenActive:
+          type: boolean
+        codexAccessTokenRequired:
+          type: boolean
+        codexAccessBlockedReason:
+          type: string
+          nullable: true
+    CodexThreadSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        preview:
+          type: string
+        updatedAt:
+          type: integer
+        createdAt:
+          type: integer
+        status:
+          type: string
+        lastOpenedAt:
+          type: string
+          nullable: true
+    AdminAccessTokenSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        revokedAt:
+          type: string
+          nullable: true
+        lastUsedAt:
+          type: string
+          nullable: true
+paths:
+  /codex/account:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read Codex account status
+      responses:
+        "200":
+          description: Codex account status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  account:
+                    $ref: "#/components/schemas/CodexAccountStatus"
+  /codex/account/logout:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Logout the Codex session
+      responses:
+        "200":
+          description: Logout result
+  /codex/threads:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List Codex threads
+      responses:
+        "200":
+          description: Thread list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  threads:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CodexThreadSummary"
+  /codex/threads/{threadId}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read a Codex thread
+      parameters:
+        - $ref: "#/components/parameters/ThreadId"
+      responses:
+        "200":
+          description: Thread detail
+  /admin/tokens:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List admin access tokens
+      responses:
+        "200":
+          description: Token list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminAccessTokenSummary"
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create an admin access token
+      responses:
+        "200":
+          description: Created token
+  /admin/tokens/{tokenId}/revoke:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Revoke an admin access token
+      parameters:
+        - $ref: "#/components/parameters/TokenId"
+      responses:
+        "200":
+          description: Revocation result
