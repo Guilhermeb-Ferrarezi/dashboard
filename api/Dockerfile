@@ -3,7 +3,7 @@ FROM oven/bun:1.3.11-alpine
 WORKDIR /app
 ENV PATH="/root/.bun/bin:${PATH}"
 
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl ripgrep
 
 COPY package.json bun.lock ./
 
