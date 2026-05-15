@@ -11,6 +11,7 @@ RUN bun install --frozen-lockfile --production
 RUN bun install -g @openai/codex && command -v codex && codex --version
 
 COPY scripts/bootstrap-codex-home.sh /usr/local/bin/bootstrap-codex-home.sh
+COPY codex/AGENTS.md /usr/local/share/codex/AGENTS.md
 COPY codex/AGENTS.override.md /usr/local/share/codex/AGENTS.override.md
 COPY codex/openapi.yaml /usr/local/share/codex/openapi.yaml
 

@@ -24,6 +24,6 @@ docker compose up -d --build
 - A API agora sobe com bypass de sandbox interna por padrão, para evitar falhas com `bwrap` em container ou workspace já sandboxado.
 - Se quiser reativar o comportamento sem bypass, defina `CODEX_DANGEROUSLY_BYPASS_APPROVALS_AND_SANDBOX=0`.
 - O `CODEX_HOME` fica persistido em `./.codex-home`.
-- No boot, o container copia `AGENTS.override.md` e `openapi.yaml` para `CODEX_HOME` para guiar o Codex com a API do projeto.
+- No boot, o container copia `AGENTS.md`, `AGENTS.override.md` e `openapi.yaml` para `CODEX_HOME` para guiar o Codex com a API do projeto.
 - O compose também sobe Mongo e Redis locais para o stack completo.
 - As portas do `web` e da `api` ficam presas em `127.0.0.1`, então não ficam abertas para fora da VPS.
