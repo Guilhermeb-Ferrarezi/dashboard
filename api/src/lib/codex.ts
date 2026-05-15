@@ -1817,11 +1817,23 @@ export function attachCodexGateway(server: HttpServer) {
       return;
     }
 
+    console.info("[codex-gateway] upgrade request received", {
+      path: url.pathname,
+      host,
+      hasCookie: Boolean(request.headers.cookie),
+      origin: request.headers.origin ?? null,
+    });
+
     let user: AuthUserPayload;
 
     try {
       user = authenticateAdminSocket(request);
     } catch (error) {
+      console.warn("[codex-gateway] upgrade auth failed", {
+        path: url.pathname,
+        host,
+        reason: error instanceof Error ? error.message : "unknown",
+      });
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;
