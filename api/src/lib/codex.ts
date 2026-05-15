@@ -17,6 +17,7 @@ import {
   shouldRequestCodexConfirmation,
 } from "./codex-agent-runtime";
 import { resolveCodexAccessState } from "./codex-access";
+import { runCodexRuntimeTool } from "./codex-tool-runtime";
 
 type JsonRpcId = string | number;
 
@@ -560,6 +561,141 @@ type CodexExecRunResult = {
   timelineEntries: CodexTimelineEntry[];
   status: string | null;
 };
+
+const LOCAL_EXEC_THREAD_PREFIX = "local-exec:";
+
+function normalizeCodexPromptForMatch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function detectModalidadeFromPrompt(prompt: string) {
+  const normalized = normalizeCodexPromptForMatch(prompt);
+
+  if (normalized.includes("counter strike") || normalized.includes("counter-strike") || normalized.includes("cs")) {
+    return "counter-strike";
+  }
+
+  if (normalized.includes("league of legends") || normalized.includes("lol")) {
+    return "lol";
+  }
+
+  if (normalized.includes("valorant")) {
+    return "valorant";
+  }
+
+  return null;
+}
+
+export function classifyExecBusinessReadPrompt(prompt: string) {
+  const normalized = normalizeCodexPromptForMatch(prompt);
+  const modalidade = detectModalidadeFromPrompt(prompt);
+  const suffix = modalidade ? `?modalidade=${modalidade}` : "";
+
+  const asksTeamCount =
+    (normalized.includes("quantos") || normalized.includes("quantidade") || normalized.includes("total"))
+    && normalized.includes("time")
+    && (normalized.includes("inscrit") || normalized.includes("cadastrad"));
+
+  if (asksTeamCount) {
+    return {
+      kind: "vct_team_count" as const,
+      path: `/vct/times${suffix}`,
+      modalidade,
+    };
+  }
+
+  const asksRegistrationCount =
+    (normalized.includes("quantos") || normalized.includes("quantidade") || normalized.includes("total"))
+    && normalized.includes("inscrit")
+    && !normalized.includes("time");
+
+  if (asksRegistrationCount) {
+    return {
+      kind: "vct_registration_count" as const,
+      path: `/vct/inscricoes${suffix}`,
+      modalidade,
+    };
+  }
+
+  return null;
+}
+
+function buildModalidadeLabel(modalidade: string | null) {
+  if (!modalidade) {
+    return "";
+  }
+
+  if (modalidade === "counter-strike") {
+    return " de Counter-Strike";
+  }
+
+  if (modalidade === "lol") {
+    return " de League of Legends";
+  }
+
+  return " de Valorant";
+}
+
+function buildExecBusinessReadAnswer(
+  prompt: string,
+  result: Awaited<ReturnType<typeof runCodexRuntimeTool>>,
+) {
+  const classification = classifyExecBusinessReadPrompt(prompt);
+
+  if (!classification) {
+    return null;
+  }
+
+  if (!result.ok) {
+    const reason = result.error?.message || result.summary;
+    return `Não consegui concluir a leitura documentada. Motivo: ${reason}`;
+  }
+
+  const payload = (result.data ?? {}) as {
+    times?: Array<unknown>;
+    inscricoes?: Array<unknown>;
+  };
+
+  if (classification.kind === "vct_team_count") {
+    const count = Array.isArray(payload.times) ? payload.times.length : 0;
+    return `Há ${count} times cadastrados${buildModalidadeLabel(classification.modalidade)}.`;
+  }
+
+  if (classification.kind === "vct_registration_count") {
+    const count = Array.isArray(payload.inscricoes) ? payload.inscricoes.length : 0;
+    return `Há ${count} inscrições${buildModalidadeLabel(classification.modalidade)}.`;
+  }
+
+  return null;
+}
+
+async function tryHandleExecBusinessReadPrompt(prompt: string, workspaceRoot: string) {
+  const classification = classifyExecBusinessReadPrompt(prompt);
+
+  if (!classification) {
+    return null;
+  }
+
+  const result = await runCodexRuntimeTool(
+    "execute_internal_api",
+    { method: "GET", path: classification.path },
+    { workspaceRoot, confirmed: false },
+  );
+
+  const answer = buildExecBusinessReadAnswer(prompt, result);
+
+  if (!answer) {
+    return null;
+  }
+
+  return {
+    answer,
+    status: result.ok ? "completed" : "failed",
+  };
+}
 
 function getTimelineSnapshot(session: { timeline?: unknown[] | null } | null | undefined) {
   return Array.isArray(session?.timeline) ? (session!.timeline as CodexTimelineEntry[]) : [];
@@ -1631,6 +1767,7 @@ export function attachCodexGateway(server: HttpServer) {
               }
 
               let threadId = payload.threadId?.trim() || null;
+              const isLocalExecThread = Boolean(threadId?.startsWith(LOCAL_EXEC_THREAD_PREFIX));
               const confirmationKey = `${threadId ?? "new"}:${prompt}`;
               const alreadyConfirmed = confirmedPrompts.delete(confirmationKey);
               const classification = shouldRequestCodexConfirmation(prompt);
@@ -1654,6 +1791,86 @@ export function attachCodexGateway(server: HttpServer) {
 
               if (threadId) {
                 await ensureOwnedThread(user.id, threadId);
+              }
+
+              const directRead = await tryHandleExecBusinessReadPrompt(prompt, resolveWorkspaceRoot());
+
+              if (directRead) {
+                const activeThreadId = threadId ?? `${LOCAL_EXEC_THREAD_PREFIX}${Date.now()}`;
+                const activeTurnId = `local-turn:${Date.now()}`;
+                const userEntry: CodexTimelineEntry = {
+                  id: `user:${activeThreadId}:${activeTurnId}`,
+                  kind: "user",
+                  text: prompt,
+                  status: "completed",
+                  turnId: activeTurnId,
+                };
+                const assistantEntry: CodexTimelineEntry = {
+                  id: `assistant:${activeThreadId}:${activeTurnId}`,
+                  kind: "assistant",
+                  text: directRead.answer,
+                  turnId: activeTurnId,
+                };
+
+                if (!threadId) {
+                  sendBrowserEvent(browserSocket, {
+                    type: "threadCreated",
+                    thread: {
+                      id: activeThreadId,
+                      title: prompt.slice(0, 80) || "Nova conversa",
+                      preview: directRead.answer.slice(0, 160),
+                      updatedAt: Date.now(),
+                      createdAt: Date.now(),
+                      status: directRead.status,
+                      lastOpenedAt: null,
+                    } satisfies CodexThreadSummary,
+                  });
+                }
+
+                currentThreadId = activeThreadId;
+
+                sendBrowserEvent(browserSocket, {
+                  type: "turnStarted",
+                  threadId: activeThreadId,
+                  turnId: activeTurnId,
+                });
+
+                sendBrowserEvent(browserSocket, {
+                  type: "userPromptAccepted",
+                  threadId: activeThreadId,
+                  prompt,
+                });
+
+                sendBrowserEvent(browserSocket, {
+                  type: "itemCompleted",
+                  threadId: activeThreadId,
+                  entry: userEntry,
+                });
+
+                sendBrowserEvent(browserSocket, {
+                  type: "itemCompleted",
+                  threadId: activeThreadId,
+                  entry: assistantEntry,
+                });
+
+                sendBrowserEvent(browserSocket, {
+                  type: "turnCompleted",
+                  threadId: activeThreadId,
+                  turnId: activeTurnId,
+                  status: directRead.status,
+                });
+
+                await upsertThreadSummary(user.id, activeThreadId, {
+                  name: prompt.slice(0, 80) || "Nova conversa",
+                  preview: directRead.answer.slice(0, 160),
+                  status: directRead.status,
+                });
+                await appendTimelineEntries(user.id, activeThreadId, [userEntry, assistantEntry]);
+                break;
+              }
+
+              if (isLocalExecThread) {
+                threadId = null;
               }
 
               const collectedEntries: CodexTimelineEntry[] = [];
