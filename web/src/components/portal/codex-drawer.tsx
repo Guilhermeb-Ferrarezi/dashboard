@@ -354,7 +354,7 @@ export function CodexDrawer({
   }, []);
 
   useEffect(() => {
-    if (!open || user.role !== "admin" || account === null || accessBlocked) {
+    if (!open || user.role !== "admin" || loading || accessBlocked) {
       return;
     }
 
@@ -493,7 +493,7 @@ export function CodexDrawer({
       activeTurnIdRef.current = null;
       setDeviceLogin(null);
     };
-  }, [accessBlocked, account, accessRefreshTick, open, user.role]);
+  }, [accessBlocked, accessRefreshTick, loading, open, user.role]);
 
   useEffect(() => {
     if (!open || user.role !== "admin") {
