@@ -26,7 +26,7 @@ export default async function HomePage() {
       user={user}
       eyebrow="Universal Home"
       title="Launcher de projetos"
-      description="Uma entrada unica para portal, admin, zap e outras operacoes."
+      description="Uma entrada unica para portal, admin e outras operacoes."
     >
       {projectsLoadFailed ? (
         <Alert variant="destructive" className="mb-6 border-border/60 bg-card/80">
