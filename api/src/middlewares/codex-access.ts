@@ -5,7 +5,7 @@ import {
   getActiveAdminAccessToken,
   type AdminAccessTokenSummary,
 } from "../lib/admin-access-token";
-import { CODEX_ACCESS_BLOCKED_REASON } from "../lib/codex-access";
+import { resolveCodexServiceToken } from "../lib/codex-service-token";
 
 function readCodexAccessToken(req: Request) {
   const cookieToken = req.cookies?.codex_access_token;
@@ -36,12 +36,46 @@ export function requireCodexAccessToken(req: Request, res: Response, next: NextF
     return res.status(401).json({ message: "Missing token" });
   }
 
+  if (resolveCodexServiceToken()) {
+    const tokenValue = readCodexAccessToken(req);
+
+    if (!tokenValue) {
+      next();
+      return;
+    }
+
+    return getActiveAdminAccessToken(adminId, "codex")
+      .then((token: AdminAccessTokenSummary | null) => {
+        if (!token) {
+          next();
+          return null;
+        }
+
+        return authenticateAdminAccessToken(adminId, "codex", tokenValue)
+          .then((authenticatedToken: AdminAccessTokenSummary | null) => {
+            req.codexAccessToken = authenticatedToken ?? token;
+            next();
+            return null;
+          })
+          .catch((error) => {
+            console.error("[codex-access] erro ao autenticar token:", error);
+            return res.status(500).json({
+              message: "Falha ao validar o token de acesso do Codex.",
+            });
+          });
+      })
+      .catch((error) => {
+        console.error("[codex-access] erro ao carregar token ativo:", error);
+        return res.status(500).json({
+          message: "Falha ao validar o token de acesso do Codex.",
+        });
+      });
+  }
+
   return getActiveAdminAccessToken(adminId, "codex")
     .then((token: AdminAccessTokenSummary | null) => {
       if (!token) {
-        return res.status(403).json({
-          message: CODEX_ACCESS_BLOCKED_REASON,
-        });
+        return res.status(403).json({ message: "Codex sem credencial ativa." });
       }
 
       const tokenValue = readCodexAccessToken(req);

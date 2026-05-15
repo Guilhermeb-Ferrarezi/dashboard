@@ -44,7 +44,7 @@ type AdminAccessTokenRevokeResponse = {
 };
 
 export function buildTokenStatusText(active: boolean) {
-  return active ? "Ativo" : "Bloqueado";
+  return active ? "Ativo" : "Gerenciado pelo sistema";
 }
 
 function isActiveToken(token: AdminAccessTokenSummary) {
@@ -170,7 +170,7 @@ export function CodexAccessPanel() {
           <div>
             <h3 className="text-base font-semibold">Acesso Codex</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Um token ativo por admin libera o Codex automaticamente no portal.
+              O chat usa uma credencial delegada criada e mantida pelo sistema.
             </p>
           </div>
           <Badge

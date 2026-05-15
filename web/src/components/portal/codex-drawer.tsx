@@ -74,7 +74,7 @@ type CodexSocketEvent =
   | { type: "error"; message: string };
 
 export function isCodexAccessBlocked(account: CodexAccountStatus | null) {
-  return Boolean(account && !account.codexAccessTokenActive);
+  return Boolean(account?.codexAccessTokenRequired && !account.codexAccessTokenActive);
 }
 
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {

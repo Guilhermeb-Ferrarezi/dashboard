@@ -10,10 +10,7 @@ import {
   listCodexRuntimeTools,
   runCodexRuntimeTool,
 } from "../lib/codex-tool-runtime";
-import {
-  CODEX_ACCESS_BLOCKED_REASON,
-  resolveCodexAccessState,
-} from "../lib/codex-access";
+import { resolveCodexAccessState } from "../lib/codex-access";
 import type {
   CodexAccountStatus,
   CodexThreadSummary,
@@ -27,8 +24,8 @@ const DISCONNECTED_CODEX_ACCOUNT: CodexAccountStatus = {
   email: null,
   sharedAccountLabel: null,
   codexAccessTokenActive: false,
-  codexAccessTokenRequired: true,
-  codexAccessBlockedReason: CODEX_ACCESS_BLOCKED_REASON,
+  codexAccessTokenRequired: false,
+  codexAccessBlockedReason: null,
 };
 
 export async function resolveCodexAccountStatus(

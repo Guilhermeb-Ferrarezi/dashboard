@@ -4,11 +4,11 @@ import { buildTokenStatusText } from "./codex-access-panel";
 import { isCodexAccessBlocked } from "./codex-drawer";
 
 describe("codex access panel", () => {
-  test("mostra bloqueio quando nao existe token ativo", () => {
-    expect(buildTokenStatusText(false)).toBe("Bloqueado");
+  test("mostra o estado gerenciado quando nao existe token manual ativo", () => {
+    expect(buildTokenStatusText(false)).toBe("Gerenciado pelo sistema");
   });
 
-  test("considera o codex bloqueado quando o backend diz que nao ha token", () => {
+  test("nao considera o codex bloqueado quando o backend nao exige token manual", () => {
     expect(
       isCodexAccessBlocked({
         connected: false,
@@ -18,9 +18,9 @@ describe("codex access panel", () => {
         email: null,
         sharedAccountLabel: null,
         codexAccessTokenActive: false,
-        codexAccessTokenRequired: true,
-        codexAccessBlockedReason: "Crie um token de acesso.",
+        codexAccessTokenRequired: false,
+        codexAccessBlockedReason: null,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

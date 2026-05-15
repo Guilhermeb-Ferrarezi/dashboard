@@ -2,6 +2,7 @@ import {
   getActiveAdminAccessToken,
   type AdminAccessTokenSummary,
 } from "./admin-access-token";
+import { resolveCodexServiceToken } from "./codex-service-token";
 
 export type CodexAccessState = {
   codexAccessTokenActive: boolean;
@@ -20,13 +21,22 @@ export async function resolveCodexAccessState(
   if (!adminId) {
     return {
       codexAccessTokenActive: false,
-      codexAccessTokenRequired: true,
-      codexAccessBlockedReason: CODEX_ACCESS_BLOCKED_REASON,
+      codexAccessTokenRequired: false,
+      codexAccessBlockedReason: null,
       activeToken: null,
     };
   }
 
   const activeToken = await fetchActiveToken(adminId, "codex");
+
+  if (resolveCodexServiceToken()) {
+    return {
+      codexAccessTokenActive: true,
+      codexAccessTokenRequired: false,
+      codexAccessBlockedReason: null,
+      activeToken,
+    };
+  }
 
   if (!activeToken) {
     return {
