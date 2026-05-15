@@ -27,6 +27,13 @@ components:
       required: true
       schema:
         type: string
+    ModalidadeQuery:
+      name: modalidade
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [valorant, counter-strike, lol]
   schemas:
     CodexAccountStatus:
       type: object
@@ -100,6 +107,103 @@ components:
           type: string
         requiresConfirmation:
           type: boolean
+    VctInscricaoSummary:
+      type: object
+      additionalProperties: true
+      properties:
+        _id:
+          type: string
+        modalidade:
+          type: string
+        nome:
+          type: string
+        nick:
+          type: string
+        email:
+          type: string
+        elo:
+          type: string
+        pico:
+          type: string
+        status:
+          type: string
+        time:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    VctTimeSummary:
+      type: object
+      additionalProperties: true
+      properties:
+        _id:
+          type: string
+        modalidade:
+          type: string
+        numero:
+          type: integer
+        nome:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    VctFormacaoMember:
+      type: object
+      additionalProperties: true
+      properties:
+        _id:
+          type: string
+        modalidade:
+          type: string
+        formacaoTimeId:
+          type: string
+        ordem:
+          type: integer
+        papel:
+          type: string
+        nome:
+          type: string
+        email:
+          type: string
+        instagram:
+          type: string
+        whatsapp:
+          type: string
+        nick:
+          type: string
+        eloAtual:
+          type: string
+        peakRanking:
+          type: string
+    VctFormacaoSummary:
+      type: object
+      additionalProperties: true
+      properties:
+        _id:
+          type: string
+        modalidade:
+          type: string
+        nome:
+          type: string
+        tag:
+          type: string
+        logoKey:
+          type: string
+        logoUrl:
+          type: string
+        membroCount:
+          type: integer
+        membros:
+          type: array
+          items:
+            $ref: "#/components/schemas/VctFormacaoMember"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
 paths:
   /codex/account:
     get:
@@ -235,3 +339,66 @@ paths:
       responses:
         "200":
           description: Revocation result
+  /vct/inscricoes:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List VCT registrations
+      parameters:
+        - $ref: "#/components/parameters/ModalidadeQuery"
+      responses:
+        "200":
+          description: Registration list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  inscricoes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VctInscricaoSummary"
+  /vct/times:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List VCT teams
+      parameters:
+        - $ref: "#/components/parameters/ModalidadeQuery"
+      responses:
+        "200":
+          description: Team list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  times:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VctTimeSummary"
+  /vct/formacoes:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List VCT formations
+      parameters:
+        - $ref: "#/components/parameters/ModalidadeQuery"
+      responses:
+        "200":
+          description: Formation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  formacoes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VctFormacaoSummary"

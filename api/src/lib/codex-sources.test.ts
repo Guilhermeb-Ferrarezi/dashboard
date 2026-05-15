@@ -28,6 +28,7 @@ describe("codex sources", () => {
       "Precisão primeiro.",
       "Completude em segundo.",
       "Velocidade apenas como desempate.",
+      "Para consultas de negocio, endpoint documentado no OpenAPI vem antes de workspace, shell ou banco.",
     ]);
     expect(capabilities.routingRules.map((rule) => rule.intent)).toContain("validar-endpoint");
     expect(capabilities.responsePolicy).toContain(
@@ -35,6 +36,9 @@ describe("codex sources", () => {
     );
     expect(capabilities.suggestOnlyRules).toContain(
       "Peça escolha quando houver múltiplas opções com trade-offs reais.",
+    );
+    expect(capabilities.suggestOnlyRules).toContain(
+      "Se a rota existir no codigo mas nao estiver no OpenAPI, informe que ela precisa entrar no contrato antes do uso.",
     );
   });
 

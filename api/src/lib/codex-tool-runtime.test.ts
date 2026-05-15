@@ -14,7 +14,18 @@ function createWorkspace() {
   fs.mkdirSync(path.join(root, "api", "codex"), { recursive: true });
   fs.writeFileSync(
     path.join(root, "api", "codex", "openapi.yaml"),
-    "paths:\n  /codex/account:\n    get:\n      summary: Read Codex account status\n",
+    [
+      "paths:",
+      "  /codex/account:",
+      "    get:",
+      "      summary: Read Codex account status",
+      "  /admin/tokens:",
+      "    post:",
+      "      summary: Create admin access token",
+      "  /vct/inscricoes:",
+      "    get:",
+      "      summary: List VCT registrations",
+    ].join("\n"),
   );
   fs.writeFileSync(path.join(root, "README.md"), "# Santos Tech Home\n\nCodex runtime docs.\n");
   return root;
@@ -56,6 +67,56 @@ describe("codex tool runtime", () => {
 
     expect(result.ok).toBe(false);
     expect(result.requiresConfirmation).toBe(true);
+  });
+
+  test("bloqueia path interno fora do OpenAPI", async () => {
+    const fetchCalls: string[] = [];
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      fetchCalls.push(String(input));
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const result = await runCodexRuntimeTool(
+        "execute_internal_api",
+        { method: "GET", path: "/vct/times" },
+        { workspaceRoot: createWorkspace(), confirmed: false },
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.summary).toContain("nao esta documentado no OpenAPI");
+      expect(fetchCalls).toHaveLength(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("permite path interno documentado no OpenAPI", async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ ok: true, inscricoes: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+
+    try {
+      const result = await runCodexRuntimeTool(
+        "execute_internal_api",
+        { method: "GET", path: "/vct/inscricoes?modalidade=valorant" },
+        { workspaceRoot: createWorkspace(), confirmed: false },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.summary).toBe("Chamada GET /vct/inscricoes?modalidade=valorant executada com sucesso.");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   test("normaliza erros conhecidos", () => {

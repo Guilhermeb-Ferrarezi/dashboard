@@ -148,9 +148,9 @@ export function buildCodexRoutingRules(): CodexRoutingRule[] {
     },
     {
       intent: "estado-atual",
-      preferredSourceId: "workspace-files",
+      preferredSourceId: "project-openapi",
       preferredToolId: "workspace.read",
-      description: "Estado real do projeto vem do workspace, logs e API interna.",
+      description: "Estado de negocio deve sair de endpoint interno documentado no OpenAPI.",
     },
     {
       intent: "validar-endpoint",
@@ -181,6 +181,7 @@ export function buildCodexAgentCapabilities(workspaceRoot: string, executionMode
       "Precisão primeiro.",
       "Completude em segundo.",
       "Velocidade apenas como desempate.",
+      "Para consultas de negocio, endpoint documentado no OpenAPI vem antes de workspace, shell ou banco.",
     ],
     sources: buildCodexSourceCatalog(workspaceRoot),
     tools: buildCodexToolCatalog(),
@@ -189,11 +190,13 @@ export function buildCodexAgentCapabilities(workspaceRoot: string, executionMode
       "Estruture a resposta por etapas lógicas.",
       "Mostre fonte explicitamente quando houver conflito, evidência decisiva ou pedido do usuário.",
       "Oculte detalhes de fonte quando todas reforçam a mesma conclusão.",
+      "Nao use shell ou acesso indireto a banco como fonte primaria de dado de negocio.",
     ],
     suggestOnlyRules: [
       "Pare na sugestão quando a ação estiver fora das ferramentas disponíveis.",
       "Peça escolha quando houver múltiplas opções com trade-offs reais.",
       "Peça contexto quando zona, projeto, domínio ou ambiente não puderem ser inferidos.",
+      "Se a rota existir no codigo mas nao estiver no OpenAPI, informe que ela precisa entrar no contrato antes do uso.",
       "Informe erro e sugira caminho manual quando a API falhar sem alternativa segura.",
       "Só execute mudanças de alto risco com confirmação explícita.",
     ],

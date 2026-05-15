@@ -20,6 +20,9 @@ This file is injected into `CODEX_HOME` on every container start.
 - `POST /api/codex/account/logout`
 - `GET /api/codex/threads`
 - `GET /api/codex/threads/{threadId}`
+- `GET /api/vct/inscricoes`
+- `GET /api/vct/times`
+- `GET /api/vct/formacoes`
 - `GET /api/admin/tokens`
 - `POST /api/admin/tokens`
 - `POST /api/admin/tokens/{tokenId}/revoke`
@@ -27,6 +30,8 @@ This file is injected into `CODEX_HOME` on every container start.
 ## Workflow
 
 1. Read the OpenAPI file.
-2. Verify which token/header the endpoint expects.
-3. Call the API with the injected token.
-4. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
+2. Verify that the route is documented in the OpenAPI file before using it.
+3. Verify which token/header the endpoint expects.
+4. Call the API with the injected token.
+5. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
+6. If the route exists only in code, stop and report that it must be added to the OpenAPI contract before the agent can use it.

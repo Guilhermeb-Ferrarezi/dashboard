@@ -29,6 +29,8 @@ A escolha de ferramentas segue a regra: precisao primeiro, completude depois e v
 
 O runtime de ferramentas fica em `GET /api/codex/tools` e `POST /api/codex/tools/:toolId/run`. Cada ferramenta possui schema fixo de parâmetros; chamadas de escrita por `execute_internal_api` retornam pedido de confirmação quando `confirmed` nao foi enviado.
 
+O agente agora opera em modo estrito para dado de negocio: consultas e acoes internas devem usar endpoints documentados em `api/codex/openapi.yaml`. Se a rota existir no codigo, mas nao estiver no OpenAPI, o agente deve parar e informar que o contrato precisa ser atualizado antes do uso. Shell, script ad hoc e acesso indireto a banco nao valem como caminho primario para resposta operacional.
+
 ## Docker Compose
 
 ```bash

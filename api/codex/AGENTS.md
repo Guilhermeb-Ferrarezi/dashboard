@@ -40,8 +40,10 @@ This file is injected into `CODEX_HOME` on every container start.
 - Do not invent tool names or parameters.
 - Prefer accuracy first, completeness second, and speed only as a tie-breaker.
 - For "how do I do X?", use documentation first.
-- For current project state, inspect the workspace or live API state.
-- For endpoint or payload shape, validate against OpenAPI before writing.
+- For business state, prefer a documented internal API endpoint over workspace, shell, or database access.
+- For endpoint or payload shape, validate against OpenAPI before any internal API read or write.
+- If a route exists in the codebase but is missing from the OpenAPI file, do not use it. Report that it must be added to `openapi.yaml` before the agent can call it.
+- Do not use shell, ad hoc scripts, or indirect database access as the primary path for business reads.
 - When several sources apply, combine them by problem-solving step rather than by source name.
 
 ## Confirmation rule
@@ -68,7 +70,9 @@ This file is injected into `CODEX_HOME` on every container start.
 ## Workflow
 
 1. Read the OpenAPI file.
-2. Verify which token/header the endpoint expects.
-3. Call the API with the injected token.
-4. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
-5. If the UI asks for confirmation, do not continue until the decision is resolved.
+2. Verify that the target route is documented in the OpenAPI file.
+3. Verify which token/header the endpoint expects.
+4. Call the API with the injected token.
+5. If the OpenAPI file and the implementation disagree, inspect the current route/controller files under `api/src`.
+6. If the route exists only in code, stop and report that it must be formalized in OpenAPI first.
+7. If the UI asks for confirmation, do not continue until the decision is resolved.

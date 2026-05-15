@@ -219,6 +219,26 @@ function readMaxResults(value: unknown) {
     : 5;
 }
 
+function normalizeOpenApiPath(value: string) {
+  const [pathname] = value.split("?");
+  const normalized = pathname.replace(/\/+$/u, "");
+  return normalized || "/";
+}
+
+async function readDocumentedOpenApiPaths(workspaceRoot: string) {
+  const file = path.join(workspaceRoot, "api", "codex", "openapi.yaml");
+  const content = await fs.readFile(file, "utf8").catch(() => "");
+  const paths = new Set<string>();
+  const section = content.match(/(^|\n)paths:\n([\s\S]*?)(\n[a-zA-Z][^:\n]*:|\s*$)/u)?.[2] ?? "";
+  const matches = section.matchAll(/^\s{2}(\/[^\s:]*):\s*$/gmu);
+
+  for (const match of matches) {
+    paths.add(normalizeOpenApiPath(match[1]));
+  }
+
+  return paths;
+}
+
 async function searchTextFiles(files: string[], query: string, maxResults: number) {
   const normalizedQuery = query.toLowerCase();
   const results: Array<{ file: string; line: number; text: string }> = [];
@@ -265,9 +285,27 @@ function getInternalApiBaseUrl() {
 async function executeInternalApi(params: Record<string, unknown>, context: CodexToolRunContext): Promise<CodexToolRunResult> {
   const method = String(params.method).toUpperCase();
   const pathValue = String(params.path);
+  const normalizedPath = normalizeOpenApiPath(pathValue);
 
   if (!pathValue.startsWith("/") || /^https?:\/\//i.test(pathValue)) {
     throw new Error("Path interno deve iniciar com / e não pode conter host.");
+  }
+
+  const documentedPaths = await readDocumentedOpenApiPaths(context.workspaceRoot);
+  if (!documentedPaths.has(normalizedPath)) {
+    return {
+      ok: false,
+      toolId: "execute_internal_api",
+      requiresConfirmation: false,
+      summary: `O path ${normalizedPath} nao esta documentado no OpenAPI e precisa entrar no contrato antes do uso pelo agente.`,
+      error: {
+        status: 400,
+        kind: "validation",
+        message: `Path ${normalizedPath} fora do OpenAPI.`,
+        nextStep: "Adicione o endpoint ao openapi.yaml antes de usar execute_internal_api para esse recurso.",
+      },
+      data: { method, path: pathValue },
+    };
   }
 
   if (method !== "GET" && !context.confirmed) {
