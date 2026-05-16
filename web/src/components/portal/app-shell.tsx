@@ -118,6 +118,7 @@ export function AppShell({
     return Number.isFinite(saved) ? clampCodexDrawerWidth(saved) : CODEX_DRAWER_DEFAULT_WIDTH;
   });
   const codexDragActiveRef = useRef(false);
+  const codexContentGutter = user.role === "admin" && codexOpen ? codexWidth : 0;
 
   useEffect(() => {
     function handleLastProjectChanged(event: Event) {
@@ -421,7 +422,10 @@ export function AppShell({
             lockViewport && "h-screen min-h-0 overflow-hidden",
           )}
         >
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            className="flex min-w-0 flex-1 flex-col"
+            style={codexContentGutter ? { paddingRight: `${codexContentGutter}px` } : undefined}
+          >
             <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
               <div
                 className={cn(
