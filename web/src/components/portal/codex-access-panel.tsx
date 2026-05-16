@@ -13,20 +13,12 @@ import {
   KeyRoundIcon,
   LoaderCircleIcon,
   PlusIcon,
+  RefreshCwIcon,
   Trash2Icon,
 } from "@/components/ui/icons";
 import { clientApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-type UserAccessTokenSummary = {
-  id: string;
-  userId: string;
-  label: string;
-  revokedAt: string | null;
-  lastUsedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+import type { UserAccessTokenSummary, UserAccessTokenType } from "@/types/user-access-token";
 
 type UserAccessTokenResponse = {
   ok: true;
@@ -38,10 +30,40 @@ type CreateTokenResponse = {
   tokenId: string;
   token: string;
   label: string;
+  type: UserAccessTokenType;
 };
+
+const TOKEN_MODES: Array<{
+  id: UserAccessTokenType;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "account",
+    label: "Normal",
+    description: "Token de conta",
+  },
+  {
+    id: "codex",
+    label: "Codex",
+    description: "Token do Codex",
+  },
+];
 
 export function buildTokenStatusText(active: boolean) {
   return active ? "Ativo" : "Gerenciado pelo sistema";
+}
+
+function getModeTitle(mode: UserAccessTokenType) {
+  return mode === "codex" ? "Token do Codex" : "Token de conta";
+}
+
+function getModeButtonLabel(mode: UserAccessTokenType) {
+  return mode === "codex" ? "Gerar token do Codex" : "Gerar token de conta";
+}
+
+function getModePlaceholder(mode: UserAccessTokenType) {
+  return mode === "codex" ? "Codex" : "Minha conta";
 }
 
 function formatDateTime(value: string | null) {
@@ -111,6 +133,7 @@ function TokenRow({
 }
 
 export function CodexAccessPanel() {
+  const [activeMode, setActiveMode] = useState<UserAccessTokenType>("account");
   const [tokens, setTokens] = useState<UserAccessTokenSummary[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(true);
   const [creatingToken, setCreatingToken] = useState(false);
@@ -119,11 +142,11 @@ export function CodexAccessPanel() {
   const [createdToken, setCreatedToken] = useState("");
   const [copied, setCopied] = useState(false);
 
-  async function loadTokens() {
+  async function loadTokens(mode: UserAccessTokenType = activeMode) {
     setLoadingTokens(true);
 
     try {
-      const response = await clientApi<UserAccessTokenResponse>("/user/tokens");
+      const response = await clientApi<UserAccessTokenResponse>(`/user/tokens?type=${mode}`);
       setTokens(response.tokens);
     } catch {
       toast.error("Nao foi possivel carregar seus tokens.");
@@ -133,13 +156,15 @@ export function CodexAccessPanel() {
   }
 
   useEffect(() => {
-    void loadTokens();
-  }, []);
+    void loadTokens(activeMode);
+    setCreatedToken("");
+    setCopied(false);
+  }, [activeMode]);
 
   async function handleCreateToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const label = tokenLabel.trim() || "Codex";
+    const label = tokenLabel.trim() || getModeTitle(activeMode);
 
     setCreatingToken(true);
     setCopied(false);
@@ -147,13 +172,13 @@ export function CodexAccessPanel() {
     try {
       const response = await clientApi<CreateTokenResponse>("/user/tokens", {
         method: "POST",
-        body: JSON.stringify({ label }),
+        body: JSON.stringify({ label, type: activeMode }),
       });
 
       setCreatedToken(response.token);
       setTokenLabel("");
       toast.success("Token criado.");
-      await loadTokens();
+      await loadTokens(activeMode);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel criar o token.");
     } finally {
@@ -187,13 +212,15 @@ export function CodexAccessPanel() {
       );
 
       toast.success("Token revogado.");
-      await loadTokens();
+      await loadTokens(activeMode);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel revogar o token.");
     } finally {
       setRevokingTokenId(null);
     }
   }
+
+  const currentModeMeta = TOKEN_MODES.find((mode) => mode.id === activeMode) ?? TOKEN_MODES[0];
 
   return (
     <div className="space-y-4">
@@ -202,19 +229,29 @@ export function CodexAccessPanel() {
           <div className="space-y-1">
             <h3 className="text-base font-semibold tracking-tight">Acesso Codex</h3>
             <p className="text-sm text-muted-foreground">
-              Gere um token pessoal para usar no Codex ou em outro servico.
+              Selecione um modo e gere o token para usar na API.
             </p>
           </div>
+        </div>
 
-          <Badge
-            variant="destructive"
-            className={cn(
-              "rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.22em]",
-              "border border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
-            )}
-          >
-            {buildTokenStatusText(false)}
-          </Badge>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {TOKEN_MODES.map((mode) => {
+            const active = activeMode === mode.id;
+
+            return (
+              <Button
+                key={mode.id}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveMode(mode.id)}
+                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+              >
+                <span>{mode.label}</span>
+                <span className="text-[11px] font-normal opacity-80">{mode.description}</span>
+              </Button>
+            );
+          })}
         </div>
 
         <Separator className="my-4" />
@@ -228,16 +265,22 @@ export function CodexAccessPanel() {
               <Input
                 value={tokenLabel}
                 onChange={(event) => setTokenLabel(event.target.value)}
-                placeholder="Codex"
+                placeholder={getModePlaceholder(activeMode)}
                 maxLength={80}
               />
             </label>
 
             <Button type="submit" size="lg" disabled={creatingToken}>
               {creatingToken ? <LoaderCircleIcon className="size-4 animate-spin" /> : <PlusIcon className="size-4" />}
-              Gerar token do Codex
+              {getModeButtonLabel(activeMode)}
             </Button>
           </div>
+
+          {activeMode === "codex" ? (
+            <p className="text-xs text-muted-foreground">
+              O modo Codex mantém apenas um token ativo por vez.
+            </p>
+          ) : null}
         </form>
 
         {createdToken ? (
@@ -245,7 +288,7 @@ export function CodexAccessPanel() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                  Token gerado
+                  {getModeTitle(activeMode)} gerado
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Copie agora. Este valor nao volta a ser exibido.
@@ -267,10 +310,17 @@ export function CodexAccessPanel() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold">Tokens cadastrados</h4>
-          <p className="text-xs text-muted-foreground">
-            {loadingTokens ? "Carregando..." : `${tokens.length} token(s)`}
-          </p>
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold">{currentModeMeta.label}</h4>
+            <p className="text-xs text-muted-foreground">
+              {currentModeMeta.description}
+            </p>
+          </div>
+
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadTokens()}>
+            <RefreshCwIcon className="size-3.5" />
+            Atualizar
+          </Button>
         </div>
 
         <div className="space-y-3">
@@ -289,7 +339,7 @@ export function CodexAccessPanel() {
             ))
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
-              Nenhum token pessoal foi criado ainda.
+              Nenhum token foi criado neste modo ainda.
             </div>
           )}
         </div>

@@ -4,6 +4,7 @@ import {
   createUserAccessToken,
   listUserAccessTokens,
   revokeUserAccessToken,
+  type UserAccessTokenType,
 } from "../lib/user-access-token";
 
 function getUserId(req: Request) {
@@ -16,6 +17,14 @@ type UserAccessTokenDeps = {
   revokeUserAccessToken?: typeof revokeUserAccessToken;
 };
 
+function normalizeType(value: unknown): UserAccessTokenType | null {
+  if (value === "account" || value === "codex") {
+    return value;
+  }
+
+  return null;
+}
+
 export async function listUserAccessTokensHandler(
   req: Request,
   res: Response,
@@ -27,7 +36,8 @@ export async function listUserAccessTokensHandler(
     return res.status(401).json({ message: "Missing token" });
   }
 
-  const tokens = await (deps.listUserAccessTokens ?? listUserAccessTokens)(userId);
+  const type = normalizeType(req.query?.type);
+  const tokens = await (deps.listUserAccessTokens ?? listUserAccessTokens)(userId, type ?? undefined);
   return res.json({ ok: true, tokens });
 }
 
@@ -48,9 +58,17 @@ export async function createUserAccessTokenHandler(
     return res.status(400).json({ message: "Preencha o nome do token." });
   }
 
+  const requestedType = req.body?.type;
+  const type = normalizeType(requestedType);
+
+  if (requestedType !== undefined && !type) {
+    return res.status(400).json({ message: "Tipo de token invalido." });
+  }
+
   const created = await (deps.createUserAccessToken ?? createUserAccessToken)({
     userId,
     label,
+    type: type ?? "account",
   });
 
   return res.status(201).json({
@@ -58,6 +76,7 @@ export async function createUserAccessTokenHandler(
     tokenId: created.id,
     token: created.plaintextToken,
     label,
+    type,
   });
 }
 

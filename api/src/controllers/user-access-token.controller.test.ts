@@ -35,6 +35,7 @@ describe("user access token controller", () => {
         {
           id: "token-1",
           userId: "user-1",
+          type: "account",
           label: "Meu bot",
           revokedAt: null,
           lastUsedAt: null,
@@ -50,6 +51,7 @@ describe("user access token controller", () => {
         {
           id: "token-1",
           userId: "user-1",
+          type: "account",
           label: "Meu bot",
           revokedAt: null,
           lastUsedAt: null,
@@ -60,10 +62,32 @@ describe("user access token controller", () => {
     });
   });
 
+  test("filtra tokens pelo tipo solicitado", async () => {
+    const req = {
+      user: { id: "user-1", role: "user" },
+      query: { type: "codex" },
+    } as Request;
+    const res = makeResponse();
+    let receivedType: string | undefined;
+
+    await listUserAccessTokensHandler(req, res as Response, {
+      listUserAccessTokens: async (_userId, type) => {
+        receivedType = type;
+        return [];
+      },
+    });
+
+    expect(receivedType).toBe("codex");
+    expect(res.body).toEqual({
+      ok: true,
+      tokens: [],
+    });
+  });
+
   test("cria token e retorna o valor bruto apenas uma vez", async () => {
     const req = {
       user: { id: "user-1", role: "user" },
-      body: { label: "Meu bot" },
+      body: { label: "Meu bot", type: "account" },
     } as Request;
     const res = makeResponse();
 
@@ -80,6 +104,31 @@ describe("user access token controller", () => {
       tokenId: "token-1",
       token: "uat_secret",
       label: "Meu bot",
+      type: "account",
+    });
+  });
+
+  test("cria token do codex quando o modo pede", async () => {
+    const req = {
+      user: { id: "user-1", role: "user" },
+      body: { label: "Codex", type: "codex" },
+    } as Request;
+    const res = makeResponse();
+
+    await createUserAccessTokenHandler(req, res as Response, {
+      createUserAccessToken: async () => ({
+        id: "token-1",
+        plaintextToken: "uat_secret",
+      }),
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body).toEqual({
+      ok: true,
+      tokenId: "token-1",
+      token: "uat_secret",
+      label: "Codex",
+      type: "codex",
     });
   });
 

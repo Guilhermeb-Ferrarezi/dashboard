@@ -33,13 +33,18 @@ O agente agora opera em modo estrito para dado de negocio: consultas e acoes int
 
 O backend provisiona automaticamente um token delegado de serviço para o agente. Internamente ele continua sendo resolvido a partir de `CODEX_ACCESS_TOKEN`, mas o processo `codex exec` recebe essa credencial pelos nomes `CODEX_INTERNAL_API_TOKEN`, `CODEX_INTERNAL_API_URL` e `CODEX_INTERNAL_USER_ID`, para poder consultar a API protegida em nome do usuário atual sem depender do cookie da sessao do navegador e sem conflitar com o JWT interno do proprio CLI. Chamadas internas em nome do usuário devem enviar `Authorization: Bearer $CODEX_INTERNAL_API_TOKEN` e `X-Codex-User-Id: $CODEX_INTERNAL_USER_ID`.
 
+Na tela de `Acesso Codex` existem dois modos:
+
+- `Normal`, para token de conta.
+- `Codex`, para um token único do Codex; ao gerar um novo, o anterior é revogado.
+
 Para integrações externas em nome de um usuário real, use um token pessoal de API criado pelo próprio usuário autenticado:
 
 ```bash
 curl -X POST http://localhost:4000/api/user/tokens \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $JWT_DA_SESSAO_OU_TOKEN_INTERNO" \
-  -d '{"label":"Meu servico"}'
+  -d '{"label":"Meu servico","type":"codex"}'
 ```
 
 O valor retornado em `token` é mostrado apenas uma vez. Depois disso, outros serviços podem chamar os endpoints protegidos usando:

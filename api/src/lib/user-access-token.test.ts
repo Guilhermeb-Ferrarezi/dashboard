@@ -35,6 +35,7 @@ describe("user access token service", () => {
   const originalCreate = UserAccessToken.create;
   const originalFind = UserAccessToken.find;
   const originalUpdateOne = UserAccessToken.updateOne;
+  const originalUpdateMany = UserAccessToken.updateMany;
   const originalFindOneAndUpdate = UserAccessToken.findOneAndUpdate;
   const originalFindById = User.findById;
 
@@ -42,6 +43,7 @@ describe("user access token service", () => {
     UserAccessToken.create = originalCreate;
     UserAccessToken.find = originalFind;
     UserAccessToken.updateOne = originalUpdateOne;
+    UserAccessToken.updateMany = originalUpdateMany;
     UserAccessToken.findOneAndUpdate = originalFindOneAndUpdate;
     User.findById = originalFindById;
   });
@@ -62,9 +64,43 @@ describe("user access token service", () => {
     expect(UserAccessToken.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
+        type: "account",
         label: "Meu bot",
         tokenHash: expect.any(String),
         encryptedToken: expect.any(String),
+      }),
+    );
+  });
+
+  test("revoga o codex anterior antes de criar outro token codex", async () => {
+    let revokedCount = 0;
+
+    UserAccessToken.updateMany = mock((_filter: unknown, update: Record<string, unknown>) => {
+      if (update.$set?.revokedAt) {
+        revokedCount += 1;
+      }
+
+      return Promise.resolve({ acknowledged: true, modifiedCount: 1 });
+    }) as typeof UserAccessToken.updateMany;
+
+    UserAccessToken.create = mock(async (payload: Record<string, unknown>) => ({
+      _id: "token-1",
+      ...payload,
+    })) as typeof UserAccessToken.create;
+
+    const result = await createUserAccessToken({
+      userId: "user-1",
+      label: "Codex",
+      type: "codex",
+    });
+
+    expect(revokedCount).toBe(1);
+    expect(result.id).toBe("token-1");
+    expect(UserAccessToken.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        type: "codex",
+        label: "Codex",
       }),
     );
   });
@@ -76,6 +112,7 @@ describe("user access token service", () => {
           {
             _id: "token-1",
             userId: "user-1",
+            type: "account",
             label: "Meu bot",
             tokenHash: "hashed",
             revokedAt: null,
@@ -93,6 +130,7 @@ describe("user access token service", () => {
       {
         id: "token-1",
         userId: "user-1",
+        type: "account",
         label: "Meu bot",
         revokedAt: null,
         lastUsedAt: null,
@@ -111,11 +149,12 @@ describe("user access token service", () => {
   test("autentica token pelo valor bruto e resolve o usuario", async () => {
     UserAccessToken.findOneAndUpdate = mock(() => ({
       lean: async () => ({
-        _id: "token-1",
-        userId: "user-1",
-        label: "Meu bot",
-        revokedAt: null,
-        lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
+      _id: "token-1",
+      userId: "user-1",
+      type: "account",
+      label: "Meu bot",
+      revokedAt: null,
+      lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
         createdAt: new Date("2024-01-01T00:00:00.000Z"),
         updatedAt: new Date("2024-01-03T00:00:00.000Z"),
       }),
@@ -138,6 +177,7 @@ describe("user access token service", () => {
       token: {
         id: "token-1",
         userId: "user-1",
+        type: "account",
         label: "Meu bot",
         revokedAt: null,
         lastUsedAt: "2024-01-03T00:00:00.000Z",

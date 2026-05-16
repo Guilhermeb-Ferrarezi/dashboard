@@ -198,7 +198,7 @@ export function AccountSettingsDialog({
                   : activeSection === "preferences"
                     ? "Tema, aparencia e conforto visual."
                     : activeSection === "codex"
-                      ? "Veja como o acesso do agente funciona e quando a conta compartilhada do ChatGPT precisa ser conectada."
+                      ? "Gere um token de conta ou um token do Codex."
                     : "Controle de acesso da sessao atual."}
               </DialogDescription>
             </DialogHeader>

@@ -239,6 +239,9 @@ components:
           type: string
         userId:
           type: string
+        type:
+          type: string
+          enum: [account, codex]
         label:
           type: string
         revokedAt:
@@ -265,6 +268,9 @@ components:
       properties:
         label:
           type: string
+        type:
+          type: string
+          enum: [account, codex]
     Project:
       type: object
       additionalProperties: true
@@ -700,6 +706,13 @@ paths:
         - bearerAuth: []
       x-codex-risk: low
       summary: Lista tokens pessoais de API do usuário autenticado
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [account, codex]
       responses:
         "200":
           description: Lista de tokens

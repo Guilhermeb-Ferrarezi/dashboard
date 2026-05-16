@@ -3,6 +3,7 @@ import Mongoose from "mongoose";
 
 export interface IUserAccessToken extends Mongoose.Document {
   userId: string;
+  type: "account" | "codex";
   label: string;
   tokenHash: string;
   encryptedToken?: string | null;
@@ -15,6 +16,7 @@ export interface IUserAccessToken extends Mongoose.Document {
 const UserAccessTokenSchema = new Schema<IUserAccessToken>(
   {
     userId: { type: String, required: true, index: true },
+    type: { type: String, required: true, enum: ["account", "codex"], default: "account", index: true },
     label: { type: String, required: true, trim: true },
     tokenHash: { type: String, required: true, unique: true, index: true },
     encryptedToken: { type: String, default: null, select: false },
@@ -24,7 +26,7 @@ const UserAccessTokenSchema = new Schema<IUserAccessToken>(
   { timestamps: true },
 );
 
-UserAccessTokenSchema.index({ userId: 1, revokedAt: 1 });
+UserAccessTokenSchema.index({ userId: 1, type: 1, revokedAt: 1 });
 
 export const UserAccessToken = Mongoose.model<IUserAccessToken>(
   "UserAccessToken",
