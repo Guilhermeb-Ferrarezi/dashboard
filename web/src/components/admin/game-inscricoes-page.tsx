@@ -38,6 +38,7 @@ export async function GameInscricoesPage({
       eyebrow={eyebrow}
       title={title}
       description={description}
+      fullWidth
     >
       <VctInscricoesPanel
         initialInscricoes={inscricoesRes.inscricoes}

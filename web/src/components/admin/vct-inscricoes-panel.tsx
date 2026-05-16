@@ -1978,9 +1978,9 @@ export function VctInscricoesPanel({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex min-w-0 flex-col gap-8">
       {/* ============ SEÇÃO 1: INSCRITOS ============ */}
-      <section className="flex w-full flex-col gap-3 px-4 xl:mx-[calc((100%-100vw+16rem)/2)] xl:w-[calc(100vw-16rem)] xl:px-6">
+      <section className="flex min-w-0 w-full flex-col gap-3 px-4 xl:px-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -2119,7 +2119,7 @@ export function VctInscricoesPanel({
       </section>
 
       {/* ============ SEÇÃO 2: TIMES ============ */}
-      <section className="flex flex-col gap-3">
+      <section className="flex min-w-0 flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
