@@ -4,6 +4,7 @@ import { buildTokenStatusText } from "./codex-access-panel";
 import {
   canStartCodexDeviceLogin,
   canUseCodexChat,
+  formatCodexReasoningLines,
   formatCodexErrorMessage,
   isCodexAccessBlocked,
   appendOptimisticUserEntry,
@@ -113,5 +114,14 @@ describe("codex access panel", () => {
       status: "reasoning",
       turnId: "turn-1",
     })).toBe(true);
+  });
+
+  test("resume reasoning em linhas curtas e diretas", () => {
+    expect(
+      formatCodexReasoningLines("vou validar o endpoint antes. Depois confirmo o retorno."),
+    ).toEqual([
+      "vou validar o endpoint antes.",
+      "Depois confirmo o retorno.",
+    ]);
   });
 });

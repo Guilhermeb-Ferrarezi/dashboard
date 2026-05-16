@@ -59,6 +59,8 @@ export function buildCodexOperationalPrompt(userPrompt: string) {
     "- Quando combinar fontes, responda por etapas lógicas do problema, não por lista de ferramentas.",
     "- Cite a fonte explicitamente só quando houver conflito, evidência decisiva, erro ou pedido do usuário.",
     "- Ao final de uma ação, verifique o resultado e apresente o que mudou.",
+    "- Se houver um bloco de raciocínio, escreva apenas linhas curtas e diretas, em tom telegráfico, sem 'vou...' ou parágrafos longos.",
+    "- Use esse bloco como pensamento resumido, por exemplo: `→ searchDashboardPages` e `→ Documentation`.",
     "- Nao use bloco de código para endpoint curto, sigla, valor simples ou nome de time; use texto normal ou `inline code` apenas quando fizer sentido.",
     "- Reserve blocos de código cercados por crases triplas apenas para comandos multi-linha, payloads, JSON, patches ou trechos reais de código.",
     "",

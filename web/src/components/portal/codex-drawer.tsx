@@ -138,6 +138,24 @@ export function isCodexReasoningEntry(entry: CodexTimelineEntry) {
   return entry.kind === "system" && entry.status === "reasoning";
 }
 
+export function formatCodexReasoningLines(text: string) {
+  const normalized = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const segments =
+    normalized.length > 1
+      ? normalized
+      : text
+          .replace(/\s+/g, " ")
+          .split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Ýa-zà-öø-ÿ0-9])/u)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+  return segments.map((line) => line.replace(/^[\s>*-]+/, "").trim()).filter(Boolean);
+}
+
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
   return [thread, ...list.filter((item) => item.id !== thread.id)].sort(
     (left, right) => right.updatedAt - left.updatedAt,
@@ -373,7 +391,7 @@ export function CodexDrawer({
   const [historySearch, setHistorySearch] = useState("");
   const [accessRefreshTick, setAccessRefreshTick] = useState(0);
   const [expandedCommandIds, setExpandedCommandIds] = useState<Set<string>>(() => new Set());
-  const [expandedReasoningIds, setExpandedReasoningIds] = useState<Set<string>>(() => new Set());
+  const [hiddenReasoningIds, setHiddenReasoningIds] = useState<Set<string>>(() => new Set());
   const [executionMode, setExecutionMode] = useState<string | null>(null);
 
   const connected = Boolean(account?.connected);
@@ -448,7 +466,7 @@ export function CodexDrawer({
   }
 
   function toggleReasoningDetails(entryId: string) {
-    setExpandedReasoningIds((current) => {
+    setHiddenReasoningIds((current) => {
       const next = new Set(current);
 
       if (next.has(entryId)) {
@@ -1097,27 +1115,38 @@ export function CodexDrawer({
               }
 
               if (isCodexReasoningEntry(entry)) {
-                const expanded = expandedReasoningIds.has(entry.id);
+                const hidden = hiddenReasoningIds.has(entry.id);
+                const reasoningLines = formatCodexReasoningLines(entry.text);
 
                 return (
                   <div key={entry.id} className="rounded-xl border border-border/60 bg-card/40 px-3 py-2">
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 text-left"
-                      onClick={() => toggleReasoningDetails(entry.id)}
-                      aria-expanded={expanded}
-                    >
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CaretDown className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
-                        <span>Pensamento</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        <CaretDown className={cn("size-3 shrink-0 transition-transform", hidden && "-rotate-90")} />
+                        <span>thinking</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">Expandir</span>
-                    </button>
-                    {expanded ? (
-                      <div className="mt-2 px-0.5">
-                        <CodexMarkdown tone="muted" className="text-sm leading-7">
-                          {entry.text}
-                        </CodexMarkdown>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        onClick={() => toggleReasoningDetails(entry.id)}
+                        aria-expanded={!hidden}
+                      >
+                        {hidden ? "show thinking" : "hide thinking"}
+                      </button>
+                    </div>
+                    {!hidden ? (
+                      <div className="mt-2 space-y-1 rounded-lg border border-border/50 bg-background/70 px-2.5 py-2 font-mono text-[11px] leading-5 text-foreground">
+                        {reasoningLines.length > 0 ? reasoningLines.map((line, index) => (
+                          <div key={`${entry.id}:reasoning:${index}`} className="flex gap-2">
+                            <span className="shrink-0 text-muted-foreground">→</span>
+                            <span className="min-w-0 break-words">{line}</span>
+                          </div>
+                        )) : (
+                          <div className="flex gap-2">
+                            <span className="shrink-0 text-muted-foreground">→</span>
+                            <span className="min-w-0 break-words">Pensamento em andamento.</span>
+                          </div>
+                        )}
                       </div>
                     ) : null}
                   </div>
