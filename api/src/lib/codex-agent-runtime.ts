@@ -4,6 +4,16 @@ import { listCodexRuntimeTools } from "./codex-tool-runtime";
 
 export type CodexAgentExecutionMode = "workspace-write" | "exec";
 
+export type CodexOperationalPromptContext = {
+  user: {
+    id: string;
+    username: string;
+    email: string | null | undefined;
+    role: "user" | "admin";
+  };
+  pathname?: string | null;
+};
+
 export function buildCodexAgentRuntimeState(
   workspaceRoot: string,
   executionMode: CodexAgentExecutionMode,
@@ -19,13 +29,28 @@ export function shouldRequestCodexConfirmation(prompt: string) {
   return classifyCodexPrompt(prompt);
 }
 
-export function buildCodexOperationalPrompt(userPrompt: string) {
+export function buildCodexOperationalPrompt(
+  userPrompt: string,
+  context?: CodexOperationalPromptContext,
+) {
   const tools = listCodexRuntimeTools()
     .map((tool) => `- ${tool.id}: ${JSON.stringify(tool.parameters)}`)
     .join("\n");
 
+  const contextLines = context
+    ? [
+        `- Conta atual: ${context.user.username}${context.user.email ? ` (${context.user.email})` : ""}`,
+        `- User ID: ${context.user.id}`,
+        `- Perfil: ${context.user.role}`,
+        ...(context.pathname ? [`- Rota atual: ${context.pathname}`] : []),
+      ]
+    : [];
+
   return [
     "Você é o agente operacional do Santos Tech Home.",
+    "Contexto disponível:",
+    ...contextLines,
+    contextLines.length ? "" : "- Sem contexto adicional de conta ou rota.",
     "",
     "Regras de seleção de fonte:",
     "- Priorize precisão, depois completude, e use velocidade só como desempate.",

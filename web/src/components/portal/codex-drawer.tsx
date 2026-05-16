@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   ArrowsOutSimple,
   ArrowUp,
@@ -399,6 +400,7 @@ export function CodexDrawer({
   const [expandedCommandIds, setExpandedCommandIds] = useState<Set<string>>(() => new Set());
   const [hiddenReasoningIds, setHiddenReasoningIds] = useState<Set<string>>(() => new Set());
   const [executionMode, setExecutionMode] = useState<string | null>(null);
+  const pathname = usePathname();
 
   const connected = Boolean(account?.connected);
   const accessBlocked = isCodexAccessBlocked(account);
@@ -814,6 +816,7 @@ export function CodexDrawer({
         type: "sendPrompt",
         threadId: currentThread?.id ?? null,
         prompt,
+        context: { pathname },
       }),
     );
   }

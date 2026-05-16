@@ -146,7 +146,12 @@ type CodexSocketIncomingMessage =
   | { type: "startDeviceLogin" }
   | { type: "cancelDeviceLogin"; loginId: string }
   | { type: "loadThread"; threadId: string }
-  | { type: "sendPrompt"; threadId?: string | null; prompt: string }
+  | {
+      type: "sendPrompt";
+      threadId?: string | null;
+      prompt: string;
+      context?: { pathname?: string | null };
+    }
   | { type: "confirmPrompt"; requestId: string; accepted: boolean }
   | { type: "interrupt"; threadId: string; turnId: string };
 
@@ -1585,6 +1590,7 @@ export function attachCodexGateway(server: HttpServer) {
         {
           threadId: string | null;
           prompt: string;
+          context?: { pathname?: string | null };
         }
       >();
 
@@ -1683,7 +1689,15 @@ export function attachCodexGateway(server: HttpServer) {
                 cwd: resolveWorkspaceRoot(),
                 threadId,
                 delegatedUserId: user.id,
-                prompt: buildCodexOperationalPrompt(prompt),
+                prompt: buildCodexOperationalPrompt(prompt, {
+                  user: {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email ?? null,
+                    role: user.role,
+                  },
+                  pathname: payload.context?.pathname ?? null,
+                }),
                 onJsonLine: (event) => {
                   if (event.type === "thread.started") {
                     const rawThreadId = (event as { thread_id?: unknown }).thread_id;
@@ -1860,6 +1874,7 @@ export function attachCodexGateway(server: HttpServer) {
                   type: "sendPrompt",
                   threadId: pending.threadId,
                   prompt: pending.prompt,
+                  context: pending.context ?? undefined,
                 })),
               );
               break;
@@ -1949,12 +1964,25 @@ export function attachCodexGateway(server: HttpServer) {
       {
         threadId: string | null;
         prompt: string;
+        context?: { pathname?: string | null };
       }
     >();
 
-    async function executePrompt(threadIdInput: string | null, prompt: string) {
+    async function executePrompt(
+      threadIdInput: string | null,
+      prompt: string,
+      context?: { pathname?: string | null },
+    ) {
       let threadId = threadIdInput?.trim() || null;
-      const operationalPrompt = buildCodexOperationalPrompt(prompt);
+      const operationalPrompt = buildCodexOperationalPrompt(prompt, {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email ?? null,
+          role: user.role,
+        },
+        pathname: context?.pathname ?? null,
+      });
 
       if (threadId) {
         await ensureOwnedThread(user.id, threadId);
@@ -2325,7 +2353,7 @@ export function attachCodexGateway(server: HttpServer) {
               throw new Error("Prompt vazio.");
             }
 
-            await executePrompt(payload.threadId?.trim() || null, prompt);
+            await executePrompt(payload.threadId?.trim() || null, prompt, payload.context);
             break;
           }
           case "confirmPrompt": {
@@ -2356,7 +2384,7 @@ export function attachCodexGateway(server: HttpServer) {
               accepted: true,
             });
 
-            await executePrompt(pending.threadId, pending.prompt);
+            await executePrompt(pending.threadId, pending.prompt, pending.context);
             break;
           }
           case "interrupt": {
