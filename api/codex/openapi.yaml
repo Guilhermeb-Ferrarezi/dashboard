@@ -3,9 +3,10 @@ info:
   title: Santos Tech Home API
   version: 1.0.0
   description: >
-    Minimal OpenAPI surface for the Codex container. The live Codex chat also
-    uses a websocket endpoint that is documented in the codebase, but this file
-    focuses on the HTTP endpoints the agent should call directly.
+    Contrato HTTP completo para o agente Codex operar o Santos Tech Home.
+    Todas as rotas montadas em api/src/server.ts e api/src/routes estão
+    documentadas aqui. O agente deve validar path, método, payload e risco
+    por esta especificação antes de executar chamadas internas.
 servers:
   - url: http://127.0.0.1:4000/api
 components:
@@ -21,22 +22,296 @@ components:
       required: true
       schema:
         type: string
+    ToolId:
+      name: toolId
+      in: path
+      required: true
+      schema:
+        type: string
     TokenId:
       name: tokenId
       in: path
       required: true
       schema:
         type: string
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    TeamNumber:
+      name: numero
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
     ModalidadeQuery:
       name: modalidade
       in: query
       required: false
       schema:
+        $ref: "#/components/schemas/Modalidade"
+    ProjectIdQuery:
+      name: projectId
+      in: query
+      required: true
+      schema:
         type: string
-        enum: [valorant, counter-strike, lol]
+    SearchQuery:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+    MethodQuery:
+      name: method
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [GET, POST, PUT, PATCH, DELETE, SYSTEM]
+    FromQuery:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    ToQuery:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    PageQuery:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
   schemas:
+    Modalidade:
+      type: string
+      enum: [valorant, counter-strike, lol]
+    OkResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+    UserRole:
+      type: string
+      enum: [user, admin]
+    ThemeMode:
+      type: string
+      enum: [light, dark, system]
+    ThemePreferences:
+      type: object
+      additionalProperties: true
+      properties:
+        theme:
+          $ref: "#/components/schemas/ThemeMode"
+        mode:
+          $ref: "#/components/schemas/ThemeMode"
+        accentColor:
+          type: string
+        radius:
+          type: string
+        density:
+          type: string
+    User:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          nullable: true
+        role:
+          $ref: "#/components/schemas/UserRole"
+        preferences:
+          $ref: "#/components/schemas/ThemePreferences"
+        createdAt:
+          type: string
+          nullable: true
+    LoginRequest:
+      type: object
+      required: [password]
+      properties:
+        identifier:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+    CreateUserRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+    UpdateProfileRequest:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+    UpdatePreferencesRequest:
+      type: object
+      additionalProperties: true
+      properties:
+        preferences:
+          $ref: "#/components/schemas/ThemePreferences"
+        theme:
+          $ref: "#/components/schemas/ThemeMode"
+    AdminAccessTokenSummary:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        revokedAt:
+          type: string
+          nullable: true
+        lastUsedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+    CreateAdminTokenRequest:
+      type: object
+      required: [type, label]
+      properties:
+        type:
+          type: string
+          enum: [codex]
+        label:
+          type: string
+    Project:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        category:
+          type: string
+        audience:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        icon:
+          type: string
+        status:
+          type: string
+        ssoMode:
+          type: string
+        featured:
+          type: boolean
+    LogProject:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        apiKey:
+          type: string
+        collectionName:
+          type: string
+        totalLogs:
+          type: integer
+    CreateLogProjectRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+    LogEntry:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        status:
+          type: integer
+        method:
+          type: string
+        endpoint:
+          type: string
+        url:
+          type: string
+        ip:
+          type: string
+        durationMs:
+          type: integer
+        createdAt:
+          type: string
+        requestPayload:
+          nullable: true
+        responsePayload:
+          nullable: true
     CodexAccountStatus:
       type: object
+      additionalProperties: true
       properties:
         connected:
           type: boolean
@@ -63,6 +338,7 @@ components:
           nullable: true
     CodexThreadSummary:
       type: object
+      additionalProperties: true
       properties:
         id:
           type: string
@@ -79,23 +355,9 @@ components:
         lastOpenedAt:
           type: string
           nullable: true
-    AdminAccessTokenSummary:
-      type: object
-      properties:
-        id:
-          type: string
-        label:
-          type: string
-        type:
-          type: string
-        revokedAt:
-          type: string
-          nullable: true
-        lastUsedAt:
-          type: string
-          nullable: true
     CodexRuntimeTool:
       type: object
+      additionalProperties: true
       properties:
         id:
           type: string
@@ -107,14 +369,96 @@ components:
           type: string
         requiresConfirmation:
           type: boolean
-    VctInscricaoSummary:
+    RunCodexToolRequest:
+      type: object
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+        confirmed:
+          type: boolean
+    SsoStartResponse:
+      type: object
+      additionalProperties: true
+      properties:
+        code:
+          type: string
+        expiresIn:
+          type: integer
+        redirectUrl:
+          type: string
+    SsoExchangeRequest:
+      type: object
+      required: [projectId, code]
+      properties:
+        projectId:
+          type: string
+        code:
+          type: string
+    RiotLookupRequest:
+      type: object
+      required: [riotId]
+      properties:
+        riotId:
+          type: string
+          example: Jogador#BR1
+    VctInscricaoPayload:
+      type: object
+      additionalProperties: true
+      required:
+        - nome
+        - nick
+        - email
+        - whatsapp
+        - elo
+        - pico
+        - funcaoPrimaria
+        - funcaoSecundaria
+      properties:
+        modalidade:
+          $ref: "#/components/schemas/Modalidade"
+        nome:
+          type: string
+        nick:
+          type: string
+        email:
+          type: string
+        whatsapp:
+          type: string
+        instagram:
+          type: string
+        cidade:
+          type: string
+        elo:
+          type: string
+        pico:
+          type: string
+        funcaoPrimaria:
+          type: string
+        funcaoSecundaria:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        time:
+          type: integer
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        observacoes:
+          type: string
+        highlightColor:
+          type: string
+    VctInscricao:
       type: object
       additionalProperties: true
       properties:
         _id:
           type: string
         modalidade:
-          type: string
+          $ref: "#/components/schemas/Modalidade"
         nome:
           type: string
         nick:
@@ -134,58 +478,46 @@ components:
           type: string
         updatedAt:
           type: string
-    VctTimeSummary:
+    VctTime:
       type: object
       additionalProperties: true
       properties:
         _id:
           type: string
         modalidade:
-          type: string
+          $ref: "#/components/schemas/Modalidade"
         numero:
           type: integer
         nome:
           type: string
-        createdAt:
+    VctFormationFilters:
+      type: object
+      additionalProperties: true
+      properties:
+        sameTrainingDays:
+          type: boolean
+        sameAvailability:
+          type: boolean
+    VctFormacaoPayload:
+      type: object
+      additionalProperties: true
+      properties:
+        modalidade:
+          $ref: "#/components/schemas/Modalidade"
+        payload:
           type: string
-        updatedAt:
+          description: JSON string com time, capitao e jogadores. Usado em multipart/form-data.
+        logo:
           type: string
-    VctFormacaoMember:
+          format: binary
+    VctFormacao:
       type: object
       additionalProperties: true
       properties:
         _id:
           type: string
         modalidade:
-          type: string
-        formacaoTimeId:
-          type: string
-        ordem:
-          type: integer
-        papel:
-          type: string
-        nome:
-          type: string
-        email:
-          type: string
-        instagram:
-          type: string
-        whatsapp:
-          type: string
-        nick:
-          type: string
-        eloAtual:
-          type: string
-        peakRanking:
-          type: string
-    VctFormacaoSummary:
-      type: object
-      additionalProperties: true
-      properties:
-        _id:
-          type: string
-        modalidade:
-          type: string
+          $ref: "#/components/schemas/Modalidade"
         nome:
           type: string
         tag:
@@ -199,20 +531,371 @@ components:
         membros:
           type: array
           items:
-            $ref: "#/components/schemas/VctFormacaoMember"
-        createdAt:
-          type: string
-        updatedAt:
-          type: string
+            type: object
+            additionalProperties: true
+  responses:
+    Unauthorized:
+      description: Token ausente ou inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Permissão insuficiente
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Payload inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 paths:
+  /:
+    get:
+      x-codex-risk: low
+      summary: Health check do backend
+      responses:
+        "200":
+          description: Backend ativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /auth/login:
+    post:
+      x-codex-risk: low
+      summary: Realiza login e grava cookie auth_token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login realizado
+  /auth/logout:
+    post:
+      x-codex-risk: low
+      summary: Remove o cookie auth_token
+      responses:
+        "200":
+          description: Logout realizado
+  /auth/register:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria usuário e credencial de acesso.
+      summary: Cria usuário pelo fluxo legado de auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Usuário criado
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /user/me:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lê o usuário autenticado
+      responses:
+        "200":
+          description: Usuário atual
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/User"
+  /user/profile:
+    put:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Altera nome ou email da conta autenticada.
+      summary: Atualiza perfil do usuário autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Perfil atualizado
+  /user/preferences:
+    put:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Atualiza preferências visuais e tema do usuário autenticado
+      description: Operação de baixo risco; pode ser usada para mudar tema sem confirmação extra.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesRequest"
+      responses:
+        "200":
+          description: Preferências atualizadas
+  /user:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Área do usuário autenticado
+      responses:
+        "200":
+          description: Usuário autorizado
+  /admin:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Área administrativa
+      responses:
+        "200":
+          description: Admin autorizado
+  /admin/users:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lista usuários do portal
+      responses:
+        "200":
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria uma nova conta no portal.
+      summary: Cria usuário pelo painel admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Usuário criado
+  /admin/tokens:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lista tokens administrativos
+      responses:
+        "200":
+          description: Lista de tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminAccessTokenSummary"
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: high
+      x-codex-risk-reasons:
+        - Cria credencial administrativa reutilizável.
+        - O token plaintext só é exibido uma vez.
+      summary: Cria token administrativo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminTokenRequest"
+      responses:
+        "201":
+          description: Token criado
+  /admin/tokens/{tokenId}/revoke:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: high
+      x-codex-risk-reasons:
+        - Revoga uma credencial administrativa.
+      summary: Revoga token administrativo
+      parameters:
+        - $ref: "#/components/parameters/TokenId"
+      responses:
+        "200":
+          description: Token revogado
+  /projects:
+    get:
+      x-codex-risk: low
+      summary: Lista projetos do portal
+      responses:
+        "200":
+          description: Projetos disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Project"
+  /logs/projects:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lista projetos/collections de logs
+      responses:
+        "200":
+          description: Projetos de logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LogProject"
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria collection e API key para um novo projeto de logs.
+      summary: Cria projeto de logs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLogProjectRequest"
+      responses:
+        "201":
+          description: Projeto de logs criado
+  /logs:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lista logs de uma collection
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdQuery"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/MethodQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+        - $ref: "#/components/parameters/PageQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+      responses:
+        "200":
+          description: Logs paginados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LogEntry"
+                  page:
+                    type: integer
+                  total:
+                    type: integer
+                  totalPages:
+                    type: integer
+  /sso/{projectId}/start:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Inicia SSO shared-ticket para um projeto
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Código SSO criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SsoStartResponse"
+  /sso/exchange:
+    post:
+      x-codex-risk: low
+      summary: Troca código SSO por usuário usando x-sso-shared-secret
+      parameters:
+        - name: x-sso-shared-secret
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SsoExchangeRequest"
+      responses:
+        "200":
+          description: Usuário do SSO
+  /valorant-account/lookup:
+    post:
+      x-codex-risk: low
+      summary: Consulta Riot ID via proxy externo público
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiotLookupRequest"
+      responses:
+        "200":
+          description: Dados da conta Valorant
   /codex/account:
     get:
       security:
         - bearerAuth: []
-      summary: Read Codex account status
+      x-codex-risk: low
+      summary: Lê status da conta Codex
       responses:
         "200":
-          description: Codex account status
+          description: Status Codex
           content:
             application/json:
               schema:
@@ -226,37 +909,22 @@ paths:
     post:
       security:
         - bearerAuth: []
-      summary: Logout the Codex session
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Desconecta a conta Codex ativa.
+      summary: Desconecta conta Codex
       responses:
         "200":
-          description: Logout result
-  /codex/threads:
-    get:
-      security:
-        - bearerAuth: []
-      summary: List Codex threads
-      responses:
-        "200":
-          description: Thread list
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  threads:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CodexThreadSummary"
+          description: Conta desconectada
   /codex/tools:
     get:
       security:
         - bearerAuth: []
-      summary: List fixed Codex runtime tools
+      x-codex-risk: low
+      summary: Lista ferramentas runtime do Codex
       responses:
         "200":
-          description: Tool list
+          description: Ferramentas disponíveis
           content:
             application/json:
               schema:
@@ -272,45 +940,30 @@ paths:
     post:
       security:
         - bearerAuth: []
-      summary: Run a fixed Codex runtime tool
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Executa ferramenta operacional do Codex; a própria ferramenta pode exigir confirmação adicional.
+      summary: Executa ferramenta runtime do Codex
       parameters:
-        - name: toolId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ToolId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                params:
-                  type: object
-                confirmed:
-                  type: boolean
+              $ref: "#/components/schemas/RunCodexToolRequest"
       responses:
         "200":
-          description: Tool run result
-  /codex/threads/{threadId}:
+          description: Resultado da ferramenta
+  /codex/threads:
     get:
       security:
         - bearerAuth: []
-      summary: Read a Codex thread
-      parameters:
-        - $ref: "#/components/parameters/ThreadId"
+      x-codex-risk: low
+      summary: Lista threads Codex
       responses:
         "200":
-          description: Thread detail
-  /admin/tokens:
-    get:
-      security:
-        - bearerAuth: []
-      summary: List admin access tokens
-      responses:
-        "200":
-          description: Token list
+          description: Threads Codex
           content:
             application/json:
               schema:
@@ -318,37 +971,47 @@ paths:
                 properties:
                   ok:
                     type: boolean
-                  tokens:
+                  threads:
                     type: array
                     items:
-                      $ref: "#/components/schemas/AdminAccessTokenSummary"
-    post:
+                      $ref: "#/components/schemas/CodexThreadSummary"
+  /codex/threads/{threadId}:
+    get:
       security:
         - bearerAuth: []
-      summary: Create an admin access token
-      responses:
-        "200":
-          description: Created token
-  /admin/tokens/{tokenId}/revoke:
-    post:
-      security:
-        - bearerAuth: []
-      summary: Revoke an admin access token
+      x-codex-risk: low
+      summary: Lê timeline de uma thread Codex
       parameters:
-        - $ref: "#/components/parameters/TokenId"
+        - $ref: "#/components/parameters/ThreadId"
       responses:
         "200":
-          description: Revocation result
+          description: Detalhe da thread
+  /vct/inscricao:
+    post:
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria inscrição pública em campeonato.
+      summary: Cria inscrição VCT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VctInscricaoPayload"
+      responses:
+        "201":
+          description: Inscrição criada
   /vct/inscricoes:
     get:
       security:
         - bearerAuth: []
-      summary: List VCT registrations
+      x-codex-risk: low
+      summary: Lista inscrições VCT
       parameters:
         - $ref: "#/components/parameters/ModalidadeQuery"
       responses:
         "200":
-          description: Registration list
+          description: Inscrições
           content:
             application/json:
               schema:
@@ -359,17 +1022,139 @@ paths:
                   inscricoes:
                     type: array
                     items:
-                      $ref: "#/components/schemas/VctInscricaoSummary"
+                      $ref: "#/components/schemas/VctInscricao"
+  /vct/inscricao/{id}:
+    put:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Altera dados pessoais e competitivos de uma inscrição.
+      summary: Atualiza inscrição VCT
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VctInscricaoPayload"
+      responses:
+        "200":
+          description: Inscrição atualizada
+    delete:
+      security:
+        - bearerAuth: []
+      x-codex-risk: high
+      x-codex-risk-reasons:
+        - Remove permanentemente uma inscrição.
+      summary: Remove inscrição VCT
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Inscrição removida
+  /vct/inscricao/{id}/status:
+    patch:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Ativa ou inativa inscrição; ao inativar remove time.
+      summary: Atualiza status de uma inscrição
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [active, inactive]
+      responses:
+        "200":
+          description: Status atualizado
+  /vct/inscricao/{id}/time:
+    patch:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Move participante entre times.
+      summary: Atualiza time de uma inscrição
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [time]
+              properties:
+                time:
+                  type: integer
+                  nullable: true
+                  minimum: 1
+      responses:
+        "200":
+          description: Time atualizado
+  /vct/inscricoes/status:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Altera status de múltiplas inscrições.
+      summary: Atualiza status em lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                status:
+                  type: string
+                  enum: [active, inactive]
+      responses:
+        "200":
+          description: Status em lote atualizado
+  /vct/valorant-account/lookup:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Consulta Riot ID via HenrikDev para admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiotLookupRequest"
+      responses:
+        "200":
+          description: Dados da conta Valorant
   /vct/times:
     get:
       security:
         - bearerAuth: []
-      summary: List VCT teams
+      x-codex-risk: low
+      summary: Lista times VCT
       parameters:
         - $ref: "#/components/parameters/ModalidadeQuery"
       responses:
         "200":
-          description: Team list
+          description: Times
           content:
             application/json:
               schema:
@@ -380,17 +1165,107 @@ paths:
                   times:
                     type: array
                     items:
-                      $ref: "#/components/schemas/VctTimeSummary"
+                      $ref: "#/components/schemas/VctTime"
+  /vct/time/{numero}:
+    put:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria ou renomeia time.
+      summary: Atualiza nome de um time
+      parameters:
+        - $ref: "#/components/parameters/TeamNumber"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nome]
+              properties:
+                modalidade:
+                  $ref: "#/components/schemas/Modalidade"
+                nome:
+                  type: string
+      responses:
+        "200":
+          description: Time atualizado
+    delete:
+      security:
+        - bearerAuth: []
+      x-codex-risk: high
+      x-codex-risk-reasons:
+        - Remove time vazio permanentemente.
+      summary: Remove um time vazio
+      parameters:
+        - $ref: "#/components/parameters/TeamNumber"
+        - $ref: "#/components/parameters/ModalidadeQuery"
+      responses:
+        "200":
+          description: Time removido
+  /vct/times/{numero}/fill:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Atribui participantes automaticamente a um time.
+      summary: Preenche vagas de um time
+      parameters:
+        - $ref: "#/components/parameters/TeamNumber"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VctFormationFilters"
+      responses:
+        "200":
+          description: Time preenchido
+  /vct/times/{numero}/clear:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Remove todos os participantes de um time.
+      summary: Limpa um time
+      parameters:
+        - $ref: "#/components/parameters/TeamNumber"
+      responses:
+        "200":
+          description: Time limpo
+  /vct/times/auto:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Distribui participantes automaticamente entre times.
+      summary: Atribui times automaticamente
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                $ref: "#/components/schemas/VctFormationFilters"
+      responses:
+        "200":
+          description: Atribuição automática concluída
   /vct/formacoes:
     get:
       security:
         - bearerAuth: []
-      summary: List VCT formations
+      x-codex-risk: low
+      summary: Lista formações VCT
       parameters:
         - $ref: "#/components/parameters/ModalidadeQuery"
       responses:
         "200":
-          description: Formation list
+          description: Formações
           content:
             application/json:
               schema:
@@ -401,4 +1276,50 @@ paths:
                   formacoes:
                     type: array
                     items:
-                      $ref: "#/components/schemas/VctFormacaoSummary"
+                      $ref: "#/components/schemas/VctFormacao"
+    post:
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria formação pública com jogadores e logo.
+      summary: Cria formação VCT
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/VctFormacaoPayload"
+      responses:
+        "201":
+          description: Formação criada
+  /vct/formacoes/{id}:
+    put:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Substitui dados, jogadores e possivelmente logo da formação.
+      summary: Atualiza formação VCT
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/VctFormacaoPayload"
+      responses:
+        "200":
+          description: Formação atualizada
+    delete:
+      security:
+        - bearerAuth: []
+      x-codex-risk: high
+      x-codex-risk-reasons:
+        - Remove formação, jogadores vinculados e logo.
+      summary: Remove formação VCT
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - $ref: "#/components/parameters/ModalidadeQuery"
+      responses:
+        "200":
+          description: Formação removida

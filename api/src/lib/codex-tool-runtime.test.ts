@@ -9,6 +9,8 @@ import {
   runCodexRuntimeTool,
 } from "./codex-tool-runtime";
 
+type FetchInput = Parameters<typeof fetch>[0];
+
 function createWorkspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-tools-"));
   fs.mkdirSync(path.join(root, "api", "codex"), { recursive: true });
@@ -21,7 +23,22 @@ function createWorkspace() {
       "      summary: Read Codex account status",
       "  /admin/tokens:",
       "    post:",
+      "      x-codex-risk: elevated",
+      "      x-codex-risk-reasons:",
+      "        - Cria credencial administrativa.",
       "      summary: Create admin access token",
+      "  /user/preferences:",
+      "    put:",
+      "      x-codex-risk: low",
+      "      summary: Update current user preferences",
+      "  /vct/inscricao/{id}:",
+      "    put:",
+      "      x-codex-risk: elevated",
+      "      summary: Update VCT registration",
+      "  /vct/inscricao/{id}/status:",
+      "    patch:",
+      "      x-codex-risk: elevated",
+      "      summary: Update VCT registration status",
       "  /vct/inscricoes:",
       "    get:",
       "      summary: List VCT registrations",
@@ -73,7 +90,7 @@ describe("codex tool runtime", () => {
     const fetchCalls: string[] = [];
     const originalFetch = globalThis.fetch;
 
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    globalThis.fetch = (async (input: FetchInput) => {
       fetchCalls.push(String(input));
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -89,10 +106,63 @@ describe("codex tool runtime", () => {
       );
 
       expect(result.ok).toBe(false);
-      expect(result.summary).toContain("nao esta documentado no OpenAPI");
+      expect(result.summary).toContain("nao esta documentada no OpenAPI");
       expect(fetchCalls).toHaveLength(0);
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("bloqueia método interno fora do OpenAPI mesmo quando o path existe", async () => {
+    const result = await runCodexRuntimeTool(
+      "execute_internal_api",
+      { method: "DELETE", path: "/vct/inscricoes" },
+      { workspaceRoot: createWorkspace(), confirmed: false },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.summary).toContain("DELETE /vct/inscricoes");
+    expect(result.requiresConfirmation).toBe(false);
+  });
+
+  test("aceita paths parametrizados documentados e usa risco da operação", async () => {
+    const result = await runCodexRuntimeTool(
+      "execute_internal_api",
+      { method: "PATCH", path: "/vct/inscricao/abc123/status", body: { status: "inactive" } },
+      { workspaceRoot: createWorkspace(), confirmed: false },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.requiresConfirmation).toBe(true);
+    expect(result.summary).toContain("risco elevated");
+  });
+
+  test("executa escrita de baixo risco sem confirmação quando OpenAPI permite", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalToken = process.env.CODEX_ACCESS_TOKEN;
+
+    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
+
+    globalThis.fetch = (async (_input: FetchInput, init?: RequestInit) => {
+      expect(init?.method).toBe("PUT");
+      return new Response(JSON.stringify({ ok: true, preferences: { theme: "dark" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const result = await runCodexRuntimeTool(
+        "execute_internal_api",
+        { method: "PUT", path: "/user/preferences", body: { theme: "dark" } },
+        { workspaceRoot: createWorkspace(), confirmed: false },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.requiresConfirmation).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      process.env.CODEX_ACCESS_TOKEN = originalToken;
     }
   });
 
@@ -102,7 +172,7 @@ describe("codex tool runtime", () => {
 
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
 
-    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (_input: FetchInput, init?: RequestInit) => {
       expect(init?.headers).toBeDefined();
       const headers = new Headers(init?.headers);
       expect(headers.get("authorization")).toBe("Bearer codex_service_token");

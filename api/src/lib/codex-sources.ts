@@ -191,6 +191,7 @@ export function buildCodexAgentCapabilities(workspaceRoot: string, executionMode
       "Mostre fonte explicitamente quando houver conflito, evidência decisiva ou pedido do usuário.",
       "Oculte detalhes de fonte quando todas reforçam a mesma conclusão.",
       "Nao use shell ou acesso indireto a banco como fonte primaria de dado de negocio.",
+      "Use o risco documentado no OpenAPI para decidir confirmação de chamada interna.",
     ],
     suggestOnlyRules: [
       "Pare na sugestão quando a ação estiver fora das ferramentas disponíveis.",

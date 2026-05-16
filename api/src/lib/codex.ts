@@ -14,7 +14,6 @@ import { type ICodexThreadSession, CodexThreadSession } from "../models/CodexThr
 import {
   buildCodexAgentRuntimeState,
   buildCodexOperationalPrompt,
-  shouldRequestCodexConfirmation,
 } from "./codex-agent-runtime";
 import { resolveCodexAccessState } from "./codex-access";
 import { resolveCodexServiceToken } from "./codex-service-token";
@@ -1581,7 +1580,6 @@ export function attachCodexGateway(server: HttpServer) {
           prompt: string;
         }
       >();
-      const confirmedPrompts = new Set<string>();
 
       browserSocket.on("error", (error) => {
         console.error("[codex-browser-socket] erro:", error);
@@ -1665,26 +1663,6 @@ export function attachCodexGateway(server: HttpServer) {
               }
 
               let threadId = payload.threadId?.trim() || null;
-              const confirmationKey = `${threadId ?? "new"}:${prompt}`;
-              const alreadyConfirmed = confirmedPrompts.delete(confirmationKey);
-              const classification = shouldRequestCodexConfirmation(prompt);
-
-              if (classification.requiresConfirmation && !alreadyConfirmed) {
-                const requestId = `prompt-confirmation:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-                pendingConfirmations.set(requestId, {
-                  threadId,
-                  prompt,
-                });
-
-                sendBrowserEvent(browserSocket, {
-                  type: "confirmationRequested",
-                  requestId,
-                  prompt,
-                  riskLevel: classification.riskLevel,
-                  reasons: classification.reasons,
-                });
-                break;
-              }
 
               if (threadId) {
                 await ensureOwnedThread(user.id, threadId);
@@ -1867,8 +1845,6 @@ export function attachCodexGateway(server: HttpServer) {
                 requestId: payload.requestId,
                 accepted: true,
               });
-
-              confirmedPrompts.add(`${pending.threadId ?? "new"}:${pending.prompt}`);
 
               browserSocket.emit(
                 "message",
@@ -2339,25 +2315,6 @@ export function attachCodexGateway(server: HttpServer) {
 
             if (!prompt) {
               throw new Error("Prompt vazio.");
-            }
-
-            const classification = shouldRequestCodexConfirmation(prompt);
-
-            if (classification.requiresConfirmation) {
-              const requestId = `prompt-confirmation:${Date.now()}:${Math.random().toString(16).slice(2)}`;
-              pendingConfirmations.set(requestId, {
-                threadId: payload.threadId?.trim() || null,
-                prompt,
-              });
-
-              sendBrowserEvent(browserSocket, {
-                type: "confirmationRequested",
-                requestId,
-                prompt,
-                riskLevel: classification.riskLevel,
-                reasons: classification.reasons,
-              });
-              break;
             }
 
             await executePrompt(payload.threadId?.trim() || null, prompt);

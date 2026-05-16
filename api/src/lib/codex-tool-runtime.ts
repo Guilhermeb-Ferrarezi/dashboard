@@ -44,6 +44,15 @@ export type CodexNormalizedApiError = {
   nextStep: string;
 };
 
+type CodexOperationRiskLevel = "low" | "elevated" | "high";
+
+type DocumentedOpenApiOperation = {
+  template: string;
+  method: string;
+  riskLevel: CodexOperationRiskLevel;
+  reasons: string[];
+};
+
 const TOOL_DEFINITIONS: CodexRuntimeTool[] = [
   {
     id: "search_openapi_spec",
@@ -78,9 +87,9 @@ const TOOL_DEFINITIONS: CodexRuntimeTool[] = [
   {
     id: "execute_internal_api",
     label: "Executar API interna",
-    description: "Executa uma chamada HTTP na API interna do Home com validação de método e erro normalizado.",
+    description: "Executa uma chamada HTTP na API interna do Home com validação de método, risco OpenAPI e erro normalizado.",
     kind: "write",
-    requiresConfirmation: true,
+    requiresConfirmation: false,
     parameters: {
       type: "object",
       required: ["method", "path"],
@@ -222,23 +231,109 @@ function readMaxResults(value: unknown) {
 }
 
 function normalizeOpenApiPath(value: string) {
-  const [pathname] = value.split("?");
+  const pathname = value.split("?")[0] ?? "";
   const normalized = pathname.replace(/\/+$/u, "");
   return normalized || "/";
 }
 
-async function readDocumentedOpenApiPaths(workspaceRoot: string) {
-  const file = path.join(workspaceRoot, "api", "codex", "openapi.yaml");
-  const content = await fs.readFile(file, "utf8").catch(() => "");
-  const paths = new Set<string>();
-  const section = content.match(/(^|\n)paths:\n([\s\S]*?)(\n[a-zA-Z][^:\n]*:|\s*$)/u)?.[2] ?? "";
-  const matches = section.matchAll(/^\s{2}(\/[^\s:]*):\s*$/gmu);
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-  for (const match of matches) {
-    paths.add(normalizeOpenApiPath(match[1]));
+function openApiTemplateMatchesPath(template: string, pathname: string) {
+  const pattern = `^${template
+    .split("/")
+    .map((segment) => (
+      /^\{[^/{}]+\}$/u.test(segment)
+        ? "[^/]+"
+        : escapeRegex(segment)
+    ))
+    .join("/")}$`;
+
+  return new RegExp(pattern, "u").test(pathname);
+}
+
+function getDefaultRiskForMethod(method: string): CodexOperationRiskLevel {
+  if (method === "GET") {
+    return "low";
   }
 
-  return paths;
+  if (method === "DELETE") {
+    return "high";
+  }
+
+  return "elevated";
+}
+
+function normalizeRiskLevel(value: string | undefined, method: string): CodexOperationRiskLevel {
+  if (value === "low" || value === "elevated" || value === "high") {
+    return value;
+  }
+
+  return getDefaultRiskForMethod(method);
+}
+
+function readRiskReasons(methodBlock: string) {
+  const reasonsBlock = methodBlock.match(/^\s{6}x-codex-risk-reasons:\s*\n((?:\s{8,}-\s*.+\n?)*)/mu)?.[1] ?? "";
+  return Array.from(reasonsBlock.matchAll(/^\s{8,}-\s*(.+?)\s*$/gmu))
+    .map((reasonMatch) => reasonMatch[1])
+    .filter((reason): reason is string => Boolean(reason));
+}
+
+async function readDocumentedOpenApiOperations(workspaceRoot: string) {
+  const file = path.join(workspaceRoot, "api", "codex", "openapi.yaml");
+  const content = await fs.readFile(file, "utf8").catch(() => "");
+  const operations: DocumentedOpenApiOperation[] = [];
+  const section = content.match(/(^|\n)paths:\n([\s\S]*?)(\n[a-zA-Z][^:\n]*:|\s*$)/u)?.[2] ?? "";
+  const pathMatches = Array.from(section.matchAll(/^\s{2}(\/[^\s:]*):\s*$/gmu));
+
+  for (let index = 0; index < pathMatches.length; index += 1) {
+    const match = pathMatches[index];
+    const nextMatch = pathMatches[index + 1];
+    const template = normalizeOpenApiPath(match?.[1] ?? "");
+    const start = (match?.index ?? 0) + (match?.[0].length ?? 0);
+    const end = nextMatch?.index ?? section.length;
+    const pathBlock = section.slice(start, end);
+    const methodMatches = Array.from(pathBlock.matchAll(/^\s{4}(get|post|put|patch|delete):\s*$/gmu));
+
+    for (let methodIndex = 0; methodIndex < methodMatches.length; methodIndex += 1) {
+      const methodMatch = methodMatches[methodIndex];
+      const nextMethodMatch = methodMatches[methodIndex + 1];
+      const method = String(methodMatch?.[1] ?? "").toUpperCase();
+      const methodStart = (methodMatch?.index ?? 0) + (methodMatch?.[0].length ?? 0);
+      const methodEnd = nextMethodMatch?.index ?? pathBlock.length;
+      const methodBlock = pathBlock.slice(methodStart, methodEnd);
+      const riskLevel = normalizeRiskLevel(
+        methodBlock.match(/^\s{6}x-codex-risk:\s*(low|elevated|high)\s*$/mu)?.[1],
+        method,
+      );
+      const reasons = readRiskReasons(methodBlock);
+
+      if (template && method) {
+        operations.push({
+          template,
+          method,
+          riskLevel,
+          reasons,
+        });
+      }
+    }
+  }
+
+  return operations;
+}
+
+async function findDocumentedOpenApiOperation(
+  workspaceRoot: string,
+  method: string,
+  pathname: string,
+) {
+  const operations = await readDocumentedOpenApiOperations(workspaceRoot);
+  return operations.find(
+    (operation) =>
+      operation.method === method &&
+      openApiTemplateMatchesPath(operation.template, pathname),
+  ) ?? null;
 }
 
 async function searchTextFiles(files: string[], query: string, maxResults: number) {
@@ -293,30 +388,42 @@ async function executeInternalApi(params: Record<string, unknown>, context: Code
     throw new Error("Path interno deve iniciar com / e não pode conter host.");
   }
 
-  const documentedPaths = await readDocumentedOpenApiPaths(context.workspaceRoot);
-  if (!documentedPaths.has(normalizedPath)) {
+  const documentedOperation = await findDocumentedOpenApiOperation(
+    context.workspaceRoot,
+    method,
+    normalizedPath,
+  );
+
+  if (!documentedOperation) {
     return {
       ok: false,
       toolId: "execute_internal_api",
       requiresConfirmation: false,
-      summary: `O path ${normalizedPath} nao esta documentado no OpenAPI e precisa entrar no contrato antes do uso pelo agente.`,
+      summary: `A operação ${method} ${normalizedPath} nao esta documentada no OpenAPI e precisa entrar no contrato antes do uso pelo agente.`,
       error: {
         status: 400,
         kind: "validation",
-        message: `Path ${normalizedPath} fora do OpenAPI.`,
-        nextStep: "Adicione o endpoint ao openapi.yaml antes de usar execute_internal_api para esse recurso.",
+        message: `Operação ${method} ${normalizedPath} fora do OpenAPI.`,
+        nextStep: "Adicione o endpoint e método ao openapi.yaml antes de usar execute_internal_api para esse recurso.",
       },
       data: { method, path: pathValue },
     };
   }
 
-  if (method !== "GET" && !context.confirmed) {
+  if (documentedOperation.riskLevel !== "low" && !context.confirmed) {
     return {
       ok: false,
       toolId: "execute_internal_api",
       requiresConfirmation: true,
-      summary: `A chamada ${method} ${pathValue} precisa de confirmação antes da execução.`,
-      data: { method, path: pathValue, body: params.body ?? null },
+      summary: `A chamada ${method} ${pathValue} foi classificada como risco ${documentedOperation.riskLevel} e precisa de confirmação antes da execução.`,
+      data: {
+        method,
+        path: pathValue,
+        body: params.body ?? null,
+        riskLevel: documentedOperation.riskLevel,
+        reasons: documentedOperation.reasons,
+        documentedAs: documentedOperation.template,
+      },
     };
   }
 

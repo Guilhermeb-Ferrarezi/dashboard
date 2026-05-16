@@ -23,13 +23,13 @@ O painel do Codex agora expõe um modo de agente com fontes declaradas explicita
 - workspace do projeto
 - web e docs publicas
 
-Quando o agente sinaliza uma acao de risco, o drawer pede confirmacao antes de continuar.
+O risco de chamadas internas vem do contrato OpenAPI, por operação, via `x-codex-risk`. Operações `low`, como alterar preferências visuais/tema, podem rodar direto; operações `elevated` ou `high` fazem `execute_internal_api` retornar `requiresConfirmation: true` para o Codex pedir confirmação antes de repetir a chamada com `confirmed=true`.
 
 A escolha de ferramentas segue a regra: precisao primeiro, completude depois e velocidade apenas como desempate. Respostas que combinam fontes devem ser organizadas por etapas do problema, e nao por lista de ferramentas usadas. Quando faltam dados para identificar o alvo correto, o agente deve perguntar antes de agir.
 
-O runtime de ferramentas fica em `GET /api/codex/tools` e `POST /api/codex/tools/:toolId/run`. Cada ferramenta possui schema fixo de parâmetros; chamadas de escrita por `execute_internal_api` retornam pedido de confirmação quando `confirmed` nao foi enviado.
+O runtime de ferramentas fica em `GET /api/codex/tools` e `POST /api/codex/tools/:toolId/run`. Cada ferramenta possui schema fixo de parâmetros; `execute_internal_api` valida método, path parametrizado e risco no OpenAPI antes de executar.
 
-O agente agora opera em modo estrito para dado de negocio: consultas e acoes internas devem usar endpoints documentados em `api/codex/openapi.yaml`. Se a rota existir no codigo, mas nao estiver no OpenAPI, o agente deve parar e informar que o contrato precisa ser atualizado antes do uso. Shell, script ad hoc e acesso indireto a banco nao valem como caminho primario para resposta operacional.
+O agente agora opera em modo estrito para dado de negocio: consultas e acoes internas devem usar endpoints documentados em `api/codex/openapi.yaml`, incluindo `GET`, `POST`, `PUT`, `PATCH` e `DELETE`. Se a rota ou método existir no codigo, mas nao estiver no OpenAPI, o agente deve parar e informar que o contrato precisa ser atualizado antes do uso. Shell, script ad hoc e acesso indireto a banco nao valem como caminho primario para resposta operacional.
 
 O backend provisiona automaticamente um token delegado de serviço para o agente. Internamente ele continua sendo resolvido a partir de `CODEX_ACCESS_TOKEN`, mas o processo `codex exec` recebe essa credencial pelos nomes `CODEX_INTERNAL_API_TOKEN` e `CODEX_INTERNAL_API_URL`, para poder consultar a API protegida sem depender do cookie da sessao do navegador e sem conflitar com o JWT interno do proprio CLI.
 
