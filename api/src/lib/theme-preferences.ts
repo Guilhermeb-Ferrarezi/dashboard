@@ -11,6 +11,10 @@ export interface ThemePreferences {
   density: ThemeDensity;
 }
 
+type ThemePreferenceInput = Partial<ThemePreferences> & {
+  theme?: ThemeMode;
+};
+
 export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
   mode: "system",
   accent: "ember",
@@ -29,8 +33,13 @@ function isAllowedValue<T extends string>(value: unknown, allowedValues: readonl
   return typeof value === "string" && allowedValues.includes(value as T);
 }
 
-export function normalizeThemePreferences(input?: Partial<ThemePreferences> | null): ThemePreferences {
+export function normalizeThemePreferences(input?: ThemePreferenceInput | null): ThemePreferences {
   const preferences = input ?? {};
+  const normalizedMode = isAllowedValue(preferences.mode, THEME_MODES)
+    ? preferences.mode
+    : isAllowedValue(preferences.theme, THEME_MODES)
+      ? preferences.theme
+      : DEFAULT_THEME_PREFERENCES.mode;
   const customAccentColor =
     typeof preferences.customAccentColor === "string" &&
     HEX_COLOR_PATTERN.test(preferences.customAccentColor)
@@ -38,9 +47,7 @@ export function normalizeThemePreferences(input?: Partial<ThemePreferences> | nu
       : DEFAULT_THEME_PREFERENCES.customAccentColor;
 
   return {
-    mode: isAllowedValue(preferences.mode, THEME_MODES)
-      ? preferences.mode
-      : DEFAULT_THEME_PREFERENCES.mode,
+    mode: normalizedMode,
     accent: isAllowedValue(preferences.accent, THEME_ACCENTS)
       ? preferences.accent
       : DEFAULT_THEME_PREFERENCES.accent,

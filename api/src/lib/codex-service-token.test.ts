@@ -12,12 +12,14 @@ import {
 const originalEnv = {
   CODEX_HOME: process.env.CODEX_HOME,
   CODEX_ACCESS_TOKEN: process.env.CODEX_ACCESS_TOKEN,
+  CODEX_INTERNAL_API_TOKEN: process.env.CODEX_INTERNAL_API_TOKEN,
   CODEX_WORKSPACE_ROOT: process.env.CODEX_WORKSPACE_ROOT,
 };
 
 afterEach(() => {
   process.env.CODEX_HOME = originalEnv.CODEX_HOME;
   process.env.CODEX_ACCESS_TOKEN = originalEnv.CODEX_ACCESS_TOKEN;
+  process.env.CODEX_INTERNAL_API_TOKEN = originalEnv.CODEX_INTERNAL_API_TOKEN;
   process.env.CODEX_WORKSPACE_ROOT = originalEnv.CODEX_WORKSPACE_ROOT;
 });
 
@@ -39,6 +41,13 @@ describe("codex service token", () => {
     process.env.CODEX_ACCESS_TOKEN = "codex_env_token";
 
     expect(resolveCodexServiceToken()).toBe("codex_env_token");
+  });
+
+  test("prioriza o token interno documentado quando existe", () => {
+    process.env.CODEX_INTERNAL_API_TOKEN = "codex_internal_token";
+    process.env.CODEX_ACCESS_TOKEN = "codex_env_token";
+
+    expect(resolveCodexServiceToken()).toBe("codex_internal_token");
   });
 
   test("lê token delegado do header ou bearer", () => {

@@ -33,4 +33,14 @@ describe("normalizeThemePreferences", () => {
       customAccentColor: "#2563eb",
     });
   });
+
+  test("accepts the documented theme alias", () => {
+    expect(
+      normalizeThemePreferences({
+        theme: "dark",
+      }),
+    ).toMatchObject({
+      mode: "dark",
+    });
+  });
 });

@@ -32,7 +32,9 @@ function generateCodexServiceToken() {
 }
 
 export function resolveCodexServiceToken() {
-  const existing = process.env.CODEX_ACCESS_TOKEN?.trim();
+  const existing =
+    process.env.CODEX_INTERNAL_API_TOKEN?.trim() ||
+    process.env.CODEX_ACCESS_TOKEN?.trim();
 
   if (existing) {
     return existing;
