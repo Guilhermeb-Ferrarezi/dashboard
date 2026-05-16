@@ -139,21 +139,27 @@ export function isCodexReasoningEntry(entry: CodexTimelineEntry) {
 }
 
 export function formatCodexReasoningLines(text: string) {
-  const normalized = text
-    .split(/\n+/)
-    .map((line) => line.trim())
+  const blocks = text
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
     .filter(Boolean);
 
-  const segments =
-    normalized.length > 1
-      ? normalized
-      : text
-          .replace(/\s+/g, " ")
-          .split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Ýa-zà-öø-ÿ0-9])/u)
-          .map((line) => line.trim())
-          .filter(Boolean);
+  const lines = blocks.map((block) => {
+    const firstLine = block
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .find(Boolean);
 
-  return segments.map((line) => line.replace(/^[\s>*-]+/, "").trim()).filter(Boolean);
+    return firstLine?.replace(/^[\s>*-]+/, "").trim() ?? "";
+  });
+
+  const thoughtLines = lines.filter((line) => line.startsWith("→") || line.startsWith("->"));
+
+  if (thoughtLines.length > 0) {
+    return thoughtLines;
+  }
+
+  return lines.filter(Boolean).slice(0, 6);
 }
 
 function upsertThread(list: CodexThreadSummary[], thread: CodexThreadSummary) {
@@ -1138,13 +1144,11 @@ export function CodexDrawer({
                       <div className="mt-2 space-y-1 rounded-lg border border-border/50 bg-background/70 px-2.5 py-2 font-mono text-[11px] leading-5 text-foreground">
                         {reasoningLines.length > 0 ? reasoningLines.map((line, index) => (
                           <div key={`${entry.id}:reasoning:${index}`} className="flex gap-2">
-                            <span className="shrink-0 text-muted-foreground">→</span>
                             <span className="min-w-0 break-words">{line}</span>
                           </div>
                         )) : (
                           <div className="flex gap-2">
-                            <span className="shrink-0 text-muted-foreground">→</span>
-                            <span className="min-w-0 break-words">Pensamento em andamento.</span>
+                            <span className="min-w-0 break-words">→ Pensamento em andamento.</span>
                           </div>
                         )}
                       </div>

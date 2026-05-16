@@ -118,10 +118,12 @@ describe("codex access panel", () => {
 
   test("resume reasoning em linhas curtas e diretas", () => {
     expect(
-      formatCodexReasoningLines("vou validar o endpoint antes. Depois confirmo o retorno."),
+      formatCodexReasoningLines(
+        "→ OpenAPI\nValidando primeiro se existe endpoint documentado.\n\n→ Logs\nA rota /logs está documentada como leitura de baixo risco.",
+      ),
     ).toEqual([
-      "vou validar o endpoint antes.",
-      "Depois confirmo o retorno.",
+      "→ OpenAPI",
+      "→ Logs",
     ]);
   });
 });
