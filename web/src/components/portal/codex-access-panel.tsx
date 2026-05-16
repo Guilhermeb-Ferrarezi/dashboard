@@ -13,8 +13,6 @@ import {
   KeyRoundIcon,
   LoaderCircleIcon,
   PlusIcon,
-  RefreshCwIcon,
-  ShieldIcon,
   Trash2Icon,
 } from "@/components/ui/icons";
 import { clientApi } from "@/lib/api";
@@ -141,11 +139,7 @@ export function CodexAccessPanel() {
   async function handleCreateToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const label = tokenLabel.trim();
-    if (!label) {
-      toast.error("Informe um nome para o token.");
-      return;
-    }
+    const label = tokenLabel.trim() || "Codex";
 
     setCreatingToken(true);
     setCopied(false);
@@ -204,13 +198,11 @@ export function CodexAccessPanel() {
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-background p-5 shadow-[0_1px_0_rgba(255,255,255,0.45)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
             <h3 className="text-base font-semibold tracking-tight">Acesso Codex</h3>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              O chat usa uma credencial delegada criada e mantida pelo sistema.
-              Quando voce precisar integrar outro servico com a API, crie um token
-              pessoal nesta mesma tela.
+            <p className="text-sm text-muted-foreground">
+              Gere um token pessoal para usar no Codex ou em outro servico.
             </p>
           </div>
 
@@ -227,102 +219,50 @@ export function CodexAccessPanel() {
 
         <Separator className="my-4" />
 
-        <div className="space-y-3 text-sm leading-6 text-muted-foreground">
-          <p>
-            O Codex operacional do servidor continua gerenciado pelo sistema.
-          </p>
-          <p>
-            Se o drawer mostrar <span className="font-medium text-foreground">Conectar ChatGPT</span>, o que falta e apenas autenticar a conta compartilhada do agente.
-          </p>
-          <p>
-            Depois dessa conexao, os admins continuam com conversas separadas, mas a conta operacional do Codex permanece a mesma no servidor.
-          </p>
-        </div>
-      </div>
+        <form className="space-y-3" onSubmit={handleCreateToken}>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <label className="grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Nome do token
+              </span>
+              <Input
+                value={tokenLabel}
+                onChange={(event) => setTokenLabel(event.target.value)}
+                placeholder="Codex"
+                maxLength={80}
+              />
+            </label>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-2xl border border-border bg-background p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <KeyRoundIcon className="size-4 text-muted-foreground" />
-                <h4 className="text-sm font-semibold">Tokens pessoais de API</h4>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Crie um token para outro sistema chamar a API em seu nome.
-              </p>
-            </div>
-
-            <Button type="button" variant="outline" size="sm" onClick={() => void loadTokens()}>
-              <RefreshCwIcon className="size-3.5" />
-              Atualizar
+            <Button type="submit" size="lg" disabled={creatingToken}>
+              {creatingToken ? <LoaderCircleIcon className="size-4 animate-spin" /> : <PlusIcon className="size-4" />}
+              Gerar token do Codex
             </Button>
           </div>
+        </form>
 
-          <Separator className="my-4" />
+        {createdToken ? (
+          <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  Token gerado
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Copie agora. Este valor nao volta a ser exibido.
+                </p>
+              </div>
 
-          <form className="space-y-3" onSubmit={handleCreateToken}>
-            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-              <label className="grid gap-2">
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                  Nome do token
-                </span>
-                <Input
-                  value={tokenLabel}
-                  onChange={(event) => setTokenLabel(event.target.value)}
-                  placeholder="Meu servico"
-                  maxLength={80}
-                />
-              </label>
-
-              <Button type="submit" size="lg" disabled={creatingToken}>
-                {creatingToken ? <LoaderCircleIcon className="size-4 animate-spin" /> : <PlusIcon className="size-4" />}
-                Criar token
+              <Button type="button" variant="outline" size="sm" onClick={() => void handleCopyToken()}>
+                {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+                {copied ? "Copiado" : "Copiar"}
               </Button>
             </div>
 
-            <p className="text-xs leading-5 text-muted-foreground">
-              O valor bruto aparece apenas uma vez apos a criacao. Depois disso,
-              salve o token no sistema externo que vai consumir a API.
-            </p>
-          </form>
-
-          {createdToken ? (
-            <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                    Token criado
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Copie agora. Este valor nao volta a ser exibido.
-                  </p>
-                </div>
-
-                <Button type="button" variant="outline" size="sm" onClick={() => void handleCopyToken()}>
-                  {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
-                  {copied ? "Copiado" : "Copiar"}
-                </Button>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs break-all text-foreground">
-                {createdToken}
-              </div>
+            <div className="mt-3 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs break-all text-foreground">
+              {createdToken}
             </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-2xl border border-border bg-muted/30 p-4">
-          <div className="flex items-center gap-2">
-            <ShieldIcon className="size-4 text-muted-foreground" />
-            <h4 className="text-sm font-semibold">Uso esperado</h4>
           </div>
-          <div className="mt-3 space-y-3 text-sm leading-6 text-muted-foreground">
-            <p>Use o token em `Authorization: Bearer &lt;token&gt;`.</p>
-            <p>Ele vale para os endpoints protegidos da API do usuario.</p>
-            <p>Revogue quando o sistema externo nao precisar mais do acesso.</p>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       <div className="space-y-3">
