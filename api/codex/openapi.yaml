@@ -107,6 +107,13 @@ components:
         type: integer
         minimum: 1
         maximum: 100
+    CodexUserIdHeader:
+      name: X-Codex-User-Id
+      in: header
+      required: false
+      description: Usuário real em nome de quem o token interno do Codex deve operar.
+      schema:
+        type: string
   schemas:
     Modalidade:
       type: string
@@ -224,6 +231,25 @@ components:
         createdAt:
           type: string
           nullable: true
+    UserAccessTokenSummary:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        label:
+          type: string
+        revokedAt:
+          type: string
+          nullable: true
+        lastUsedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
     CreateAdminTokenRequest:
       type: object
       required: [type, label]
@@ -231,6 +257,12 @@ components:
         type:
           type: string
           enum: [codex]
+        label:
+          type: string
+    CreateUserTokenRequest:
+      type: object
+      required: [label]
+      properties:
         label:
           type: string
     Project:
@@ -611,6 +643,8 @@ paths:
         - bearerAuth: []
       x-codex-risk: low
       summary: Lê o usuário autenticado
+      parameters:
+        - $ref: "#/components/parameters/CodexUserIdHeader"
       responses:
         "200":
           description: Usuário atual
@@ -631,6 +665,8 @@ paths:
       x-codex-risk-reasons:
         - Altera nome ou email da conta autenticada.
       summary: Atualiza perfil do usuário autenticado
+      parameters:
+        - $ref: "#/components/parameters/CodexUserIdHeader"
       requestBody:
         required: true
         content:
@@ -647,6 +683,8 @@ paths:
       x-codex-risk: low
       summary: Atualiza preferências visuais e tema do usuário autenticado
       description: Operação de baixo risco; pode ser usada para mudar tema sem confirmação extra.
+      parameters:
+        - $ref: "#/components/parameters/CodexUserIdHeader"
       requestBody:
         required: true
         content:
@@ -656,6 +694,56 @@ paths:
       responses:
         "200":
           description: Preferências atualizadas
+  /user/tokens:
+    get:
+      security:
+        - bearerAuth: []
+      x-codex-risk: low
+      summary: Lista tokens pessoais de API do usuário autenticado
+      responses:
+        "200":
+          description: Lista de tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  tokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserAccessTokenSummary"
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Cria credencial pessoal reutilizável para outros serviços chamarem a API.
+        - O token plaintext só é exibido uma vez.
+      summary: Cria token pessoal de API
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserTokenRequest"
+      responses:
+        "201":
+          description: Token criado
+  /user/tokens/{tokenId}/revoke:
+    post:
+      security:
+        - bearerAuth: []
+      x-codex-risk: elevated
+      x-codex-risk-reasons:
+        - Revoga uma credencial pessoal de API.
+      summary: Revoga token pessoal de API
+      parameters:
+        - $ref: "#/components/parameters/TokenId"
+      responses:
+        "200":
+          description: Token revogado
   /user:
     get:
       security:
@@ -893,6 +981,8 @@ paths:
         - bearerAuth: []
       x-codex-risk: low
       summary: Lê status da conta Codex
+      parameters:
+        - $ref: "#/components/parameters/CodexUserIdHeader"
       responses:
         "200":
           description: Status Codex

@@ -9,12 +9,12 @@ import {
   runCodexTool,
 } from "../controllers/codex.controller";
 import { requireCodexAccessToken } from "../middlewares/codex-access";
-import { verifyJWT } from "../middlewares/jwe";
+import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
 const router = Router();
 
-router.use(verifyJWT, requireRole("admin"));
+router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 router.use(requireCodexAccessToken);
 router.get("/account", getCodexAccount);
 router.post("/account/logout", logoutCodex);

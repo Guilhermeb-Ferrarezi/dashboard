@@ -145,6 +145,7 @@ describe("codex tool runtime", () => {
 
     globalThis.fetch = (async (_input: FetchInput, init?: RequestInit) => {
       expect(init?.method).toBe("PUT");
+      expect(new Headers(init?.headers).get("x-codex-user-id")).toBe("user-123");
       return new Response(JSON.stringify({ ok: true, preferences: { theme: "dark" } }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -155,7 +156,7 @@ describe("codex tool runtime", () => {
       const result = await runCodexRuntimeTool(
         "execute_internal_api",
         { method: "PUT", path: "/user/preferences", body: { theme: "dark" } },
-        { workspaceRoot: createWorkspace(), confirmed: false },
+        { workspaceRoot: createWorkspace(), confirmed: false, delegatedUserId: "user-123" },
       );
 
       expect(result.ok).toBe(true);

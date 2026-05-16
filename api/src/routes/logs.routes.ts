@@ -5,13 +5,13 @@ import {
   listLogProjects,
   listProjectLogs,
 } from "../controllers/logs.controller";
-import { verifyJWT } from "../middlewares/jwe";
+import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
 const router = Router();
 
-router.get("/projects", verifyJWT, requireRole("admin"), listLogProjects);
-router.post("/projects", verifyJWT, requireRole("admin"), createLogProject);
-router.get("/", verifyJWT, requireRole("admin"), listProjectLogs);
+router.get("/projects", verifyJWTOrCodexServiceToken, requireRole("admin"), listLogProjects);
+router.post("/projects", verifyJWTOrCodexServiceToken, requireRole("admin"), createLogProject);
+router.get("/", verifyJWTOrCodexServiceToken, requireRole("admin"), listProjectLogs);
 
 export default router;

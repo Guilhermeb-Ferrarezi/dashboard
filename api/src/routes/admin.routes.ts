@@ -6,12 +6,12 @@ import {
   listAdminAccessTokensHandler,
   revokeAdminAccessTokenHandler,
 } from "../controllers/admin-access-token.controller";
-import { verifyJWT } from "../middlewares/jwe";
+import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
 const router = Router();
 
-router.use(verifyJWT, requireRole("admin"));
+router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 router.get("/users", listUsers);
 router.post("/users", createUser);
 router.get("/tokens", listAdminAccessTokensHandler);

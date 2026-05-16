@@ -26,6 +26,7 @@ export type CodexToolRunContext = {
   workspaceRoot: string;
   cookieHeader?: string;
   confirmed?: boolean;
+  delegatedUserId?: string | null;
 };
 
 export type CodexToolRunResult = {
@@ -432,6 +433,7 @@ async function executeInternalApi(params: Record<string, unknown>, context: Code
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${resolveCodexServiceToken()}`,
+      ...(context.delegatedUserId ? { "X-Codex-User-Id": context.delegatedUserId } : {}),
       ...(context.cookieHeader ? { Cookie: context.cookieHeader } : {}),
     },
     body: method === "GET" ? undefined : JSON.stringify(params.body ?? {}),

@@ -9,6 +9,7 @@ describe("codex agent runtime", () => {
     expect(prompt).toContain("Consultas de negocio devem usar endpoint interno documentado no OpenAPI.");
     expect(prompt).toContain("CODEX_INTERNAL_API_URL");
     expect(prompt).toContain("CODEX_INTERNAL_API_TOKEN");
+    expect(prompt).toContain("X-Codex-User-Id: $CODEX_INTERNAL_USER_ID");
     expect(prompt).toContain("Se a rota existir no codigo, mas nao estiver no OpenAPI, pare e informe");
     expect(prompt).toContain("O risco de uma chamada interna vem da operação documentada no OpenAPI");
     expect(prompt).toContain("x-codex-risk: low");

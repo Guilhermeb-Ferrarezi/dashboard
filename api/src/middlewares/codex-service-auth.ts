@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 import { readCodexServiceTokenFromRequest, resolveCodexServiceToken } from "../lib/codex-service-token";
+import { authenticateUserAccessToken } from "../lib/user-access-token";
+import { User } from "../models/User";
 
 function readAuthToken(req: Request) {
   const cookieToken = req.cookies?.auth_token;
@@ -17,7 +19,7 @@ function readAuthToken(req: Request) {
   return null;
 }
 
-export function verifyJWTOrCodexServiceToken(req: Request, res: Response, next: NextFunction) {
+export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, next: NextFunction) {
   const authToken = readAuthToken(req);
 
   if (authToken) {
@@ -37,12 +39,48 @@ export function verifyJWTOrCodexServiceToken(req: Request, res: Response, next: 
   });
 
   if (serviceToken && serviceToken === resolveCodexServiceToken()) {
-    req.user = {
-      id: "codex-service",
-      username: "codex-agent",
-      role: "admin",
-    };
-    return next();
+    const delegatedUserId =
+      typeof req.headers["x-codex-user-id"] === "string"
+        ? req.headers["x-codex-user-id"].trim()
+        : "";
+
+    if (!delegatedUserId) {
+      req.user = {
+        id: "codex-service",
+        username: "codex-agent",
+        role: "admin",
+      };
+      return next();
+    }
+
+    try {
+      const user = await User.findById(delegatedUserId)
+        .select("_id username email role")
+        .lean();
+
+      if (!user) {
+        return res.status(403).json({ message: "Invalid delegated user" });
+      }
+
+      req.user = {
+        id: String(user._id),
+        username: user.username,
+        email: user.email ?? null,
+        role: user.role,
+      };
+      return next();
+    } catch {
+      return res.status(403).json({ message: "Invalid delegated user" });
+    }
+  }
+
+  if (authToken) {
+    const authenticatedUserToken = await authenticateUserAccessToken(authToken);
+
+    if (authenticatedUserToken) {
+      req.user = authenticatedUserToken.user;
+      return next();
+    }
   }
 
   if (!authToken && !serviceToken) {

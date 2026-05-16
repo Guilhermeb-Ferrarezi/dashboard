@@ -41,6 +41,7 @@ export function buildCodexOperationalPrompt(userPrompt: string) {
     "- O OpenAPI local fica em `/app/codex/openapi.yaml`.",
     "- O sistema fornece automaticamente `CODEX_INTERNAL_API_URL` e `CODEX_INTERNAL_API_TOKEN` para chamadas internas protegidas no modo exec.",
     "- Para ler ou modificar dado de negocio no modo exec, use o endpoint documentado no OpenAPI com `Authorization: Bearer $CODEX_INTERNAL_API_TOKEN` contra `$CODEX_INTERNAL_API_URL`.",
+    "- Quando a ação for em nome do usuário atual, inclua também `X-Codex-User-Id: $CODEX_INTERNAL_USER_ID` na chamada interna.",
     "- Nao dependa do cookie do navegador para chamadas internas protegidas.",
     "- Consultas de negocio devem usar endpoint interno documentado no OpenAPI.",
     "- Nao use acesso indireto a banco para responder dado de negocio.",

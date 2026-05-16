@@ -184,6 +184,7 @@ export async function runCodexTool(req: Request, res: Response) {
         ? process.cwd().replace(/\/api$/u, "")
         : process.cwd(),
       cookieHeader: req.headers.cookie,
+      delegatedUserId: req.user?.id ?? null,
       confirmed: Boolean(req.body?.confirmed),
     });
 

@@ -18,7 +18,12 @@ import {
   updateCurrentUserProfile,
   updateCurrentUserPreferences,
 } from "./controllers/user.controller";
-import { verifyJWT } from "./middlewares/jwe";
+import {
+  createUserAccessTokenHandler,
+  listUserAccessTokensHandler,
+  revokeUserAccessTokenHandler,
+} from "./controllers/user-access-token.controller";
+import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
 import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { requireRole } from "./middlewares/role";
 import { attachCodexGateway } from "./lib/codex";
@@ -183,15 +188,18 @@ app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 app.use("/api/codex", codexRoutes);
 
-app.get("/api/user/me", verifyJWT, getCurrentUser);
-app.put("/api/user/profile", verifyJWT, updateCurrentUserProfile);
-app.put("/api/user/preferences", verifyJWT, updateCurrentUserPreferences);
+app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
+app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
+app.put("/api/user/preferences", verifyJWTOrCodexServiceToken, updateCurrentUserPreferences);
+app.get("/api/user/tokens", verifyJWTOrCodexServiceToken, listUserAccessTokensHandler);
+app.post("/api/user/tokens", verifyJWTOrCodexServiceToken, createUserAccessTokenHandler);
+app.post("/api/user/tokens/:tokenId/revoke", verifyJWTOrCodexServiceToken, revokeUserAccessTokenHandler);
 
-app.get("/api/user", verifyJWT, requireRole("user"), (_req, res) => {
+app.get("/api/user", verifyJWTOrCodexServiceToken, requireRole("user"), (_req, res) => {
   res.json({ message: "Area do usuario liberada." });
 });
 
-app.get("/api/admin", verifyJWT, requireRole("admin"), (_req, res) => {
+app.get("/api/admin", verifyJWTOrCodexServiceToken, requireRole("admin"), (_req, res) => {
   res.json({ message: "Area administrativa liberada." });
 });
 

@@ -244,11 +244,12 @@ function getCodexInternalApiBaseUrl() {
   return (process.env.CODEX_INTERNAL_API_URL || `http://127.0.0.1:${Number(process.env.PORT) || 4000}/api`).replace(/\/$/, "");
 }
 
-export function resolveCodexExecEnv() {
+export function resolveCodexExecEnv(delegatedUserId?: string | null) {
   return {
     ...resolveCodexAuthEnv(),
     CODEX_INTERNAL_API_URL: getCodexInternalApiBaseUrl(),
     CODEX_INTERNAL_API_TOKEN: resolveCodexServiceToken(),
+    ...(delegatedUserId ? { CODEX_INTERNAL_USER_ID: delegatedUserId } : {}),
   };
 }
 
@@ -753,6 +754,7 @@ async function runCodexExecSession(params: {
   cwd: string;
   prompt: string;
   threadId?: string | null;
+  delegatedUserId?: string | null;
   onJsonLine?: (event: CodexExecEvent) => void;
 }) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "santos-home-codex-"));
@@ -783,7 +785,7 @@ async function runCodexExecSession(params: {
   const child = spawn(getCodexBinary(), args, {
     cwd: resolveWorkspaceRoot(),
     env: {
-      ...resolveCodexExecEnv(),
+      ...resolveCodexExecEnv(params.delegatedUserId),
       ...(codexHome ? { CODEX_HOME: codexHome.codexHome, HOME: codexHome.home } : {}),
     },
     stdio: ["pipe", "pipe", "pipe"],
@@ -1675,6 +1677,7 @@ export function attachCodexGateway(server: HttpServer) {
               const result = await runCodexExecSession({
                 cwd: resolveWorkspaceRoot(),
                 threadId,
+                delegatedUserId: user.id,
                 prompt: buildCodexOperationalPrompt(prompt),
                 onJsonLine: (event) => {
                   if (event.type === "thread.started") {

@@ -66,11 +66,12 @@ describe("codex bootstrap args", () => {
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
     process.env.PORT = "4123";
 
-    const env = resolveCodexExecEnv();
+    const env = resolveCodexExecEnv("user-123");
 
     expect(env.CODEX_ACCESS_TOKEN).toBeUndefined();
     expect(env.CODEX_INTERNAL_API_TOKEN).toBe("codex_service_token");
     expect(env.CODEX_INTERNAL_API_URL).toBe("http://127.0.0.1:4123/api");
+    expect(env.CODEX_INTERNAL_USER_ID).toBe("user-123");
 
     process.env.CODEX_ACCESS_TOKEN = originalToken;
     process.env.PORT = originalPort;
