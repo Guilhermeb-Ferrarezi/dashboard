@@ -360,6 +360,20 @@ export function buildCodexTimelineEntryId(turnId: string, itemId: string) {
   return `${turnId}:${itemId}`;
 }
 
+export function createCodexFallbackTurnId(prefix = "turn") {
+  return `${prefix}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+}
+
+export function resolveCodexTurnId(
+  rawTurnId: unknown,
+  currentTurnId: string | null | undefined,
+  fallbackTurnId: string,
+) {
+  return typeof rawTurnId === "string" && rawTurnId.trim()
+    ? rawTurnId
+    : currentTurnId || fallbackTurnId;
+}
+
 function serializeTimelineItem(turnId: string, item: CodexThreadItem): CodexTimelineEntry | null {
   const entryId = buildCodexTimelineEntryId(turnId, item.id);
 
@@ -785,6 +799,7 @@ async function runCodexExecSession(params: {
   const timelineEntries: CodexTimelineEntry[] = [];
   let threadId: string | null = params.threadId ?? null;
   let turnId: string | null = null;
+  const fallbackTurnId = createCodexFallbackTurnId("exec-turn");
   let finalStatus: string | null = null;
 
   child.stderr.on("data", (chunk) => {
@@ -813,7 +828,7 @@ async function runCodexExecSession(params: {
     }
 
     if (event.type === "turn.started") {
-      turnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+      turnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
       return;
     }
 
@@ -824,7 +839,7 @@ async function runCodexExecSession(params: {
 
     if (event.type === "item.completed") {
       const item = event.item as CodexThreadItem | undefined;
-      const eventTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId ?? "turn";
+      const eventTurnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
 
       if (!item || !item.type) {
         return;
@@ -1677,6 +1692,7 @@ export function attachCodexGateway(server: HttpServer) {
 
               const collectedEntries: CodexTimelineEntry[] = [];
               let turnId: string | null = null;
+              const fallbackTurnId = createCodexFallbackTurnId("exec-turn");
 
               const result = await runCodexExecSession({
                 cwd: resolveWorkspaceRoot(),
@@ -1713,7 +1729,7 @@ export function attachCodexGateway(server: HttpServer) {
                     const rawThreadId = (event as { thread_id?: unknown }).thread_id;
                     const rawTurnId = (event as { turn_id?: unknown }).turn_id;
                     const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
-                    turnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+                    turnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
 
                     if (nextThreadId) {
                       threadId = nextThreadId;
@@ -1741,7 +1757,7 @@ export function attachCodexGateway(server: HttpServer) {
                       kind: "user",
                       text: prompt,
                       status: "completed",
-                      turnId: turnId ?? `turn:${Date.now()}`,
+                      turnId: turnId ?? fallbackTurnId,
                     };
 
                     collectedEntries.push(userEntry);
@@ -1757,7 +1773,7 @@ export function attachCodexGateway(server: HttpServer) {
                     const rawThreadId = (event as { thread_id?: unknown }).thread_id;
                     const rawTurnId = (event as { turn_id?: unknown }).turn_id;
                     const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
-                    const completedTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId;
+                    const completedTurnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
 
                     if (nextThreadId) {
                       threadId = nextThreadId;
@@ -1776,7 +1792,7 @@ export function attachCodexGateway(server: HttpServer) {
                   if (event.type === "item.completed") {
                     const item = event.item as CodexThreadItem | undefined;
                     const rawTurnId = (event as { turn_id?: unknown }).turn_id;
-                    const eventTurnId = typeof rawTurnId === "string" ? rawTurnId : turnId ?? "turn";
+                    const eventTurnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
 
                     if (!item || !threadId) {
                       return;
@@ -1941,6 +1957,8 @@ export function attachCodexGateway(server: HttpServer) {
   wss.on("connection", (browserSocket: WebSocket, _request: IncomingMessage, user: AuthUserPayload) => {
     const codexClient = new CodexAppServerClient();
     let currentThreadId: string | null = null;
+    let currentTurnId: string | null = null;
+    let fallbackTurnId = createCodexFallbackTurnId("app-turn");
     let socketClosed = false;
     const pendingConfirmations = new Map<
       string,
@@ -2095,28 +2113,31 @@ export function attachCodexGateway(server: HttpServer) {
             case "turn/started": {
               const turn = params.turn as CodexTurn | undefined;
               currentThreadId = typeof params.threadId === "string" ? params.threadId : currentThreadId;
+              fallbackTurnId = createCodexFallbackTurnId("app-turn");
+              currentTurnId = turn?.id ?? fallbackTurnId;
               sendBrowserEvent(browserSocket, {
                 type: "turnStarted",
                 threadId: params.threadId ?? null,
-                turnId: turn?.id ?? null,
+                turnId: currentTurnId,
               });
               break;
             }
             case "turn/completed": {
               const turn = params.turn as CodexTurn | undefined;
+              const completedTurnId = turn?.id ?? currentTurnId ?? fallbackTurnId;
               sendBrowserEvent(browserSocket, {
                 type: "turnCompleted",
                 threadId: params.threadId ?? null,
-                turnId: turn?.id ?? null,
+                turnId: completedTurnId,
                 status: turn?.status ?? "completed",
               });
+              currentTurnId = null;
               break;
             }
             case "item/autoApprovalReview/completed": {
               const threadId =
                 typeof params.threadId === "string" ? params.threadId : currentThreadId;
-              const turnId =
-                typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const turnId = resolveCodexTurnId(params.turnId, currentTurnId, fallbackTurnId);
               const status =
                 typeof params.status === "string" ? params.status : "completed";
 
@@ -2153,7 +2174,7 @@ export function attachCodexGateway(server: HttpServer) {
               break;
             }
             case "item/agentMessage/delta": {
-              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const turnId = resolveCodexTurnId(params.turnId, currentTurnId, fallbackTurnId);
               const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "assistantDelta",
@@ -2165,7 +2186,7 @@ export function attachCodexGateway(server: HttpServer) {
               break;
             }
             case "item/commandExecution/outputDelta": {
-              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const turnId = resolveCodexTurnId(params.turnId, currentTurnId, fallbackTurnId);
               const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "commandOutputDelta",
@@ -2177,7 +2198,7 @@ export function attachCodexGateway(server: HttpServer) {
               break;
             }
             case "item/fileChange/patchUpdated": {
-              const turnId = typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const turnId = resolveCodexTurnId(params.turnId, currentTurnId, fallbackTurnId);
               const itemId = typeof params.itemId === "string" ? params.itemId : null;
               sendBrowserEvent(browserSocket, {
                 type: "filePatchUpdated",
@@ -2191,8 +2212,7 @@ export function attachCodexGateway(server: HttpServer) {
             case "item/completed": {
               const threadId =
                 typeof params.threadId === "string" ? params.threadId : currentThreadId;
-              const turnId =
-                typeof params.turnId === "string" ? params.turnId : "unknown-turn";
+              const turnId = resolveCodexTurnId(params.turnId, currentTurnId, fallbackTurnId);
               const item = params.item as CodexThreadItem | undefined;
 
               if (!item) {
