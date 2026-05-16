@@ -25,9 +25,7 @@ export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, 
   if (authToken) {
     try {
       req.user = jwt.verify(authToken, process.env.JWT_SECRET!) as Request["user"];
-      if (req.user?.role === "admin") {
-        return next();
-      }
+      return next();
     } catch {
       // fall through to service token
     }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import jwt from "jsonwebtoken";
 
 import { UserAccessToken } from "../models/UserAccessToken";
 import { User } from "../models/User";
@@ -54,6 +55,30 @@ describe("codex service auth", () => {
 
     expect(nextCalled).toBe(true);
     expect((req as { user?: { role?: string } }).user?.role).toBe("admin");
+  });
+
+  test("aceita um JWT de sessao valido de usuario comum", () => {
+    process.env.JWT_SECRET = "test_secret";
+
+    const req = {
+      cookies: {},
+      headers: {
+        authorization: `Bearer ${jwt.sign(
+          { id: "user-123", username: "alice", role: "user" },
+          "test_secret",
+        )}`,
+      },
+    } as never;
+    const res = createResponse() as never;
+    let nextCalled = false;
+
+    verifyJWTOrCodexServiceToken(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(true);
+    expect((req as { user?: { id?: string; role?: string } }).user?.id).toBe("user-123");
+    expect((req as { user?: { role?: string } }).user?.role).toBe("user");
   });
 
   test("aceita token de serviço com usuário delegado", async () => {

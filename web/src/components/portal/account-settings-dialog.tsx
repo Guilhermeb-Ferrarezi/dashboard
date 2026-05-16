@@ -42,13 +42,11 @@ interface AccountSettingsDialogProps {
 
 type SettingsSection = "account" | "preferences" | "session" | "codex";
 
-function buildSettingsSections(role: SessionUser["role"]) {
+function buildSettingsSections() {
   return [
     { id: "account", label: "Minha conta", icon: UserRoundPenIcon },
     { id: "preferences", label: "Preferencias", icon: PaletteIcon },
-    ...(role === "admin"
-      ? [{ id: "codex", label: "Acesso Codex", icon: ShieldIcon }]
-      : []),
+    { id: "codex", label: "Acesso Codex", icon: ShieldIcon },
     { id: "session", label: "Sessao", icon: ShieldIcon },
   ] as Array<{
     id: SettingsSection;
@@ -69,7 +67,7 @@ export function AccountSettingsDialog({
   const [email, setEmail] = useState(user.email ?? "");
   const [pending, setPending] = useState(false);
   const [activeSection, setActiveSection] = useState<SettingsSection>("account");
-  const settingsSections = buildSettingsSections(user.role);
+  const settingsSections = buildSettingsSections();
 
   useEffect(() => {
     setUsername(user.username);
@@ -272,7 +270,7 @@ export function AccountSettingsDialog({
                 </div>
               ) : null}
 
-              {activeSection === "codex" && user.role === "admin" ? (
+              {activeSection === "codex" ? (
                 <div className="mx-auto max-w-4xl">
                   <CodexAccessPanel />
                 </div>
