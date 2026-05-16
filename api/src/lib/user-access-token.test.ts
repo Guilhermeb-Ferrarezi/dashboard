@@ -10,6 +10,7 @@ import {
   hashUserAccessToken,
   listUserAccessTokens,
   revokeUserAccessToken,
+  resolveActiveUserAccessTokenValue,
 } from "./user-access-token";
 
 describe("user access token helpers", () => {
@@ -203,6 +204,30 @@ describe("user access token service", () => {
         },
       },
       { new: true },
+    );
+  });
+
+  test("resolve o valor ativo do token codex do usuario", async () => {
+    UserAccessToken.findOne = mock(() => ({
+      sort: () => ({
+        select: () => ({
+          lean: async () => ({
+            _id: "token-1",
+            userId: "user-1",
+            type: "codex",
+            label: "Codex",
+            encryptedToken: encryptSecret("codex_user_token"),
+            revokedAt: null,
+            lastUsedAt: null,
+            createdAt: new Date("2024-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+          }),
+        }),
+      }),
+    })) as typeof UserAccessToken.findOne;
+
+    await expect(resolveActiveUserAccessTokenValue("user-1", "codex")).resolves.toBe(
+      "codex_user_token",
     );
   });
 });

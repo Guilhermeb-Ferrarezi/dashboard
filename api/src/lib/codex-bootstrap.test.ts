@@ -1,8 +1,16 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
+import { UserAccessToken } from "../models/UserAccessToken";
+import { encryptSecret } from "./token-vault";
 import { buildCodexAppServerArgs, resolveCodexAuthEnv, resolveCodexExecEnv } from "./codex";
 
 describe("codex bootstrap args", () => {
+  const originalFindOne = UserAccessToken.findOne;
+
+  afterEach(() => {
+    UserAccessToken.findOne = originalFindOne;
+  });
+
   test("adiciona bypass por padrão", () => {
     expect(buildCodexAppServerArgs(undefined, "/app")).toEqual([
       "--dangerously-bypass-approvals-and-sandbox",
@@ -58,22 +66,37 @@ describe("codex bootstrap args", () => {
     process.env.CODEX_ACCESS_TOKEN = originalToken;
   });
 
-  test("repassa token e base url dedicados para o modo exec", () => {
-    const originalToken = process.env.CODEX_ACCESS_TOKEN;
+  test("repassa o token codex do usuario e a base url dedicada para o modo exec", async () => {
     const originalPort = process.env.PORT;
     const originalInternalApiUrl = process.env.CODEX_INTERNAL_API_URL;
     delete process.env.CODEX_INTERNAL_API_URL;
-    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
     process.env.PORT = "4123";
 
-    const env = resolveCodexExecEnv("user-123");
+    UserAccessToken.findOne = mock(() => ({
+      sort: () => ({
+        select: () => ({
+          lean: async () => ({
+            _id: "token-1",
+            userId: "user-123",
+            type: "codex",
+            label: "Codex",
+            encryptedToken: encryptSecret("codex_user_token"),
+            revokedAt: null,
+            lastUsedAt: null,
+            createdAt: new Date("2024-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+          }),
+        }),
+      }),
+    })) as typeof UserAccessToken.findOne;
+
+    const env = await resolveCodexExecEnv("user-123");
 
     expect(env.CODEX_ACCESS_TOKEN).toBeUndefined();
-    expect(env.CODEX_INTERNAL_API_TOKEN).toBe("codex_service_token");
+    expect(env.CODEX_INTERNAL_API_TOKEN).toBe("codex_user_token");
     expect(env.CODEX_INTERNAL_API_URL).toBe("http://127.0.0.1:4123/api");
     expect(env.CODEX_INTERNAL_USER_ID).toBe("user-123");
 
-    process.env.CODEX_ACCESS_TOKEN = originalToken;
     process.env.PORT = originalPort;
     process.env.CODEX_INTERNAL_API_URL = originalInternalApiUrl;
   });

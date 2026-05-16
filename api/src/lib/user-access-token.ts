@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import { User } from "../models/User";
 import { UserAccessToken } from "../models/UserAccessToken";
-import { encryptSecret } from "./token-vault";
+import { decryptSecret, encryptSecret } from "./token-vault";
 
 export type UserAccessTokenType = "account" | "codex";
 
@@ -100,6 +100,30 @@ export async function listUserAccessTokens(userId: string, type?: UserAccessToke
     .lean();
 
   return tokens.map(serializeAccessToken);
+}
+
+export async function resolveActiveUserAccessTokenValue(
+  userId: string,
+  type: UserAccessTokenType,
+) {
+  const token = await UserAccessToken.findOne({
+    userId,
+    type,
+    revokedAt: null,
+  })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .select("+encryptedToken")
+    .lean();
+
+  if (!token?.encryptedToken) {
+    return null;
+  }
+
+  try {
+    return decryptSecret(token.encryptedToken);
+  } catch {
+    return null;
+  }
 }
 
 export async function revokeUserAccessToken(userId: string, tokenId: string) {

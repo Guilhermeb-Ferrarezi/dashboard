@@ -1,4 +1,4 @@
-import { resolveCodexServiceToken } from "./codex-service-token";
+import { listUserAccessTokens } from "./user-access-token";
 
 export type CodexAccessState = {
   codexAccessTokenActive: boolean;
@@ -19,10 +19,14 @@ export async function resolveCodexAccessState(
     };
   }
 
+  const codexTokens = await listUserAccessTokens(adminId, "codex");
+
   return {
-    codexAccessTokenActive: Boolean(resolveCodexServiceToken()),
+    codexAccessTokenActive: codexTokens.length > 0,
     codexAccessTokenRequired: false,
-    codexAccessBlockedReason: null,
+    codexAccessBlockedReason: codexTokens.length
+      ? null
+      : "Crie um token Codex em Configuracoes do usuario > Acesso Codex.",
     activeToken: null,
   };
 }

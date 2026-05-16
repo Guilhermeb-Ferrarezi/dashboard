@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { UserAccessToken } from "../models/UserAccessToken";
+import { encryptSecret } from "./token-vault";
 import {
   listCodexRuntimeTools,
   normalizeApiError,
@@ -139,13 +141,30 @@ describe("codex tool runtime", () => {
 
   test("executa escrita de baixo risco sem confirmação quando OpenAPI permite", async () => {
     const originalFetch = globalThis.fetch;
-    const originalToken = process.env.CODEX_ACCESS_TOKEN;
+    const originalFindOne = UserAccessToken.findOne;
 
-    process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
+    UserAccessToken.findOne = () => ({
+      sort: () => ({
+        select: () => ({
+          lean: async () => ({
+            _id: "token-1",
+            userId: "user-123",
+            type: "codex",
+            label: "Codex",
+            encryptedToken: encryptSecret("codex_user_token"),
+            revokedAt: null,
+            lastUsedAt: null,
+            createdAt: new Date("2024-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+          }),
+        }),
+      }),
+    }) as typeof UserAccessToken.findOne;
 
     globalThis.fetch = (async (_input: FetchInput, init?: RequestInit) => {
       expect(init?.method).toBe("PUT");
       expect(new Headers(init?.headers).get("x-codex-user-id")).toBe("user-123");
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer codex_user_token");
       return new Response(JSON.stringify({ ok: true, preferences: { theme: "dark" } }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -163,7 +182,7 @@ describe("codex tool runtime", () => {
       expect(result.requiresConfirmation).toBe(false);
     } finally {
       globalThis.fetch = originalFetch;
-      process.env.CODEX_ACCESS_TOKEN = originalToken;
+      UserAccessToken.findOne = originalFindOne;
     }
   });
 

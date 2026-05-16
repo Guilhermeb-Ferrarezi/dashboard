@@ -17,6 +17,7 @@ import {
 } from "./codex-agent-runtime";
 import { resolveCodexAccessState } from "./codex-access";
 import { resolveCodexServiceToken } from "./codex-service-token";
+import { resolveActiveUserAccessTokenValue } from "./user-access-token";
 
 type JsonRpcId = string | number;
 
@@ -244,11 +245,15 @@ function getCodexInternalApiBaseUrl() {
   return (process.env.CODEX_INTERNAL_API_URL || `http://127.0.0.1:${Number(process.env.PORT) || 4000}/api`).replace(/\/$/, "");
 }
 
-export function resolveCodexExecEnv(delegatedUserId?: string | null) {
+export async function resolveCodexExecEnv(delegatedUserId?: string | null) {
+  const delegatedToken = delegatedUserId
+    ? await resolveActiveUserAccessTokenValue(delegatedUserId, "codex")
+    : null;
+
   return {
     ...resolveCodexAuthEnv(),
     CODEX_INTERNAL_API_URL: getCodexInternalApiBaseUrl(),
-    CODEX_INTERNAL_API_TOKEN: resolveCodexServiceToken(),
+    CODEX_INTERNAL_API_TOKEN: delegatedToken ?? resolveCodexServiceToken(),
     ...(delegatedUserId ? { CODEX_INTERNAL_USER_ID: delegatedUserId } : {}),
   };
 }
@@ -692,7 +697,7 @@ async function runCodexProcess(
   const child = spawn(getCodexBinary(), args, {
     cwd: resolveWorkspaceRoot(),
     env: {
-      ...resolveCodexExecEnv(),
+      ...(await resolveCodexExecEnv()),
       ...(codexHome ? { CODEX_HOME: codexHome.codexHome, HOME: codexHome.home } : {}),
     },
     stdio: ["pipe", "pipe", "pipe"],
@@ -785,7 +790,7 @@ async function runCodexExecSession(params: {
   const child = spawn(getCodexBinary(), args, {
     cwd: resolveWorkspaceRoot(),
     env: {
-      ...resolveCodexExecEnv(params.delegatedUserId),
+      ...(await resolveCodexExecEnv(params.delegatedUserId)),
       ...(codexHome ? { CODEX_HOME: codexHome.codexHome, HOME: codexHome.home } : {}),
     },
     stdio: ["pipe", "pipe", "pipe"],

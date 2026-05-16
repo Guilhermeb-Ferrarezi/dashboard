@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { resolveCodexServiceToken } from "./codex-service-token";
+import { resolveActiveUserAccessTokenValue } from "./user-access-token";
 
 export type CodexToolSchemaProperty = {
   type: "string" | "number" | "boolean" | "object";
@@ -428,11 +429,32 @@ async function executeInternalApi(params: Record<string, unknown>, context: Code
     };
   }
 
+  const delegatedToken = context.delegatedUserId
+    ? await resolveActiveUserAccessTokenValue(context.delegatedUserId, "codex")
+    : null;
+  const authToken = delegatedToken ?? resolveCodexServiceToken();
+
+  if (context.delegatedUserId && !delegatedToken) {
+    return {
+      ok: false,
+      toolId: "execute_internal_api",
+      requiresConfirmation: false,
+      summary: "Nao foi encontrado um token Codex ativo para este usuario.",
+      error: {
+        status: 503,
+        kind: "server",
+        message: "Nao foi encontrado um token Codex ativo para este usuario.",
+        nextStep: "Crie ou reative o token Codex em Acesso Codex e tente novamente.",
+      },
+      data: { method, path: pathValue },
+    };
+  }
+
   const response = await fetch(`${getInternalApiBaseUrl()}${pathValue}`, {
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${resolveCodexServiceToken()}`,
+      Authorization: `Bearer ${authToken}`,
       ...(context.delegatedUserId ? { "X-Codex-User-Id": context.delegatedUserId } : {}),
       ...(context.cookieHeader ? { Cookie: context.cookieHeader } : {}),
     },
