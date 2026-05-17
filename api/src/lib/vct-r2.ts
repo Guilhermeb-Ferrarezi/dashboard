@@ -60,23 +60,24 @@ export function getVctR2PublicUrl(key: string) {
   return publicBaseUrl ? `${publicBaseUrl}/${key}` : "";
 }
 
-export async function uploadVctFormationLogo({
+export async function uploadVctR2Object({
   buffer,
   mimeType,
   fileName,
-  formacaoId,
+  folder,
 }: {
   buffer: Buffer;
   mimeType: string;
   fileName: string;
-  formacaoId: string;
+  folder: string;
 }) {
   assertR2Configured();
   const r2Client = client as S3Client;
 
   const safeName = sanitizeObjectName(fileName || "logo");
   const extension = getFileExtension(fileName, mimeType);
-  const key = `vct/formacoes/${formacaoId}/${randomUUID()}-${safeName}${extension}`;
+  const normalizedFolder = folder.replace(/^\/+|\/+$/g, "");
+  const key = `${normalizedFolder}/${randomUUID()}-${safeName}${extension}`;
 
   await r2Client.send(
     new PutObjectCommand({
@@ -91,6 +92,25 @@ export async function uploadVctFormationLogo({
     key,
     url: getVctR2PublicUrl(key),
   };
+}
+
+export async function uploadVctFormationLogo({
+  buffer,
+  mimeType,
+  fileName,
+  formacaoId,
+}: {
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+  formacaoId: string;
+}) {
+  return uploadVctR2Object({
+    buffer,
+    mimeType,
+    fileName,
+    folder: `vct/formacoes/${formacaoId}`,
+  });
 }
 
 export async function deleteVctFormationLogo(key: string) {

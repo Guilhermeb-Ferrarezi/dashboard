@@ -2,6 +2,7 @@ import type { LucideIcon } from "@/components/ui/icons";
 import {
   BadgeCheckIcon,
   CrosshairIcon,
+  ImageIcon,
   LayoutDashboardIcon,
   LayoutGridIcon,
   LogsIcon,
@@ -46,6 +47,7 @@ export const portalIconMap = {
   users: ShieldIcon,
   account: UserRoundIcon,
   vct: CrosshairIcon,
+  images: ImageIcon,
   admin: BadgeCheckIcon,
   link: LinkIcon,
   sparkles: SparklesIcon,
@@ -166,6 +168,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           icon: ShieldIcon,
           kind: "resource",
           keywords: ["usuarios", "admin", "acesso", "perfis"],
+        }),
+        portalItem({
+          href: "/admin/r2",
+          label: "R2",
+          description: "Envio de imagens para o bucket",
+          icon: ImageIcon,
+          kind: "resource",
+          keywords: ["r2", "imagens", "upload", "bucket", "assets"],
         }),
       ],
     },
@@ -294,11 +304,13 @@ export function resolvePortalRecentItem(
             ? "account"
             : sidebarItem.icon === ShieldIcon
               ? "users"
-            : sidebarItem.icon === CrosshairIcon
-              ? "vct"
-              : sidebarItem.icon === BadgeCheckIcon
-                ? "admin"
-                : "sparkles",
+              : sidebarItem.icon === CrosshairIcon
+                ? "vct"
+                : sidebarItem.icon === ImageIcon
+                  ? "images"
+                  : sidebarItem.icon === BadgeCheckIcon
+                    ? "admin"
+                    : "sparkles",
     kind: sidebarItem.kind,
   };
 }
