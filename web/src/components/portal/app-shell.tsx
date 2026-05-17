@@ -6,6 +6,8 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronRightIcon,
+  LayoutDashboardIcon,
+  LayoutGridIcon,
   PanelRightOpenIcon,
 } from "@/components/ui/icons";
 
@@ -118,7 +120,6 @@ export function AppShell({
     return Number.isFinite(saved) ? clampCodexDrawerWidth(saved) : CODEX_DRAWER_DEFAULT_WIDTH;
   });
   const codexDragActiveRef = useRef(false);
-  const codexContentGutter = user.role === "admin" && codexOpen ? codexWidth : 0;
 
   useEffect(() => {
     function handleLastProjectChanged(event: Event) {
@@ -142,11 +143,8 @@ export function AppShell({
     };
   }, []);
 
-  useEffect(() => {
-    if (pathname === "/logs") {
-      setLogsProjectName(null);
-    }
-  }, [pathname]);
+  const currentLogsProjectName =
+    pathname.startsWith("/logs") && pathname !== "/logs" ? logsProjectName : null;
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -303,6 +301,19 @@ export function AppShell({
     );
   }
 
+  const primaryNavigation = [
+    {
+      href: "/home",
+      label: "Dashboard",
+      icon: LayoutDashboardIcon,
+    },
+    {
+      href: "/projects",
+      label: "Projetos",
+      icon: LayoutGridIcon,
+    },
+  ] as const;
+
   return (
     <SidebarProvider>
       <ThemePreferenceSync preferences={user.preferences} />
@@ -350,7 +361,7 @@ export function AppShell({
             userId={user.id}
             pathname={pathname}
             logsHref={logsHref}
-            logsProjectName={logsProjectName}
+            logsProjectName={currentLogsProjectName}
           />
 
           {visibleSidebarGroups.map((group) => (
@@ -418,14 +429,11 @@ export function AppShell({
       <SidebarInset className={cn(lockViewport && "h-screen overflow-hidden")}>
         <div
           className={cn(
-            "flex min-h-screen",
+            "relative flex min-h-screen",
             lockViewport && "h-screen min-h-0 overflow-hidden",
           )}
         >
-          <div
-            className="flex min-w-0 flex-1 flex-col"
-            style={codexContentGutter ? { paddingRight: `${codexContentGutter}px` } : undefined}
-          >
+          <div className="flex min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
               <div
                 className={cn(
@@ -474,6 +482,32 @@ export function AppShell({
               >
                 <div
                   className={cn(
+                    "mx-auto mb-4 flex w-full flex-wrap gap-2",
+                    fullWidth ? "max-w-none" : "max-w-7xl",
+                  )}
+                >
+                  {primaryNavigation.map((item) => {
+                    const Icon = item.icon;
+                    const active =
+                      item.href === "/home"
+                        ? pathname === "/home"
+                        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+                    return (
+                      <Button
+                        key={item.href}
+                        render={<Link href={item.href} />}
+                        variant={active ? "default" : "outline"}
+                        className="gap-2 rounded-full px-4"
+                      >
+                        <Icon className="size-4" />
+                        {item.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <div
+                  className={cn(
                     "flex min-h-0 w-full flex-1 flex-col",
                     fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
                   )}
@@ -484,50 +518,33 @@ export function AppShell({
             </div>
           </div>
 
-          {user.role === "admin" ? (
-            <div
-              className={cn(
-                "relative shrink-0 transition-[width,opacity] duration-300 ease-out",
-                codexOpen
-                  ? "opacity-100"
-                  : "w-0 opacity-0 pointer-events-none",
-              )}
-              style={codexOpen ? { width: `${codexWidth}px` } : undefined}
-            >
-              {codexOpen ? (
-                <button
-                  type="button"
-                  aria-label="Redimensionar chat"
-                  onPointerDown={startCodexResize}
-                  className="fixed inset-y-0 z-30 w-3 -translate-x-1/2 cursor-col-resize"
-                  style={{ right: `${codexWidth}px` }}
-                >
-                  <span className="absolute inset-y-6 left-1/2 w-px -translate-x-1/2 rounded-full bg-border/70 transition-colors hover:bg-primary/70" />
-                </button>
-              ) : null}
+          {user.role === "admin" && codexOpen ? (
+            <>
+              <button
+                type="button"
+                aria-label="Redimensionar chat"
+                onPointerDown={startCodexResize}
+                className="absolute inset-y-0 z-30 hidden w-3 -translate-x-1/2 cursor-col-resize lg:block"
+                style={{ left: `calc(100% - ${codexWidth}px)` }}
+              >
+                <span className="absolute inset-y-6 left-1/2 w-px -translate-x-1/2 rounded-full bg-border/70 transition-colors hover:bg-primary/70" />
+              </button>
 
               <aside
-                className={cn(
-                  "fixed right-0 top-0 z-20 h-screen min-h-0 min-w-0 overflow-hidden border-l border-border/60 bg-background/95 transition-[padding] duration-300 ease-out",
-                  codexOpen
-                    ? "px-3 py-[var(--app-page-padding-y)]"
-                    : "px-0 py-0",
-                )}
-                style={codexOpen ? { width: `${codexWidth}px` } : undefined}
+                className="hidden min-h-0 min-w-0 shrink-0 overflow-hidden border-l border-border/60 bg-background/95 px-3 py-[var(--app-page-padding-y)] lg:block"
+                style={{ width: `${codexWidth}px` }}
               >
-                {codexOpen ? (
-                  <CodexDrawer
-                    user={user}
-                    open={codexOpen}
-                    onOpenChange={setCodexOpen}
-                    onRequestOpenSettings={() => {
-                      setSettingsSection("codex");
-                      setSettingsOpen(true);
-                    }}
-                  />
-                ) : null}
+                <CodexDrawer
+                  user={user}
+                  open={codexOpen}
+                  onOpenChange={setCodexOpen}
+                  onRequestOpenSettings={() => {
+                    setSettingsSection("codex");
+                    setSettingsOpen(true);
+                  }}
+                />
               </aside>
-            </div>
+            </>
           ) : null}
         </div>
       </SidebarInset>

@@ -16,6 +16,14 @@ describe("portal-recent-section", () => {
     expect(resolvePortalRecentItem("/home", "/logs")).toBeNull();
   });
 
+  test("projects aparecem como recente dedicado", () => {
+    const recentItem = resolvePortalRecentItem("/projects", "/logs");
+
+    expect(recentItem?.label).toBe("Projetos");
+    expect(recentItem?.group).toBe("Operacao");
+    expect(recentItem?.id).toBe("projects");
+  });
+
   test("logs com colecao usam o nome da colecao no grupo", () => {
     const recentItem = resolvePortalRecentItem("/logs/portal-aluno", "/logs", "Portal aluno");
 

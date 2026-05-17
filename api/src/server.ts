@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 
 import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
+import dashboardRoutes from "./routes/dashboard.routes";
 import projectRoutes from "./routes/projects.routes";
 import logsRoutes from "./routes/logs.routes";
 import ssoRoutes from "./routes/sso.routes";
@@ -181,6 +182,7 @@ app.use(requestLogsMiddleware);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/sso", ssoRoutes);

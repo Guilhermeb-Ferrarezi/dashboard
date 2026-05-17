@@ -3,6 +3,7 @@ import {
   BadgeCheckIcon,
   CrosshairIcon,
   LayoutDashboardIcon,
+  LayoutGridIcon,
   LogsIcon,
   LinkIcon,
   SparklesIcon,
@@ -40,6 +41,7 @@ export type PortalRecentItem = {
 
 export const portalIconMap = {
   home: LayoutDashboardIcon,
+  grid: LayoutGridIcon,
   logs: LogsIcon,
   users: ShieldIcon,
   account: UserRoundIcon,
@@ -203,6 +205,18 @@ export function resolvePortalRecentItem(
 ): Omit<PortalRecentItem, "pinned" | "updatedAt"> | null {
   if (pathname === "/home") {
     return null;
+  }
+
+  if (pathname === "/projects") {
+    return {
+      id: "projects",
+      href: "/projects",
+      label: "Projetos",
+      description: "Entrada dedicada para abrir os apps do portal.",
+      group: "Operacao",
+      iconKey: "grid",
+      kind: "page",
+    };
   }
 
   if (pathname === "/profile") {
