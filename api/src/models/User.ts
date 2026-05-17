@@ -31,12 +31,12 @@ const UserSchema = new Schema<IUser>(
     preferences: {
       mode: {
         type: String,
-        enum: ["light", "dark", "system"],
+        enum: ["light", "dark", "system", "onix"],
         default: DEFAULT_THEME_PREFERENCES.mode,
       },
       accent: {
         type: String,
-        enum: ["ember", "sky", "emerald", "violet", "onix", "custom"],
+        enum: ["ember", "sky", "emerald", "violet", "custom"],
         default: DEFAULT_THEME_PREFERENCES.accent,
       },
       customAccentColor: {

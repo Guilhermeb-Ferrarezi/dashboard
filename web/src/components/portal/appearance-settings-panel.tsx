@@ -11,6 +11,7 @@ import {
   PaletteIcon,
   PanelTopIcon,
   Rows3Icon,
+  SquareIcon,
   SunIcon,
 } from "@/components/ui/icons";
 import { useTheme } from "next-themes";
@@ -33,6 +34,7 @@ import {
   THEME_DENSITY_OPTIONS,
   THEME_MODE_OPTIONS,
   THEME_RADIUS_OPTIONS,
+  getEffectiveColorScheme,
   type ThemeAccent,
   type ThemeDensity,
   type ThemeMode,
@@ -49,15 +51,7 @@ const modeIcons: Record<ThemeMode, React.ComponentType<{ className?: string }>> 
   system: MonitorIcon,
   light: SunIcon,
   dark: MoonIcon,
-};
-
-const accentSwatches: Record<ThemeAccent, string> = {
-  ember: "bg-[oklch(0.69_0.17_28)]",
-  sky: "bg-[oklch(0.74_0.13_250)]",
-  emerald: "bg-[oklch(0.73_0.12_155)]",
-  violet: "bg-[oklch(0.74_0.14_300)]",
-  onix: "bg-black",
-  custom: "",
+  onix: SquareIcon,
 };
 
 const radiusPreview: Record<ThemeRadius, string> = {
@@ -113,14 +107,7 @@ export function AppearanceSettingsPanel({
   }, [preferences]);
 
   useEffect(() => {
-    const effectiveTheme: "light" | "dark" =
-      draft.mode === "dark"
-        ? "dark"
-        : draft.mode === "light"
-          ? "light"
-          : resolvedTheme === "dark"
-            ? "dark"
-            : "light";
+    const effectiveTheme = getEffectiveColorScheme(draft.mode, resolvedTheme);
 
     applyThemePreferencesToDocument(
       document.documentElement,
@@ -190,7 +177,7 @@ export function AppearanceSettingsPanel({
           description="Controle como a interface acompanha luz, escuro ou o aparelho."
           icon={PanelTopIcon}
         >
-          <div className="grid overflow-hidden rounded-lg border border-border bg-muted/40 p-1 sm:grid-cols-3">
+          <div className="grid overflow-hidden rounded-lg border border-border bg-muted/40 p-1 sm:grid-cols-2 xl:grid-cols-4">
             {THEME_MODE_OPTIONS.map((option) => {
               const Icon = modeIcons[option.value];
               const active = draft.mode === option.value;
@@ -236,18 +223,24 @@ export function AppearanceSettingsPanel({
                   key={option.value}
                   type="button"
                   onClick={() => updatePreference("accent", option.value)}
-                  className={cn(
-                    "flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                    active
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-muted/30 hover:border-primary/45 hover:bg-muted/60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10",
-                      option.value !== "custom" && accentSwatches[option.value],
-                    )}
+                      className={cn(
+                        "flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                        active
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/30 hover:border-primary/45 hover:bg-muted/60",
+                      )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10",
+                        option.value !== "custom" &&
+                          ({
+                            ember: "bg-[oklch(0.69_0.17_28)]",
+                            sky: "bg-[oklch(0.74_0.13_250)]",
+                            emerald: "bg-[oklch(0.73_0.12_155)]",
+                            violet: "bg-[oklch(0.74_0.14_300)]",
+                          } as Record<Exclude<ThemeAccent, "custom">, string>)[option.value],
+                      )}
                     style={
                       option.value === "custom"
                         ? { backgroundColor: draft.customAccentColor }

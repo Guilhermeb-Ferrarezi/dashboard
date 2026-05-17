@@ -3,30 +3,31 @@ import { describe, expect, test } from "bun:test";
 import {
   DEFAULT_THEME_PREFERENCES,
   getThemeVariables,
+  getEffectiveColorScheme,
   normalizeThemePreferences,
 } from "./theme-preferences";
 
 describe("theme-preferences", () => {
-  test("keeps onix as a valid accent", () => {
+  test("keeps onix as a valid theme mode", () => {
     expect(
       normalizeThemePreferences({
-        accent: "onix",
+        mode: "onix",
       }),
     ).toMatchObject({
-      accent: "onix",
+      mode: "onix",
     });
   });
 
-  test("maps onix to a black primary palette", () => {
+  test("maps onix to the dark color scheme for accent variables", () => {
+    expect(getEffectiveColorScheme("onix", "light")).toBe("dark");
+
     const variables = getThemeVariables(
       {
         ...DEFAULT_THEME_PREFERENCES,
-        accent: "onix",
       },
-      "light",
+      "dark",
     );
 
-    expect(variables["--primary"]).toBe("oklch(0 0 0)");
-    expect(variables["--ring"]).toBe("oklch(0 0 0)");
+    expect(variables["--primary"]).toBe("oklch(0.69 0.17 28)");
   });
 });

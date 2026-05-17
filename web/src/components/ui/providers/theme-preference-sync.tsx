@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 
 import {
   applyThemePreferencesToDocument,
+  getEffectiveColorScheme,
   type ThemePreferences,
 } from "@/lib/theme-preferences";
 
@@ -20,12 +21,10 @@ export function ThemePreferenceSync({ preferences }: ThemePreferenceSyncProps) {
   }, [preferences.mode, setTheme]);
 
   useEffect(() => {
-    if (!resolvedTheme) {
-      return;
-    }
-
-    const effectiveTheme: "light" | "dark" =
-      resolvedTheme === "dark" ? "dark" : "light";
+    const effectiveTheme = getEffectiveColorScheme(
+      preferences.mode,
+      resolvedTheme,
+    );
 
     applyThemePreferencesToDocument(
       document.documentElement,

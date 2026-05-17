@@ -34,13 +34,13 @@ describe("normalizeThemePreferences", () => {
     });
   });
 
-  test("accepts the onix accent", () => {
+  test("accepts the onix theme mode", () => {
     expect(
       normalizeThemePreferences({
-        accent: "onix",
+        mode: "onix",
       }),
     ).toMatchObject({
-      accent: "onix",
+      mode: "onix",
     });
   });
 
