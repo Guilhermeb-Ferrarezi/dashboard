@@ -56,6 +56,7 @@ const accentSwatches: Record<ThemeAccent, string> = {
   sky: "bg-[oklch(0.74_0.13_250)]",
   emerald: "bg-[oklch(0.73_0.12_155)]",
   violet: "bg-[oklch(0.74_0.14_300)]",
+  onix: "bg-black",
   custom: "",
 };
 

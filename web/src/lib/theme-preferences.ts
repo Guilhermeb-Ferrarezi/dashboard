@@ -1,5 +1,5 @@
 export type ThemeMode = "light" | "dark" | "system";
-export type ThemeAccent = "ember" | "sky" | "emerald" | "violet" | "custom";
+export type ThemeAccent = "ember" | "sky" | "emerald" | "violet" | "onix" | "custom";
 export type ThemeRadius = "sm" | "md" | "lg";
 export type ThemeDensity = "compact" | "comfortable" | "spacious";
 
@@ -38,6 +38,7 @@ export const THEME_ACCENT_OPTIONS: Array<{
   { value: "sky", label: "Sky", description: "Azul mais tecnico." },
   { value: "emerald", label: "Emerald", description: "Verde mais neutro." },
   { value: "violet", label: "Violet", description: "Acento mais expressivo." },
+  { value: "onix", label: "Onix", description: "Preto total." },
   { value: "custom", label: "Custom", description: "Escolha uma cor." },
 ];
 
@@ -227,6 +228,42 @@ const THEME_PALETTES: Record<
       chart5: "oklch(0.63 0.08 310)",
     },
   },
+  onix: {
+    light: {
+      primary: "oklch(0 0 0)",
+      primaryForeground: "oklch(0.99 0.01 95)",
+      accent: "oklch(0.14 0 0)",
+      accentForeground: "oklch(0.99 0.01 95)",
+      ring: "oklch(0 0 0)",
+      sidebarPrimary: "oklch(0 0 0)",
+      sidebarPrimaryForeground: "oklch(0.99 0.01 95)",
+      sidebarAccent: "oklch(0.14 0 0)",
+      sidebarAccentForeground: "oklch(0.99 0.01 95)",
+      sidebarRing: "oklch(0 0 0)",
+      chart1: "oklch(0 0 0)",
+      chart2: "oklch(0.72 0.15 130)",
+      chart3: "oklch(0.68 0.13 235)",
+      chart4: "oklch(0.77 0.13 78)",
+      chart5: "oklch(0.6 0.08 310)",
+    },
+    dark: {
+      primary: "oklch(0 0 0)",
+      primaryForeground: "oklch(0.99 0.01 95)",
+      accent: "oklch(0.14 0 0)",
+      accentForeground: "oklch(0.99 0.01 95)",
+      ring: "oklch(0 0 0)",
+      sidebarPrimary: "oklch(0 0 0)",
+      sidebarPrimaryForeground: "oklch(0.99 0.01 95)",
+      sidebarAccent: "oklch(0.14 0 0)",
+      sidebarAccentForeground: "oklch(0.99 0.01 95)",
+      sidebarRing: "oklch(0 0 0)",
+      chart1: "oklch(0 0 0)",
+      chart2: "oklch(0.72 0.15 130)",
+      chart3: "oklch(0.68 0.13 235)",
+      chart4: "oklch(0.77 0.13 78)",
+      chart5: "oklch(0.6 0.08 310)",
+    },
+  },
 };
 
 function getPalette(accent: ThemeAccent, resolvedTheme: "light" | "dark") {
@@ -350,8 +387,9 @@ export function normalizeThemePreferences(input?: Partial<ThemePreferences> | nu
       input?.accent === "ember" ||
         input?.accent === "sky" ||
         input?.accent === "emerald" ||
-      input?.accent === "violet" ||
-      input?.accent === "custom"
+        input?.accent === "violet" ||
+        input?.accent === "onix" ||
+        input?.accent === "custom"
         ? input.accent
         : DEFAULT_THEME_PREFERENCES.accent,
     customAccentColor:

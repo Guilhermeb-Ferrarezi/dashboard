@@ -36,7 +36,7 @@ const UserSchema = new Schema<IUser>(
       },
       accent: {
         type: String,
-        enum: ["ember", "sky", "emerald", "violet", "custom"],
+        enum: ["ember", "sky", "emerald", "violet", "onix", "custom"],
         default: DEFAULT_THEME_PREFERENCES.accent,
       },
       customAccentColor: {

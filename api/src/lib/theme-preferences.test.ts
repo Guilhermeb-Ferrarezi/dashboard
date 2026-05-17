@@ -34,6 +34,16 @@ describe("normalizeThemePreferences", () => {
     });
   });
 
+  test("accepts the onix accent", () => {
+    expect(
+      normalizeThemePreferences({
+        accent: "onix",
+      }),
+    ).toMatchObject({
+      accent: "onix",
+    });
+  });
+
   test("accepts the documented theme alias", () => {
     expect(
       normalizeThemePreferences({

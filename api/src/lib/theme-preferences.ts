@@ -1,5 +1,5 @@
 export type ThemeMode = "light" | "dark" | "system";
-export type ThemeAccent = "ember" | "sky" | "emerald" | "violet" | "custom";
+export type ThemeAccent = "ember" | "sky" | "emerald" | "violet" | "onix" | "custom";
 export type ThemeRadius = "sm" | "md" | "lg";
 export type ThemeDensity = "compact" | "comfortable" | "spacious";
 
@@ -24,7 +24,7 @@ export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
 };
 
 const THEME_MODES: ThemeMode[] = ["light", "dark", "system"];
-const THEME_ACCENTS: ThemeAccent[] = ["ember", "sky", "emerald", "violet", "custom"];
+const THEME_ACCENTS: ThemeAccent[] = ["ember", "sky", "emerald", "violet", "onix", "custom"];
 const THEME_RADII: ThemeRadius[] = ["sm", "md", "lg"];
 const THEME_DENSITIES: ThemeDensity[] = ["compact", "comfortable", "spacious"];
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
