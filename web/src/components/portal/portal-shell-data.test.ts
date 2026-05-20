@@ -18,6 +18,6 @@ describe("portal-shell-data", () => {
       groups
         .find((group) => group.label === "Administracao")
         ?.items.map((item) => item.label),
-    ).toEqual(["Usuarios", "R2"]);
+    ).toEqual(["Usuarios", "R2", "Publicador"]);
   });
 });

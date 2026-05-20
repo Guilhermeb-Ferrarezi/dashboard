@@ -3,6 +3,11 @@ import { Router } from "express";
 import { createUser, listUsers } from "../controllers/admin.controller";
 import { uploadAdminR2Image } from "../controllers/admin-r2.controller";
 import {
+  deleteAdminSiteHandler,
+  listAdminPublishedSitesHandler,
+  publishAdminSiteHandler,
+} from "../controllers/admin-site-publisher.controller";
+import {
   createAdminAccessTokenHandler,
   listAdminAccessTokensHandler,
   revokeAdminAccessTokenHandler,
@@ -19,5 +24,8 @@ router.get("/tokens", listAdminAccessTokensHandler);
 router.post("/tokens", createAdminAccessTokenHandler);
 router.post("/tokens/:tokenId/revoke", revokeAdminAccessTokenHandler);
 router.post("/r2/images", uploadAdminR2Image);
+router.get("/publicador/sites", listAdminPublishedSitesHandler);
+router.post("/publicador/sites", publishAdminSiteHandler);
+router.delete("/publicador/sites", deleteAdminSiteHandler);
 
 export default router;

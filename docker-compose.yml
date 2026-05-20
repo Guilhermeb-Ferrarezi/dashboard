@@ -35,9 +35,11 @@ services:
       REDIS_URL: redis://redis:6379
       CODEX_HOME: /data/codex-home
       CODEX_WORKSPACE_ROOT: /app
+      SITE_PUBLISHER_STORAGE_DIR: /app/site-routes
     volumes:
       - ./:/app
       - ./.codex-home:/data/codex-home
+      - ./site-routes:/app/site-routes
     privileged: true
     cap_add:
       - SYS_ADMIN
@@ -62,6 +64,29 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000/api
       API_INTERNAL_URL: http://api:4000/api
+
+  site-router:
+    image: nginx:1.27-alpine
+    container_name: santos-tech-site-router
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3002:80"
+    volumes:
+      - ./site-routes:/srv/site-routes:ro
+      - ./nginx/site-router.conf:/etc/nginx/conf.d/default.conf:ro
+
+  santos-tech-home:
+    build:
+      context: .
+      dockerfile: docker/home-santos-tech-git.Dockerfile
+      args:
+        SITE_REPO_URL: https://github.com/Guilhermeb-Ferrarezi/Santos-Tech-Home-Page.git
+    container_name: santos-tech-home
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3003:3000"
 
 volumes:
   mongo_data:

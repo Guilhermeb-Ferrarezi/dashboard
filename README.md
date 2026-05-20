@@ -68,3 +68,6 @@ docker compose up -d --build
 - No boot, o container copia `AGENTS.md`, `AGENTS.override.md` e `openapi.yaml` para `CODEX_HOME` para guiar o Codex com a API do projeto.
 - O compose também sobe Mongo e Redis locais para o stack completo.
 - As portas do `web` e da `api` ficam presas em `127.0.0.1`, então não ficam abertas para fora da VPS.
+- O publicador de sites grava ZIPs publicados em `./site-routes` no host, montado no `api` em `/app/site-routes`.
+- O container `site-router` monta a mesma pasta em `/srv/site-routes` e serve as rotas publicadas por caminho.
+- O container `santos-tech-home` clona `https://github.com/Guilhermeb-Ferrarezi/Santos-Tech-Home-Page.git` no build e sobe a app separadamente na porta `3003`.

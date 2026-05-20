@@ -177,6 +177,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           kind: "resource",
           keywords: ["r2", "imagens", "upload", "bucket", "assets"],
         }),
+        portalItem({
+          href: "/admin/publicador",
+          label: "Publicador",
+          description: "Envio de ZIPs estaticos para o volume de sites",
+          icon: LayoutGridIcon,
+          kind: "resource",
+          keywords: ["publicador", "zip", "site", "rotas", "volume"],
+        }),
       ],
     },
   ];
