@@ -1,8 +1,7 @@
 "use client";
 
-import JSZip from "jszip";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -68,29 +67,6 @@ function formatInteger(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
-function summarizeSites(sites: PublishedSiteSummary[]) {
-  return sites.reduce(
-    (acc, site) => {
-      acc.totalFiles += site.fileCount;
-      acc.totalSize += site.archiveSizeBytes;
-
-      const updatedAt = new Date(site.updatedAt).getTime();
-      if (updatedAt > acc.latestUpdatedAt) {
-        acc.latestUpdatedAt = updatedAt;
-        acc.latestRoute = site.route;
-      }
-
-      return acc;
-    },
-    {
-      totalFiles: 0,
-      totalSize: 0,
-      latestUpdatedAt: 0,
-      latestRoute: "",
-    },
-  );
-}
-
 export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
   const [route, setRoute] = useState("/cursos/abc");
   const [archive, setArchive] = useState<File | null>(null);
@@ -99,6 +75,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
   const [archiveInfo, setArchiveInfo] = useState<string>("");
   const [pending, setPending] = useState(false);
   const [sites, setSites] = useState(initialSites);
+  const archiveInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setSites(initialSites);
@@ -116,6 +93,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
       }
 
       try {
+        const { default: JSZip } = await import("jszip");
         const zip = await JSZip.loadAsync(archive);
         const indexEntry = zip.file(/(^|\/)index\.html$/i)?.find(
           (entry) => entry.name.split("/").filter(Boolean).length === 1,
@@ -148,7 +126,12 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
   }, [archive]);
 
   const routePath = useMemo(() => buildRoutePath(route), [route]);
-  const summary = useMemo(() => summarizeSites(sites), [sites]);
+
+  useEffect(() => {
+    refreshSites().catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar a lista.");
+    });
+  }, []);
 
   async function refreshSites() {
     const response = await fetch(`${getClientApiBaseUrl()}/admin/publicador/sites`, {
@@ -206,8 +189,11 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
         throw new Error(message);
       }
 
-      setSites((current) => [data.site, ...current.filter((site) => site.route !== data.site.route)]);
+      await refreshSites();
       setArchive(null);
+      if (archiveInputRef.current) {
+        archiveInputRef.current.value = "";
+      }
       toast.success("Site publicado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao publicar o site.");
@@ -244,7 +230,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
         throw new Error(message);
       }
 
-      setSites((current) => current.filter((site) => site.route !== siteRoute));
+      await refreshSites();
       toast.success("Rota removida.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao remover o site.");
@@ -279,24 +265,12 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
 
             <div className="flex flex-wrap gap-3">
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Rotas</p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Rotas ativas</p>
                 <p className="mt-1 text-xl font-semibold text-foreground">{formatInteger(sites.length)}</p>
               </div>
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Arquivos</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">
-                  {formatInteger(summary.totalFiles)}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Volume</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">{formatBytes(summary.totalSize)}</p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Ultima</p>
-                <p className="mt-1 max-w-[16rem] truncate text-sm font-medium text-foreground">
-                  {summary.latestRoute || "--"}
-                </p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Publicador</p>
+                <p className="mt-1 text-sm font-medium text-foreground">Pronto para enviar</p>
               </div>
             </div>
           </div>
@@ -327,22 +301,11 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
             </div>
 
             <div className="rounded-3xl border border-border/70 bg-background/70 p-4 backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Status</p>
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Volume compartilhado</span>
-                  <span className="text-sm font-medium text-foreground">Ativo</span>
-                </div>
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Publicacoes</span>
-                  <span className="text-sm font-medium text-foreground">{formatInteger(sites.length)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-3 py-2">
-                  <span className="text-sm text-muted-foreground">Ultima atualizacao</span>
-                  <span className="text-sm font-medium text-foreground">
-                    {summary.latestUpdatedAt ? formatDate(new Date(summary.latestUpdatedAt).toISOString()) : "--"}
-                  </span>
-                </div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Guia rapido</p>
+              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
+                <p>1. Defina a rota publica.</p>
+                <p>2. Escolha o ZIP com index.html na raiz.</p>
+                <p>3. Publique e confirme a rota na lista ao lado.</p>
               </div>
             </div>
           </div>
@@ -387,12 +350,28 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                   <span className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                     ZIP
                   </span>
-                  <Input
-                    type="file"
-                    accept=".zip,application/zip,application/x-zip-compressed"
-                    onChange={(event) => setArchive(event.target.files?.[0] ?? null)}
-                    className="h-11 rounded-2xl bg-background/80 file:mr-3 file:rounded-xl file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary"
-                  />
+                  <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 p-2 pl-3">
+                    <input
+                      ref={archiveInputRef}
+                      type="file"
+                      accept=".zip,application/zip,application/x-zip-compressed"
+                      onChange={(event) => setArchive(event.target.files?.[0] ?? null)}
+                      className="sr-only"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-xl border-border/70 bg-card/80 px-4 text-sm font-medium"
+                      onClick={() => archiveInputRef.current?.click()}
+                    >
+                      Escolher ZIP
+                    </Button>
+                    <div className="min-w-0 flex-1 text-sm text-muted-foreground">
+                      <span className="block truncate font-medium text-foreground">
+                        {archive?.name ?? "No file selected"}
+                      </span>
+                    </div>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Precisa conter <span className="font-medium text-foreground">index.html</span> na raiz.
                   </p>
@@ -413,9 +392,12 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
 
                   <div className="mt-4 min-h-[320px] overflow-hidden rounded-2xl border border-border/70 bg-background/90">
                     {archivePreview ? (
-                      <pre className="max-h-[560px] overflow-auto p-4 text-xs leading-5 text-foreground">
-                        <code>{archivePreview}</code>
-                      </pre>
+                      <iframe
+                        title="Preview do index.html"
+                        sandbox=""
+                        srcDoc={archivePreview}
+                        className="h-[560px] w-full border-0 bg-background"
+                      />
                     ) : (
                       <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
                         <div className="flex size-14 items-center justify-center rounded-2xl border border-border/70 bg-muted/40">
@@ -432,40 +414,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                   </div>
                 </div>
 
-                <div className="flex flex-col justify-between gap-4 rounded-3xl border border-border/70 bg-background/80 p-4">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-foreground">Resumo</p>
-                      <span className="rounded-full border border-border/70 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-primary">
-                        Antes de publicar
-                      </span>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
-                        <span className="text-muted-foreground">Rota</span>
-                        <span className="max-w-[12rem] truncate font-medium text-foreground">{routePath || "--"}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
-                        <span className="text-muted-foreground">Arquivo</span>
-                        <span className="max-w-[12rem] truncate font-medium text-foreground">{archive?.name ?? "--"}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
-                        <span className="text-muted-foreground">Tamanho</span>
-                        <span className="font-medium text-foreground">
-                          {archive ? formatBytes(archive.size) : "--"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
-                        <span className="text-muted-foreground">Titulo</span>
-                        <span className="max-w-[12rem] truncate font-medium text-foreground">{archiveTitle || "--"}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
-                        <span className="text-muted-foreground">Itens</span>
-                        <span className="font-medium text-foreground">{archiveInfo || "--"}</span>
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="flex flex-col justify-end rounded-3xl border border-border/70 bg-background/80 p-4">
                   <Button type="submit" disabled={pending || !archive} className="h-11 rounded-2xl">
                     {pending ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
                     Publicar
