@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 
 export const dynamic = "force-dynamic";
 
 export default function CounterStrikePage() {
-  redirect("/counter-strike");
+  return <ClientRedirect to="/counter-strike" label="Counter-strike" />;
 }

@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { LoginForm } from "@/components/auth/login-form";
 import { getSessionUser } from "@/lib/session";
 
@@ -9,7 +8,7 @@ export default async function IndexPage() {
   const user = await getSessionUser();
 
   if (user) {
-    redirect("/home");
+    return <ClientRedirect to="/home" label="dashboard" />;
   }
 
   return <LoginForm />;

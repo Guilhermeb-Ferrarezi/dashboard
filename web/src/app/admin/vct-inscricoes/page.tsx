@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 
 export const dynamic = "force-dynamic";
 
 export default function VctInscricoesPage() {
-  redirect("/admin/vct");
+  return <ClientRedirect to="/admin/vct" label="Admin VCT" />;
 }

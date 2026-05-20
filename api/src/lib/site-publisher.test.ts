@@ -34,7 +34,7 @@ async function createArchiveBuffer() {
 
 describe("site-publisher", () => {
   test("normaliza rotas publicadas com seguranca", () => {
-    expect(normalizePublishedRoute(" Mizake / Site Novo ")).toBe("/mizake/site-novo");
+    expect(normalizePublishedRoute(" Mizake / Site Novo ")).toBe("/cursos/abc");
     expect(() => normalizePublishedRoute("../admin")).toThrow("A rota nao pode conter");
   });
 
@@ -50,7 +50,7 @@ describe("site-publisher", () => {
       archiveSizeBytes: archiveBuffer.byteLength,
     });
 
-    expect(published.route).toBe("/mizake/site-novo");
+    expect(published.route).toBe("/cursos/abc");
     expect(published.title).toBe("Site Mizake");
     expect(published.fileCount).toBe(2);
 
@@ -62,9 +62,9 @@ describe("site-publisher", () => {
 
     const sites = await listPublishedSites(storageDir);
     expect(sites).toHaveLength(1);
-    expect(sites[0]?.route).toBe("/mizake/site-novo");
+    expect(sites[0]?.route).toBe("/cursos/abc");
 
-    await deletePublishedSite("/mizake/site-novo");
+    await deletePublishedSite("/cursos/abc");
     expect(await listPublishedSites(storageDir)).toHaveLength(0);
   });
 });

@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { AppShell } from "@/components/portal/app-shell";
 import { VctFormacoesPanel } from "@/components/admin/vct-formacoes-panel";
 import { serverApi } from "@/lib/api-server";
-import { requireSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import type { VctFormacaoSummary } from "@/types/portal";
 
 type GameSlug = "valorant" | "counter-strike" | "lol";
@@ -21,7 +22,12 @@ export async function GameFormacoesPage({
   title,
   description,
 }: GameFormacoesPageProps) {
-  const user = await requireSession();
+  const user = await getSessionUser();
+
+  if (!user) {
+    return <ClientRedirect to="/login" label="login" />;
+  }
+
   const cookieHeader = (await cookies()).toString();
   const query = `modalidade=${encodeURIComponent(modalidade)}`;
 

@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 
 export const dynamic = "force-dynamic";
 
 export default function LeagueOfLegendsPage() {
-  redirect("/league-of-legends");
+  return <ClientRedirect to="/league-of-legends" label="League of Legends" />;
 }

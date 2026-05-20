@@ -1,14 +1,19 @@
 import { AppShell } from "@/components/portal/app-shell";
 import { ProjectLauncher } from "@/components/portal/project-launcher";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { requireSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import { loadPortalProjects } from "@/lib/portal-projects";
 import type { PortalProject } from "@/types/portal";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const user = await requireSession();
+  const user = await getSessionUser();
+
+  if (!user) {
+    return <ClientRedirect to="/login" label="login" />;
+  }
 
   let projectsLoadFailed = false;
   let projects: PortalProject[] = [];

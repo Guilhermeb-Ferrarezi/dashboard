@@ -1,8 +1,9 @@
 import { AppShell } from "@/components/portal/app-shell";
 import { PortalDashboard } from "@/components/portal/portal-dashboard";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { loadDashboardSummary } from "@/lib/dashboard";
-import { requireSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import { loadPortalProjects } from "@/lib/portal-projects";
 import { cookies } from "next/headers";
 import type { PortalProject } from "@/types/portal";
@@ -11,7 +12,12 @@ import type { DashboardSummary } from "@/types/dashboard";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const user = await requireSession();
+  const user = await getSessionUser();
+
+  if (!user) {
+    return <ClientRedirect to="/login" label="login" />;
+  }
+
   const cookieHeader = (await cookies()).toString();
 
   let projectsLoadFailed = false;
