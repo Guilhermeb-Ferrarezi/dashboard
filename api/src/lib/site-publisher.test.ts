@@ -33,12 +33,12 @@ async function createArchiveBuffer() {
 }
 
 describe("site-publisher", () => {
-  test("normaliza rotas publicadas com seguranca", () => {
-    expect(normalizePublishedRoute(" Mizake / Site Novo ")).toBe("/cursos/abc");
-    expect(() => normalizePublishedRoute("../admin")).toThrow("A rota nao pode conter");
+  test("normaliza rotas publicadas com segurança", () => {
+    expect(normalizePublishedRoute(" Mizake / Site Novo ")).toBe("/mizake/site-novo");
+    expect(() => normalizePublishedRoute("../admin")).toThrow("A rota não pode conter");
   });
 
-  test("publica, lista e remove um site estatico", async () => {
+  test("publica, lista e remove um site estático", async () => {
     const storageDir = await mkdtemp(path.join(os.tmpdir(), "site-publisher-"));
     process.env.SITE_PUBLISHER_STORAGE_DIR = storageDir;
 
@@ -50,7 +50,7 @@ describe("site-publisher", () => {
       archiveSizeBytes: archiveBuffer.byteLength,
     });
 
-    expect(published.route).toBe("/cursos/abc");
+    expect(published.route).toBe("/mizake/site-novo");
     expect(published.title).toBe("Site Mizake");
     expect(published.fileCount).toBe(2);
 
@@ -62,9 +62,9 @@ describe("site-publisher", () => {
 
     const sites = await listPublishedSites(storageDir);
     expect(sites).toHaveLength(1);
-    expect(sites[0]?.route).toBe("/cursos/abc");
+    expect(sites[0]?.route).toBe("/mizake/site-novo");
 
-    await deletePublishedSite("/cursos/abc");
+    await deletePublishedSite("/mizake/site-novo");
     expect(await listPublishedSites(storageDir)).toHaveLength(0);
   });
 });

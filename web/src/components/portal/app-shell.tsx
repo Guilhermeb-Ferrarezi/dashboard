@@ -41,6 +41,7 @@ import {
 import {
   PortalRecentSection,
 } from "@/components/portal/portal-recent-section";
+import { hydratePortalRecentsFromServer } from "@/components/portal/portal-recents";
 import { CodexDrawer } from "@/components/portal/codex-drawer";
 import {
   buildPortalSidebarGroups,
@@ -153,6 +154,10 @@ export function AppShell({
 
     window.localStorage.setItem(CODEX_DRAWER_WIDTH_KEY, String(codexWidth));
   }, [codexWidth]);
+
+  useEffect(() => {
+    void hydratePortalRecentsFromServer(user.id);
+  }, [user.id]);
 
   useEffect(() => {
     function handlePointerMove(event: PointerEvent) {

@@ -18,8 +18,10 @@ import {
   BookOpenTextIcon,
   ExternalLinkIcon,
   LoaderCircleIcon,
+  RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
+  XIcon,
 } from "@/components/ui/icons";
 import { getClientApiBaseUrl } from "@/lib/api";
 
@@ -68,12 +70,14 @@ function formatInteger(value: number) {
 }
 
 export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
-  const [route, setRoute] = useState("/cursos/abc");
+  const [route, setRoute] = useState("");
   const [archive, setArchive] = useState<File | null>(null);
   const [archivePreview, setArchivePreview] = useState<string>("");
   const [archiveTitle, setArchiveTitle] = useState<string>("");
   const [archiveInfo, setArchiveInfo] = useState<string>("");
   const [pending, setPending] = useState(false);
+  const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [sites, setSites] = useState(initialSites);
   const archiveInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -126,12 +130,6 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
   }, [archive]);
 
   const routePath = useMemo(() => buildRoutePath(route), [route]);
-
-  useEffect(() => {
-    refreshSites().catch((error) => {
-      toast.error(error instanceof Error ? error.message : "Falha ao atualizar a lista.");
-    });
-  }, []);
 
   async function refreshSites() {
     const response = await fetch(`${getClientApiBaseUrl()}/admin/publicador/sites`, {
@@ -207,6 +205,8 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
       return;
     }
 
+    setDeletingRoute(siteRoute);
+
     try {
       const response = await fetch(`${getClientApiBaseUrl()}/admin/publicador/sites`, {
         method: "DELETE",
@@ -234,84 +234,29 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
       toast.success("Rota removida.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao remover o site.");
+    } finally {
+      setDeletingRoute(null);
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await refreshSites();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar a lista.");
+    } finally {
+      setRefreshing(false);
     }
   }
 
   async function copyValue(value: string) {
     await navigator.clipboard.writeText(value);
-    toast.success("Copiado para a area de transferencia.");
+    toast.success("Copiado para a área de transferência.");
   }
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-6 shadow-[0_24px_80px_-48px_rgba(0,0,0,0.45)]">
-        <div className="pointer-events-none absolute -right-16 top-0 size-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 left-0 size-72 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
-          <div className="space-y-5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-              <span className="size-1.5 rounded-full bg-primary" />
-              Publicador de sites
-            </div>
-            <div className="space-y-3">
-              <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Publique ZIPs estaticos com mais clareza visual e menos friccao
-              </h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Escolha a rota, envie o ZIP e confira o preview antes de publicar. O volume
-                compartilhado recebe o arquivo final e o container de sites entrega a rota publica.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Rotas ativas</p>
-                <p className="mt-1 text-xl font-semibold text-foreground">{formatInteger(sites.length)}</p>
-              </div>
-              <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 backdrop-blur">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Publicador</p>
-                <p className="mt-1 text-sm font-medium text-foreground">Pronto para enviar</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-3xl border border-border/70 bg-background/70 p-4 backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Fluxo</p>
-              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    1
-                  </span>
-                  <p>Defina a rota publica que vai receber o index.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    2
-                  </span>
-                  <p>Escolha o ZIP e confira o preview do index.html.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                    3
-                  </span>
-                  <p>Publique e veja a rota entrar na lista de sites.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-border/70 bg-background/70 p-4 backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Guia rapido</p>
-              <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                <p>1. Defina a rota publica.</p>
-                <p>2. Escolha o ZIP com index.html na raiz.</p>
-                <p>3. Publique e confirme a rota na lista ao lado.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
         <Card className="overflow-hidden rounded-3xl border-border/70 bg-card/95 shadow-[0_24px_70px_-48px_rgba(0,0,0,0.5)]">
           <CardHeader className="border-b border-border/60 bg-gradient-to-b from-muted/30 to-transparent pb-5">
@@ -320,9 +265,9 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                 <UploadIcon className="size-5" />
               </div>
               <div className="space-y-1">
-                <CardTitle>Publicador de sites</CardTitle>
+                <CardTitle>Novo envio</CardTitle>
                 <CardDescription>
-                  Suba um ZIP estatico, escolha a rota e publique no volume compartilhado.
+                  Suba um ZIP estático, escolha a rota e publique no volume compartilhado.
                 </CardDescription>
               </div>
             </div>
@@ -332,7 +277,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <label className="space-y-2">
                   <span className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-                    Rota publica
+                    Rota pública
                   </span>
                   <Input
                     value={route}
@@ -368,9 +313,26 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                     </Button>
                     <div className="min-w-0 flex-1 text-sm text-muted-foreground">
                       <span className="block truncate font-medium text-foreground">
-                        {archive?.name ?? "No file selected"}
+                        {archive?.name ?? "Nenhum arquivo selecionado"}
                       </span>
                     </div>
+                    {archive ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          setArchive(null);
+                          if (archiveInputRef.current) {
+                            archiveInputRef.current.value = "";
+                          }
+                        }}
+                        aria-label="Remover arquivo selecionado"
+                      >
+                        <XIcon className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Precisa conter <span className="font-medium text-foreground">index.html</span> na raiz.
@@ -378,48 +340,56 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                 </label>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
-                <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-muted/25 to-background p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-foreground">Preview do index.html</p>
-                      <p className="text-xs text-muted-foreground">
-                        {archive ? archive.name : "Nenhum ZIP selecionado"}
-                      </p>
-                    </div>
-                    <BookOpenTextIcon className="size-5 text-muted-foreground" />
+              <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-muted/25 to-background p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {archiveTitle || "Preview do index.html"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {archive ? archive.name : "Nenhum ZIP selecionado"}
+                    </p>
                   </div>
+                  <BookOpenTextIcon className="size-5 shrink-0 text-muted-foreground" />
+                </div>
 
-                  <div className="mt-4 min-h-[320px] overflow-hidden rounded-2xl border border-border/70 bg-background/90">
-                    {archivePreview ? (
-                      <iframe
-                        title="Preview do index.html"
-                        sandbox=""
-                        srcDoc={archivePreview}
-                        className="h-[560px] w-full border-0 bg-background"
-                      />
-                    ) : (
-                      <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
-                        <div className="flex size-14 items-center justify-center rounded-2xl border border-border/70 bg-muted/40">
-                          <BookOpenTextIcon className="size-6" />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">Preview aguardando arquivo</p>
-                          <p className="max-w-sm text-xs">
-                            O conteudo da raiz do ZIP aparece aqui antes do envio.
-                          </p>
-                        </div>
+                <div className="mt-4 min-h-[320px] overflow-hidden rounded-2xl border border-border/70 bg-background/90">
+                  {archivePreview ? (
+                    <iframe
+                      title="Preview do index.html"
+                      sandbox=""
+                      srcDoc={archivePreview}
+                      className="h-[560px] w-full border-0 bg-background"
+                    />
+                  ) : (
+                    <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+                      <div className="flex size-14 items-center justify-center rounded-2xl border border-border/70 bg-muted/40">
+                        <BookOpenTextIcon className="size-6" />
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">Preview aguardando arquivo</p>
+                        <p className="max-w-sm text-xs">
+                          O conteúdo da raiz do ZIP aparece aqui antes do envio.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex flex-col justify-end rounded-3xl border border-border/70 bg-background/80 p-4">
-                  <Button type="submit" disabled={pending || !archive} className="h-11 rounded-2xl">
-                    {pending ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
-                    Publicar
-                  </Button>
-                </div>
+                {archiveInfo ? (
+                  <p className="mt-3 text-xs text-muted-foreground">{archiveInfo}</p>
+                ) : null}
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={pending || !archive}
+                  className="h-11 w-full rounded-2xl sm:w-auto sm:min-w-[200px]"
+                >
+                  {pending ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
+                  Publicar
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -431,11 +401,28 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
               <div className="space-y-1">
                 <CardTitle>Rotas publicadas</CardTitle>
                 <CardDescription>
-                  Conteudo servido pelo container de sites que monta o volume compartilhado.
+                  Conteúdo servido pelo container de sites que monta o volume compartilhado.
                 </CardDescription>
               </div>
-              <div className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                {formatInteger(sites.length)} ativas
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  {formatInteger(sites.length)} ativas
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="rounded-xl"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  aria-label="Atualizar lista"
+                >
+                  {refreshing ? (
+                    <LoaderCircleIcon className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCwIcon className="size-4" />
+                  )}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -445,7 +432,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                 <BookOpenTextIcon className="size-9" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-foreground">Nenhuma rota publicada</p>
-                  <p className="text-xs">Quando voce enviar um ZIP, ele aparece aqui.</p>
+                  <p className="text-xs">Quando você enviar um ZIP, ele aparece aqui.</p>
                 </div>
               </div>
             ) : (
@@ -491,11 +478,16 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                           variant="outline"
                           size="icon"
                           className="rounded-xl"
-                          asChild
+                          render={
+                            <Link
+                              href={site.route}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Abrir ${site.route}`}
+                            />
+                          }
                         >
-                          <Link href={site.route} target="_blank" rel="noreferrer">
-                            <ExternalLinkIcon className="size-4" />
-                          </Link>
+                          <ExternalLinkIcon className="size-4" />
                         </Button>
                         <Button
                           type="button"
@@ -503,9 +495,14 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                           size="icon"
                           className="rounded-xl text-destructive hover:text-destructive"
                           onClick={() => handleDelete(site.route)}
+                          disabled={deletingRoute === site.route}
                           aria-label={`Remover rota ${site.route}`}
                         >
-                          <Trash2Icon className="size-4" />
+                          {deletingRoute === site.route ? (
+                            <LoaderCircleIcon className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2Icon className="size-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -520,18 +517,6 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
               </div>
             )}
 
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 w-full rounded-2xl"
-              onClick={() =>
-                refreshSites().catch((error) => {
-                  toast.error(error instanceof Error ? error.message : "Falha ao atualizar a lista.");
-                })
-              }
-            >
-              Atualizar lista
-            </Button>
           </CardContent>
         </Card>
       </div>

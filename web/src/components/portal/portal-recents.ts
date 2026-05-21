@@ -1,5 +1,6 @@
 "use client";
 
+import { clientApi } from "@/lib/api";
 import type { PortalRecentItem } from "@/components/portal/portal-shell-data";
 
 const PORTAL_RECENTS_KEY_PREFIX = "portal:recents:";
@@ -7,6 +8,43 @@ const PORTAL_RECENTS_CHANGED_EVENT = "portal:recents-changed";
 const PORTAL_RECENTS_OPEN_EVENT = "portal:quicksearch-open";
 const PORTAL_RECENTS_OPEN_KEY_PREFIX = "portal:recents-open:";
 const MAX_RECENTS = 5;
+
+function syncTrackRecentToServer(item: PortalRecentItem) {
+  void clientApi<{ items: PortalRecentItem[] }>("/portal/recents/track", {
+    method: "POST",
+    body: JSON.stringify({ item }),
+  }).catch(() => undefined);
+}
+
+function syncPinRecentToServer(id: string) {
+  void clientApi<{ items: PortalRecentItem[] }>("/portal/recents/pin", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  }).catch(() => undefined);
+}
+
+export async function hydratePortalRecentsFromServer(userId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const response = await clientApi<{ items: PortalRecentItem[] }>(
+      "/portal/recents",
+    );
+    if (!Array.isArray(response.items) || response.items.length === 0) {
+      return;
+    }
+
+    const localItems = readPortalRecents(userId);
+    const merged = sortPortalRecents(
+      mergePortalRecentItems([...response.items, ...localItems]),
+    );
+    writePortalRecents(userId, merged);
+  } catch {
+    // offline ou erro de rede: mantemos o estado local.
+  }
+}
 
 function isLogsRecentItem(item: Pick<PortalRecentItem, "id" | "href">) {
   return item.id === "logs" || item.href === "/logs" || item.href.startsWith("/logs/");
@@ -123,19 +161,19 @@ export function trackPortalRecent(
   const itemId = getPortalRecentId(item);
   const currentPinned = currentItems.find((current) => current.id === itemId)?.pinned ?? false;
   const now = Date.now();
+  const trackedItem = normalizePortalRecentItem({
+    ...item,
+    id: itemId,
+    pinned: currentPinned,
+    updatedAt: now,
+  });
   const updatedItems = sortPortalRecents([
-    {
-      ...normalizePortalRecentItem({
-        ...item,
-        id: itemId,
-        pinned: currentPinned,
-        updatedAt: now,
-      }),
-    },
+    trackedItem,
     ...currentItems.filter((current) => current.id !== itemId),
   ]);
 
   writePortalRecents(userId, updatedItems);
+  syncTrackRecentToServer(trackedItem);
 }
 
 export function togglePortalRecentPin(userId: string, id: string) {
@@ -153,6 +191,7 @@ export function togglePortalRecentPin(userId: string, id: string) {
   );
 
   writePortalRecents(userId, updatedItems);
+  syncPinRecentToServer(id);
 }
 
 export function listenPortalRecentsChange(handler: () => void) {

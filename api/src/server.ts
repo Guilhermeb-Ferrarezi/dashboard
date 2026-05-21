@@ -14,6 +14,8 @@ import ssoRoutes from "./routes/sso.routes";
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
 import codexRoutes from "./routes/codex.routes";
+import portalRoutes from "./routes/portal.routes";
+import { startPortalRecentsFlushLoop } from "./lib/portal-recents-store";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -189,6 +191,7 @@ app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 app.use("/api/codex", codexRoutes);
+app.use("/api/portal", portalRoutes);
 
 app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
 app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
@@ -240,6 +243,7 @@ async function start() {
     });
 
     attachCodexGateway(server);
+    startPortalRecentsFlushLoop();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Falha ao conectar ao Mongo: ${message}`);

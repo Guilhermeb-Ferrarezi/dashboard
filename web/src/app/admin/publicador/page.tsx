@@ -29,9 +29,9 @@ export default async function AdminPublicadorPage() {
   return (
     <AppShell
       user={user}
-      eyebrow="Administracao"
+      eyebrow="Administração"
       title="Publicador de sites"
-      description="Publique ZIPs estaticos em rotas publicas servidas pelo container compartilhado."
+      description="Publique ZIPs estáticos em rotas públicas servidas pelo container compartilhado."
     >
       <AdminPublicadorPanel initialSites={response.sites} />
     </AppShell>

@@ -60,17 +60,17 @@ export function normalizePublishedRoute(value: string) {
     .filter(Boolean);
 
   if (segments.length === 0) {
-    throw new Error("Informe uma rota valida.");
+    throw new Error("Informe uma rota válida.");
   }
 
   const sanitizedSegments = segments.map((segment) => {
     if (segment === "." || segment === "..") {
-      throw new Error("A rota nao pode conter '..' ou '.'.");
+      throw new Error("A rota não pode conter '..' ou '.'.");
     }
 
     const sanitized = sanitizePathSegment(segment);
     if (!sanitized) {
-      throw new Error("A rota nao pode ter segmentos vazios.");
+      throw new Error("A rota não pode ter segmentos vazios.");
     }
 
     return sanitized;
@@ -109,7 +109,7 @@ function getEntryPathForWrite(routeDir: string, entryName: string) {
     targetPath !== normalizedRouteDir &&
     !targetPath.startsWith(`${normalizedRouteDir}${path.sep}`)
   ) {
-    throw new Error("O zip tenta escrever fora da rota destino.");
+    throw new Error("O ZIP tenta escrever fora da rota destino.");
   }
 
   return targetPath;
@@ -188,7 +188,7 @@ export async function publishStaticSiteZip(input: PublishSiteInput) {
   const rootIndexEntry = Object.values(archive.files).find((entry) => entry && !entry.dir && isRootIndexEntry(entry));
 
   if (!rootIndexEntry) {
-    throw new Error("O zip precisa conter um index.html na raiz.");
+    throw new Error("O ZIP precisa conter um index.html na raiz.");
   }
 
   await rm(routeDir, { recursive: true, force: true });
@@ -207,7 +207,7 @@ export async function publishStaticSiteZip(input: PublishSiteInput) {
       normalizedName.includes("/../") ||
       normalizedName.startsWith("/")
     ) {
-      throw new Error("O zip contem caminhos invalidos.");
+      throw new Error("O ZIP contém caminhos inválidos.");
     }
 
     const outputName =

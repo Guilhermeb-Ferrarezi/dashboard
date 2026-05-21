@@ -44,7 +44,7 @@ function parseMultipartRequest(req: Request, res: Response) {
 
 function parseRoute(value: unknown) {
   if (typeof value !== "string") {
-    throw new Error("Informe uma rota valida.");
+    throw new Error("Informe uma rota válida.");
   }
 
   return normalizePublishedRoute(value);
@@ -76,7 +76,7 @@ export async function publishAdminSiteHandler(req: Request, res: Response) {
     const route = parseRoute(req.body?.route);
 
     if (!archive) {
-      res.status(400).json({ ok: false, message: "Envie um arquivo ZIP valido." });
+      res.status(400).json({ ok: false, message: "Envie um arquivo ZIP válido." });
       return;
     }
 
