@@ -14,8 +14,8 @@ let _db: Db | null = null;
 
 export function getCheckoutDb(): Db {
   if (!_db) {
-    const url = process.env.POSTGRES_URL;
-    if (!url) throw new Error("POSTGRES_URL não configurado");
+    const url = process.env.DATABASE_HOME;
+    if (!url) throw new Error("DATABASE_HOME não configurado");
     _db = createDb(url);
   }
   return _db;
