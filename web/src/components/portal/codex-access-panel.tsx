@@ -118,6 +118,9 @@ function PermissionSelector({
     return label.toLowerCase().includes(q) || description.toLowerCase().includes(q);
   });
 
+  // grid: recurso | descrição | read | write | admin
+  const cols = "160px 1fr 72px 72px 72px";
+
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-background">
       {/* Search */}
@@ -131,23 +134,21 @@ function PermissionSelector({
       </div>
 
       {/* Header */}
-      <div className="grid border-b border-border bg-muted/40" style={{ gridTemplateColumns: "180px 1fr 120px" }}>
+      <div className="grid border-b border-border bg-muted/40" style={{ gridTemplateColumns: cols }}>
         <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Recurso
         </div>
         <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Descrição
         </div>
-        <div className="flex items-center justify-end gap-4 px-4 py-2">
-          {ALL_ACTIONS.map(({ action, label }) => (
-            <span
-              key={action}
-              className="w-12 text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-            >
-              {label}
-            </span>
-          ))}
-        </div>
+        {ALL_ACTIONS.map(({ action, label }) => (
+          <div
+            key={action}
+            className="flex items-center justify-center py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+          >
+            {label}
+          </div>
+        ))}
       </div>
 
       {/* Rows */}
@@ -163,44 +164,42 @@ function PermissionSelector({
               <div
                 key={key}
                 className="grid items-center hover:bg-muted/20"
-                style={{ gridTemplateColumns: "180px 1fr 120px" }}
+                style={{ gridTemplateColumns: cols }}
               >
                 <div className="px-4 py-3 text-sm font-medium text-foreground">{label}</div>
                 <div className="px-4 py-3 text-xs text-muted-foreground">{description}</div>
-                <div className="flex items-center justify-end gap-4 px-4 py-3">
-                  {ALL_ACTIONS.map(({ action }) => {
-                    const scope = `${key}:${action}` as string;
-                    const available = availableActions.has(action);
-                    const checked = selected.includes(scope);
+                {ALL_ACTIONS.map(({ action }) => {
+                  const scope = `${key}:${action}`;
+                  const available = availableActions.has(action);
+                  const checked = selected.includes(scope);
 
-                    return (
-                      <div key={action} className="flex w-12 items-center justify-center">
-                        {available ? (
-                          <button
-                            type="button"
-                            role="checkbox"
-                            aria-checked={checked}
-                            onClick={() => toggle(scope)}
-                            className={cn(
-                              "size-4 rounded border transition-colors",
-                              checked
-                                ? "border-primary bg-primary"
-                                : "border-border bg-background hover:border-primary/50",
-                            )}
-                          >
-                            {checked ? (
-                              <svg viewBox="0 0 12 12" className="size-full fill-primary-foreground p-0.5">
-                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                              </svg>
-                            ) : null}
-                          </button>
-                        ) : (
-                          <div className="size-4" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                  return (
+                    <div key={action} className="flex items-center justify-center py-3">
+                      {available ? (
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
+                          onClick={() => toggle(scope)}
+                          className={cn(
+                            "size-4 rounded border transition-colors",
+                            checked
+                              ? "border-primary bg-primary"
+                              : "border-border bg-background hover:border-primary/50",
+                          )}
+                        >
+                          {checked ? (
+                            <svg viewBox="0 0 12 12" className="size-full fill-primary-foreground p-0.5">
+                              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          ) : null}
+                        </button>
+                      ) : (
+                        <div className="size-4" />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })
