@@ -118,16 +118,21 @@ export async function getDashboard(_req: Request, res: Response) {
     const totalRevenueCents = Number(revenue?.value ?? 0);
     const paidCount = Number(paidOrders?.value ?? 0);
 
+    // db.execute() with postgres-js returns a RowList (array-like), first element IS the row
+    const receitaHojeRow = receitaHoje as { value: number } | undefined;
+    const receitaSemanaRow = receitaSemana as { value: number } | undefined;
+    const pedidosHojeRow = pedidosHoje as { value: number } | undefined;
+
     return res.json({
       totalOrders: Number(totalOrders?.value ?? 0),
       paidOrders: paidCount,
       totalRevenueCents,
       totalClientes: Number(totalClientes?.value ?? 0),
       ticketMedioCents: paidCount > 0 ? Math.round(totalRevenueCents / paidCount) : 0,
-      receitaHojeCents: Number((receitaHoje?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
-      receitaSemanaCents: Number((receitaSemana?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
-      pedidosHoje: Number((pedidosHoje?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
-      recentOrders: (recentOrdersRaw?.rows ?? []).map((r) => {
+      receitaHojeCents: Number(receitaHojeRow?.value ?? 0),
+      receitaSemanaCents: Number(receitaSemanaRow?.value ?? 0),
+      pedidosHoje: Number(pedidosHojeRow?.value ?? 0),
+      recentOrders: Array.from(recentOrdersRaw as Iterable<Record<string, unknown>>).map((r) => {
         const row = r as { id: number; user_id: number; description: string; amount_cents: number; status: string; created_at: Date; user_login: string | null };
         return {
           id: row.id,
@@ -139,15 +144,15 @@ export async function getDashboard(_req: Request, res: Response) {
           createdAt: new Date(row.created_at).toISOString()
         };
       }),
-      receitaPorProduto: (receitaPorProduto?.rows ?? []).map((r) => {
+      receitaPorProduto: Array.from(receitaPorProduto as Iterable<Record<string, unknown>>).map((r) => {
         const row = r as { produto: string; receita: number; qtd: number };
         return { produto: row.produto, receita: Number(row.receita), qtd: Number(row.qtd) };
       }),
-      pedidosPorDia: (pedidosPorDia?.rows ?? []).map((r) => {
+      pedidosPorDia: Array.from(pedidosPorDia as Iterable<Record<string, unknown>>).map((r) => {
         const row = r as { dia: string; total: number };
         return { dia: row.dia, total: Number(row.total) };
       }),
-      statusBreakdown: (statusBreakdown?.rows ?? []).map((r) => {
+      statusBreakdown: Array.from(statusBreakdown as Iterable<Record<string, unknown>>).map((r) => {
         const row = r as { status: string; total: number };
         return { status: row.status, total: Number(row.total) };
       })
