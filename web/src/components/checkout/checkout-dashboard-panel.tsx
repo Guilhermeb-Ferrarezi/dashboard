@@ -117,7 +117,15 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
     ? Math.round((data.paidOrders / data.totalOrders) * 100)
     : 0;
 
-  const maxReceita = Math.max(...data.receitaPorProduto.map((p) => p.receita), 1);
+  const receitaPorProduto = data.receitaPorProduto ?? [];
+  const pedidosPorDia = data.pedidosPorDia ?? [];
+  const statusBreakdown = data.statusBreakdown ?? [];
+  const ticketMedioCents = data.ticketMedioCents ?? 0;
+  const receitaHojeCents = data.receitaHojeCents ?? 0;
+  const receitaSemanaCents = data.receitaSemanaCents ?? 0;
+  const pedidosHoje = data.pedidosHoje ?? 0;
+
+  const maxReceita = Math.max(...receitaPorProduto.map((p) => p.receita), 1);
 
   return (
     <div className="flex flex-col gap-6">
@@ -153,7 +161,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
           icon={SparklesIcon}
           iconTone="bg-amber-500/10 text-amber-400"
           label="Ticket médio"
-          value={formatBRL(data.ticketMedioCents)}
+          value={formatBRL(ticketMedioCents)}
           hint="por pedido pago"
         />
       </div>
@@ -163,18 +171,18 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
         <StatCard
           icon={CalendarIcon}
           label="Receita hoje"
-          value={formatBRL(data.receitaHojeCents)}
+          value={formatBRL(receitaHojeCents)}
         />
         <StatCard
           icon={CalendarIcon}
           iconTone="bg-violet-500/10 text-violet-400"
           label="Receita esta semana"
-          value={formatBRL(data.receitaSemanaCents)}
+          value={formatBRL(receitaSemanaCents)}
         />
         <StatCard
           icon={ShoppingCartIcon}
           label="Pedidos hoje"
-          value={data.pedidosHoje.toLocaleString("pt-BR")}
+          value={pedidosHoje.toLocaleString("pt-BR")}
         />
         <StatCard
           icon={UsersIcon}
@@ -197,7 +205,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 pb-3">
-            <BarChart data={data.pedidosPorDia} />
+            <BarChart data={pedidosPorDia} />
           </CardContent>
         </Card>
 
@@ -213,13 +221,13 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
           <CardContent className="pt-4 pb-3">
             {data.statusBreakdown.length === 0
               ? <p className="text-xs text-muted-foreground text-center py-4">Sem dados.</p>
-              : <StatusBars data={data.statusBreakdown} />}
+              : <StatusBars data={statusBreakdown} />}
           </CardContent>
         </Card>
       </div>
 
       {/* Receita por produto */}
-      {data.receitaPorProduto.length > 0 && (
+      {receitaPorProduto.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="border-b border-border/40 py-3">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -230,7 +238,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 pb-3 flex flex-col gap-3">
-            {data.receitaPorProduto.map((p) => (
+            {receitaPorProduto.map((p) => (
               <div key={p.produto} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="truncate max-w-[60%]">{p.produto}</span>
