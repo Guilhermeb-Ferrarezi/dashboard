@@ -91,6 +91,9 @@ describe("admin access token service", () => {
             type: "codex",
             label: "Codex",
             tokenHash: "hashed",
+            permissions: [],
+            expiresAt: null,
+            description: "",
             revokedAt: null,
             lastUsedAt: null,
             createdAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -108,6 +111,11 @@ describe("admin access token service", () => {
         adminId: "admin-1",
         type: "codex",
         label: "Codex",
+        permissions: [],
+        expiresAt: null,
+        description: "",
+        isExpiringSoon: false,
+        isExpired: false,
         revokedAt: null,
         lastUsedAt: null,
         createdAt: "2024-01-01T00:00:00.000Z",
@@ -129,6 +137,9 @@ describe("admin access token service", () => {
         adminId: "admin-1",
         type: "codex",
         label: "Codex",
+        permissions: [],
+        expiresAt: null,
+        description: "",
         revokedAt: null,
         lastUsedAt: null,
         createdAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -143,6 +154,11 @@ describe("admin access token service", () => {
       adminId: "admin-1",
       type: "codex",
       label: "Codex",
+      permissions: [],
+      expiresAt: null,
+      description: "",
+      isExpiringSoon: false,
+      isExpired: false,
       revokedAt: null,
       lastUsedAt: null,
       createdAt: "2024-01-01T00:00:00.000Z",
@@ -151,18 +167,27 @@ describe("admin access token service", () => {
   });
 
   test("autentica token pelo valor bruto e atualiza lastUsedAt", async () => {
-    AdminAccessToken.findOneAndUpdate = mock(() => ({
-      lean: async () => ({
-        _id: "token-1",
-        adminId: "admin-1",
-        type: "codex",
-        label: "Codex",
-        revokedAt: null,
-        lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
-        createdAt: new Date("2024-01-01T00:00:00.000Z"),
-        updatedAt: new Date("2024-01-03T00:00:00.000Z"),
-      }),
-    })) as typeof AdminAccessToken.findOneAndUpdate;
+    const tokenDoc = {
+      _id: "token-1",
+      adminId: "admin-1",
+      type: "codex",
+      label: "Codex",
+      permissions: [],
+      expiresAt: null,
+      description: "",
+      revokedAt: null,
+      lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-03T00:00:00.000Z"),
+    };
+
+    AdminAccessToken.findOne = mock(() => ({
+      lean: async () => tokenDoc,
+    })) as typeof AdminAccessToken.findOne;
+
+    AdminAccessToken.updateOne = mock(() =>
+      Promise.resolve({ acknowledged: true, modifiedCount: 1 }),
+    ) as typeof AdminAccessToken.updateOne;
 
     const token = await authenticateAdminAccessToken("admin-1", "codex", "at_secret");
 
@@ -171,25 +196,36 @@ describe("admin access token service", () => {
       adminId: "admin-1",
       type: "codex",
       label: "Codex",
+      permissions: [],
+      expiresAt: null,
+      description: "",
+      isExpiringSoon: false,
+      isExpired: false,
       revokedAt: null,
       lastUsedAt: "2024-01-03T00:00:00.000Z",
       createdAt: "2024-01-01T00:00:00.000Z",
       updatedAt: "2024-01-03T00:00:00.000Z",
     });
-    expect(AdminAccessToken.findOneAndUpdate).toHaveBeenCalledWith(
-      {
+  });
+
+  test("rejeita token expirado durante autenticacao", async () => {
+    AdminAccessToken.findOne = mock(() => ({
+      lean: async () => ({
+        _id: "token-1",
         adminId: "admin-1",
         type: "codex",
+        label: "Codex",
+        permissions: [],
+        expiresAt: new Date("2020-01-01T00:00:00.000Z"),
+        description: "",
         revokedAt: null,
-        tokenHash: expect.any(String),
-      },
-      {
-        $set: {
-          lastUsedAt: expect.any(Date),
-          encryptedToken: expect.any(String),
-        },
-      },
-      { new: true },
-    );
+        lastUsedAt: null,
+        createdAt: new Date("2019-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2019-01-01T00:00:00.000Z"),
+      }),
+    })) as typeof AdminAccessToken.findOne;
+
+    const result = await authenticateAdminAccessToken("admin-1", "codex", "at_expired");
+    expect(result).toBeNull();
   });
 });

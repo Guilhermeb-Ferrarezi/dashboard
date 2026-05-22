@@ -35,17 +35,17 @@ describe("user access token helpers", () => {
 describe("user access token service", () => {
   const originalCreate = UserAccessToken.create;
   const originalFind = UserAccessToken.find;
+  const originalFindOne = UserAccessToken.findOne;
   const originalUpdateOne = UserAccessToken.updateOne;
   const originalUpdateMany = UserAccessToken.updateMany;
-  const originalFindOneAndUpdate = UserAccessToken.findOneAndUpdate;
   const originalFindById = User.findById;
 
   afterEach(() => {
     UserAccessToken.create = originalCreate;
     UserAccessToken.find = originalFind;
+    UserAccessToken.findOne = originalFindOne;
     UserAccessToken.updateOne = originalUpdateOne;
     UserAccessToken.updateMany = originalUpdateMany;
-    UserAccessToken.findOneAndUpdate = originalFindOneAndUpdate;
     User.findById = originalFindById;
   });
 
@@ -116,6 +116,9 @@ describe("user access token service", () => {
             type: "account",
             label: "Meu bot",
             tokenHash: "hashed",
+            permissions: [],
+            expiresAt: null,
+            description: "",
             revokedAt: null,
             lastUsedAt: null,
             createdAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -133,6 +136,11 @@ describe("user access token service", () => {
         userId: "user-1",
         type: "account",
         label: "Meu bot",
+        permissions: [],
+        expiresAt: null,
+        description: "",
+        isExpiringSoon: false,
+        isExpired: false,
         revokedAt: null,
         lastUsedAt: null,
         createdAt: "2024-01-01T00:00:00.000Z",
@@ -148,18 +156,27 @@ describe("user access token service", () => {
   });
 
   test("autentica token pelo valor bruto e resolve o usuario", async () => {
-    UserAccessToken.findOneAndUpdate = mock(() => ({
-      lean: async () => ({
+    const tokenDoc = {
       _id: "token-1",
       userId: "user-1",
       type: "account",
       label: "Meu bot",
+      permissions: [],
+      expiresAt: null,
+      description: "",
       revokedAt: null,
       lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
-        createdAt: new Date("2024-01-01T00:00:00.000Z"),
-        updatedAt: new Date("2024-01-03T00:00:00.000Z"),
-      }),
-    })) as typeof UserAccessToken.findOneAndUpdate;
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-03T00:00:00.000Z"),
+    };
+
+    UserAccessToken.findOne = mock(() => ({
+      lean: async () => tokenDoc,
+    })) as typeof UserAccessToken.findOne;
+
+    UserAccessToken.updateOne = mock(() =>
+      Promise.resolve({ acknowledged: true, modifiedCount: 1 }),
+    ) as typeof UserAccessToken.updateOne;
 
     User.findById = mock(() => ({
       select: () => ({
@@ -180,6 +197,11 @@ describe("user access token service", () => {
         userId: "user-1",
         type: "account",
         label: "Meu bot",
+        permissions: [],
+        expiresAt: null,
+        description: "",
+        isExpiringSoon: false,
+        isExpired: false,
         revokedAt: null,
         lastUsedAt: "2024-01-03T00:00:00.000Z",
         createdAt: "2024-01-01T00:00:00.000Z",
@@ -192,19 +214,27 @@ describe("user access token service", () => {
         role: "user",
       },
     });
-    expect(UserAccessToken.findOneAndUpdate).toHaveBeenCalledWith(
-      {
-        tokenHash: expect.any(String),
+  });
+
+  test("rejeita token expirado durante autenticacao", async () => {
+    UserAccessToken.findOne = mock(() => ({
+      lean: async () => ({
+        _id: "token-1",
+        userId: "user-1",
+        type: "account",
+        label: "Expirado",
+        permissions: [],
+        expiresAt: new Date("2020-01-01T00:00:00.000Z"),
+        description: "",
         revokedAt: null,
-      },
-      {
-        $set: {
-          lastUsedAt: expect.any(Date),
-          encryptedToken: expect.any(String),
-        },
-      },
-      { new: true },
-    );
+        lastUsedAt: null,
+        createdAt: new Date("2019-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2019-01-01T00:00:00.000Z"),
+      }),
+    })) as typeof UserAccessToken.findOne;
+
+    const result = await authenticateUserAccessToken("uat_expired");
+    expect(result).toBeNull();
   });
 
   test("resolve o valor ativo do token codex do usuario", async () => {

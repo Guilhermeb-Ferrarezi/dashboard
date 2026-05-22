@@ -10,13 +10,15 @@ const originalEnv = {
   JWT_SECRET: process.env.JWT_SECRET,
 };
 const originalFindById = User.findById;
-const originalUserAccessTokenFindOneAndUpdate = UserAccessToken.findOneAndUpdate;
+const originalUserAccessTokenFindOne = UserAccessToken.findOne;
+const originalUserAccessTokenUpdateOne = UserAccessToken.updateOne;
 
 afterEach(() => {
   process.env.CODEX_ACCESS_TOKEN = originalEnv.CODEX_ACCESS_TOKEN;
   process.env.JWT_SECRET = originalEnv.JWT_SECRET;
   User.findById = originalFindById;
-  UserAccessToken.findOneAndUpdate = originalUserAccessTokenFindOneAndUpdate;
+  UserAccessToken.findOne = originalUserAccessTokenFindOne;
+  UserAccessToken.updateOne = originalUserAccessTokenUpdateOne;
 });
 
 function createResponse() {
@@ -117,17 +119,27 @@ describe("codex service auth", () => {
   });
 
   test("aceita token pessoal de API do usuario", async () => {
-    UserAccessToken.findOneAndUpdate = (() => ({
+    process.env.CODEX_ACCESS_TOKEN = "codex_not_matching";
+
+    UserAccessToken.findOne = (() => ({
       lean: () => Promise.resolve({
         _id: "token-1",
         userId: "user-123",
+        type: "account",
         label: "Meu bot",
+        permissions: [],
+        expiresAt: null,
+        description: "",
         revokedAt: null,
         lastUsedAt: new Date("2024-01-03T00:00:00.000Z"),
         createdAt: new Date("2024-01-01T00:00:00.000Z"),
         updatedAt: new Date("2024-01-03T00:00:00.000Z"),
       }),
     })) as never;
+
+    UserAccessToken.updateOne = (() =>
+      Promise.resolve({ acknowledged: true, modifiedCount: 1 })
+    ) as never;
 
     User.findById = (() => ({
       select: () => ({
@@ -145,6 +157,9 @@ describe("codex service auth", () => {
       headers: {
         authorization: "Bearer uat_secret",
       },
+      method: "GET",
+      path: "/api/test",
+      ip: null,
     } as never;
     const res = createResponse() as never;
     let nextCalled = false;

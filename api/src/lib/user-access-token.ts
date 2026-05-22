@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 
 import { User } from "../models/User";
 import { UserAccessToken } from "../models/UserAccessToken";
+import { TokenUsageLog } from "../models/TokenUsageLog";
 import { decryptSecret, encryptSecret } from "./token-vault";
+import { validatePermissions } from "./token-permissions";
 
 export type UserAccessTokenType = "account" | "codex";
 
@@ -11,27 +13,53 @@ export type UserAccessTokenSummary = {
   userId: string;
   type: UserAccessTokenType;
   label: string;
+  permissions: string[];
+  expiresAt: string | null;
+  description: string;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
   revokedAt: string | null;
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
+const EXPIRING_SOON_MS = 7 * 24 * 3600 * 1000;
+
+function computeExpiryFlags(expiresAt: Date | null | undefined) {
+  if (!expiresAt) return { isExpiringSoon: false, isExpired: false };
+  const now = Date.now();
+  const exp = expiresAt.getTime();
+  return {
+    isExpired: exp < now,
+    isExpiringSoon: exp >= now && exp - now < EXPIRING_SOON_MS,
+  };
+}
+
 function serializeAccessToken(token: {
   _id: unknown;
   userId: string;
   type?: UserAccessTokenType | null;
   label: string;
+  permissions?: string[] | null;
+  expiresAt?: Date | null;
+  description?: string | null;
   revokedAt?: Date | null;
   lastUsedAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }): UserAccessTokenSummary {
+  const { isExpiringSoon, isExpired } = computeExpiryFlags(token.expiresAt ?? null);
   return {
     id: String(token._id),
     userId: token.userId,
     type: token.type ?? "account",
     label: token.label,
+    permissions: token.permissions ?? [],
+    expiresAt: token.expiresAt?.toISOString() ?? null,
+    description: token.description ?? "",
+    isExpiringSoon,
+    isExpired,
     revokedAt: token.revokedAt?.toISOString() ?? null,
     lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
     createdAt: token.createdAt?.toISOString() ?? new Date(0).toISOString(),
@@ -55,6 +83,9 @@ export async function createUserAccessToken(params: {
   userId: string;
   label: string;
   type?: UserAccessTokenType;
+  permissions?: string[];
+  expiresAt?: Date | null;
+  description?: string;
 }) {
   const type = normalizeUserAccessTokenType(params.type);
   const plaintextToken = createUserAccessTokenValue();
@@ -74,6 +105,9 @@ export async function createUserAccessToken(params: {
     label: params.label,
     tokenHash,
     encryptedToken,
+    permissions: params.permissions ?? [],
+    expiresAt: params.expiresAt ?? null,
+    description: params.description ?? "",
     revokedAt: null,
     lastUsedAt: null,
   });
@@ -137,28 +171,22 @@ export async function revokeUserAccessToken(userId: string, tokenId: string) {
 
 export async function authenticateUserAccessToken(plaintextToken: string) {
   const tokenHash = hashUserAccessToken(plaintextToken);
-  const token = await UserAccessToken.findOneAndUpdate(
-    { tokenHash, revokedAt: null },
-    {
-      $set: {
-        lastUsedAt: new Date(),
-        encryptedToken: encryptSecret(plaintextToken),
-      },
-    },
-    { new: true },
-  ).lean();
+  const token = await UserAccessToken.findOne({ tokenHash, revokedAt: null }).lean();
 
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
+
+  if (token.expiresAt && token.expiresAt < new Date()) return null;
+
+  await UserAccessToken.updateOne(
+    { _id: token._id },
+    { $set: { lastUsedAt: new Date(), encryptedToken: encryptSecret(plaintextToken) } },
+  );
 
   const user = await User.findById(token.userId)
     .select("_id username email role")
     .lean();
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return {
     token: serializeAccessToken(token),
@@ -170,3 +198,47 @@ export async function authenticateUserAccessToken(plaintextToken: string) {
     },
   };
 }
+
+export async function logUserTokenUsage(params: {
+  tokenId: string;
+  tokenHash: string;
+  userId: string;
+  method: string;
+  path: string;
+  ip: string | null;
+  userAgent: string | null;
+}) {
+  try {
+    await TokenUsageLog.create({
+      tokenId: params.tokenId,
+      tokenHash: params.tokenHash,
+      ownerType: "user",
+      ownerId: params.userId,
+      method: params.method,
+      path: params.path,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      usedAt: new Date(),
+    });
+  } catch {
+    // fire-and-forget
+  }
+}
+
+export async function listUserTokenUsage(userId: string, tokenId: string, limit = 20) {
+  const logs = await TokenUsageLog.find({ tokenId, ownerType: "user", ownerId: userId })
+    .sort({ usedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  return logs.map((l) => ({
+    id: String(l._id),
+    method: l.method,
+    path: l.path,
+    ip: l.ip,
+    userAgent: l.userAgent,
+    usedAt: l.usedAt.toISOString(),
+  }));
+}
+
+export { validatePermissions };

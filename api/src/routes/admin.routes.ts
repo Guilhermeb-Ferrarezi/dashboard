@@ -9,6 +9,7 @@ import {
 } from "../controllers/admin-site-publisher.controller";
 import {
   createAdminAccessTokenHandler,
+  getAdminTokenUsageHandler,
   listAdminAccessTokensHandler,
   revokeAdminAccessTokenHandler,
 } from "../controllers/admin-access-token.controller";
@@ -23,6 +24,7 @@ router.post("/users", createUser);
 router.get("/tokens", listAdminAccessTokensHandler);
 router.post("/tokens", createAdminAccessTokenHandler);
 router.post("/tokens/:tokenId/revoke", revokeAdminAccessTokenHandler);
+router.get("/tokens/:tokenId/usage", getAdminTokenUsageHandler);
 router.post("/r2/images", uploadAdminR2Image);
 router.get("/publicador/sites", listAdminPublishedSitesHandler);
 router.post("/publicador/sites", publishAdminSiteHandler);

@@ -3,7 +3,9 @@ import type { Request, Response } from "express";
 import {
   createUserAccessToken,
   listUserAccessTokens,
+  listUserTokenUsage,
   revokeUserAccessToken,
+  validatePermissions,
   type UserAccessTokenType,
 } from "../lib/user-access-token";
 
@@ -15,6 +17,7 @@ type UserAccessTokenDeps = {
   listUserAccessTokens?: typeof listUserAccessTokens;
   createUserAccessToken?: typeof createUserAccessToken;
   revokeUserAccessToken?: typeof revokeUserAccessToken;
+  listUserTokenUsage?: typeof listUserTokenUsage;
 };
 
 function normalizeType(value: unknown): UserAccessTokenType | null {
@@ -65,10 +68,28 @@ export async function createUserAccessTokenHandler(
     return res.status(400).json({ message: "Tipo de token invalido." });
   }
 
+  const permissions = validatePermissions(req.body?.permissions);
+
+  const rawExpiresAt = req.body?.expiresAt;
+  let expiresAt: Date | null = null;
+  if (rawExpiresAt) {
+    const parsed = new Date(rawExpiresAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: "Data de expiracao invalida." });
+    }
+    expiresAt = parsed;
+  }
+
+  const description =
+    typeof req.body?.description === "string" ? req.body.description.slice(0, 500) : "";
+
   const created = await (deps.createUserAccessToken ?? createUserAccessToken)({
     userId,
     label,
     type: type ?? "account",
+    permissions,
+    expiresAt,
+    description,
   });
 
   return res.status(201).json({
@@ -106,4 +127,30 @@ export async function revokeUserAccessTokenHandler(
   }
 
   return res.json({ ok: true, revoked: true, tokenId });
+}
+
+export async function getUserTokenUsageHandler(
+  req: Request,
+  res: Response,
+  deps: UserAccessTokenDeps = {},
+) {
+  const userId = getUserId(req);
+
+  if (!userId) {
+    return res.status(401).json({ message: "Missing token" });
+  }
+
+  const tokenId = Array.isArray(req.params.tokenId)
+    ? req.params.tokenId[0]
+    : req.params.tokenId;
+
+  if (!tokenId) {
+    return res.status(400).json({ message: "Token nao informada." });
+  }
+
+  const rawLimit = Number(req.query?.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+
+  const logs = await (deps.listUserTokenUsage ?? listUserTokenUsage)(userId, tokenId, limit);
+  return res.json({ ok: true, logs });
 }

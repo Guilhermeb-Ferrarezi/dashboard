@@ -4,7 +4,9 @@ import {
   createAdminAccessToken,
   getActiveAdminAccessToken,
   listAdminAccessTokens,
+  listAdminTokenUsage,
   revokeAdminAccessToken,
+  validatePermissions,
 } from "../lib/admin-access-token";
 
 function getAdminId(req: Request) {
@@ -16,6 +18,7 @@ type AdminAccessTokenDeps = {
   createAdminAccessToken?: typeof createAdminAccessToken;
   revokeAdminAccessToken?: typeof revokeAdminAccessToken;
   getActiveAdminAccessToken?: typeof getActiveAdminAccessToken;
+  listAdminTokenUsage?: typeof listAdminTokenUsage;
 };
 
 export async function listAdminAccessTokensHandler(
@@ -51,10 +54,28 @@ export async function createAdminAccessTokenHandler(
     return res.status(400).json({ message: "Preencha tipo e nome do token." });
   }
 
+  const permissions = validatePermissions(req.body?.permissions);
+
+  const rawExpiresAt = req.body?.expiresAt;
+  let expiresAt: Date | null = null;
+  if (rawExpiresAt) {
+    const parsed = new Date(rawExpiresAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: "Data de expiracao invalida." });
+    }
+    expiresAt = parsed;
+  }
+
+  const description =
+    typeof req.body?.description === "string" ? req.body.description.slice(0, 500) : "";
+
   const created = await (deps.createAdminAccessToken ?? createAdminAccessToken)({
     adminId,
     type,
     label,
+    permissions,
+    expiresAt,
+    description,
   });
 
   return res.status(201).json({
@@ -111,4 +132,30 @@ export async function getCurrentAdminCodexTokenStatus(
     adminId,
     "codex",
   );
+}
+
+export async function getAdminTokenUsageHandler(
+  req: Request,
+  res: Response,
+  deps: AdminAccessTokenDeps = {},
+) {
+  const adminId = getAdminId(req);
+
+  if (!adminId) {
+    return res.status(401).json({ message: "Missing token" });
+  }
+
+  const tokenId = Array.isArray(req.params.tokenId)
+    ? req.params.tokenId[0]
+    : req.params.tokenId;
+
+  if (!tokenId) {
+    return res.status(400).json({ message: "Token nao informada." });
+  }
+
+  const rawLimit = Number(req.query?.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+
+  const logs = await (deps.listAdminTokenUsage ?? listAdminTokenUsage)(adminId, tokenId, limit);
+  return res.json({ ok: true, logs });
 }

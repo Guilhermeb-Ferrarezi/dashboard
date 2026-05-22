@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 import { readCodexServiceTokenFromRequest, resolveCodexServiceToken } from "../lib/codex-service-token";
-import { authenticateUserAccessToken } from "../lib/user-access-token";
+import { authenticateUserAccessToken, hashUserAccessToken, logUserTokenUsage } from "../lib/user-access-token";
 import { User } from "../models/User";
 
 function readAuthToken(req: Request) {
@@ -77,6 +77,15 @@ export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, 
 
     if (authenticatedUserToken) {
       req.user = authenticatedUserToken.user;
+      void logUserTokenUsage({
+        tokenId: authenticatedUserToken.token.id,
+        tokenHash: hashUserAccessToken(authToken),
+        userId: authenticatedUserToken.token.userId,
+        method: req.method,
+        path: req.path,
+        ip: req.ip ?? null,
+        userAgent: req.headers["user-agent"] ?? null,
+      });
       return next();
     }
   }

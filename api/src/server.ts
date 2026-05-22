@@ -25,6 +25,7 @@ import {
 } from "./controllers/user.controller";
 import {
   createUserAccessTokenHandler,
+  getUserTokenUsageHandler,
   listUserAccessTokensHandler,
   revokeUserAccessTokenHandler,
 } from "./controllers/user-access-token.controller";
@@ -202,6 +203,7 @@ app.put("/api/user/preferences", verifyJWTOrCodexServiceToken, updateCurrentUser
 app.get("/api/user/tokens", verifyJWTOrCodexServiceToken, listUserAccessTokensHandler);
 app.post("/api/user/tokens", verifyJWTOrCodexServiceToken, createUserAccessTokenHandler);
 app.post("/api/user/tokens/:tokenId/revoke", verifyJWTOrCodexServiceToken, revokeUserAccessTokenHandler);
+app.get("/api/user/tokens/:tokenId/usage", verifyJWTOrCodexServiceToken, getUserTokenUsageHandler);
 
 app.get("/api/user", verifyJWTOrCodexServiceToken, requireRole("user"), (_req, res) => {
   res.json({ message: "Area do usuario liberada." });
