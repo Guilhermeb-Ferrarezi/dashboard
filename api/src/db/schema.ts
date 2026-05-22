@@ -21,7 +21,9 @@ export const checkoutCustomers = pgTable("checkout_customers", {
 
 export const checkoutOrders = pgTable("checkout_orders", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => checkoutCustomers.userId, { onDelete: "cascade" }),
   productId: text("product_id").notNull(),
   description: text("description").notNull(),
   amountCents: integer("amount_cents").notNull(),
@@ -38,7 +40,7 @@ export const checkoutPayments = pgTable("checkout_payments", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id")
     .notNull()
-    .references(() => checkoutOrders.id),
+    .references(() => checkoutOrders.id, { onDelete: "cascade" }),
   abacateEventId: text("abacate_event_id"),
   status: text("status").notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),

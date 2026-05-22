@@ -24,6 +24,34 @@ export async function runCheckoutMigrations(): Promise<void> {
     ADD COLUMN IF NOT EXISTS user_login TEXT,
     ADD COLUMN IF NOT EXISTS user_email TEXT
   `;
+
+  await _raw`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'checkout_orders_user_id_fkey'
+      ) THEN
+        ALTER TABLE checkout_orders
+          ADD CONSTRAINT checkout_orders_user_id_fkey
+            FOREIGN KEY (user_id) REFERENCES checkout_customers(user_id)
+            ON DELETE CASCADE;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'checkout_payments_order_id_fkey'
+      ) THEN
+        ALTER TABLE checkout_payments
+          DROP CONSTRAINT checkout_payments_order_id_fkey;
+      END IF;
+
+      ALTER TABLE checkout_payments
+        ADD CONSTRAINT checkout_payments_order_id_fkey
+          FOREIGN KEY (order_id) REFERENCES checkout_orders(id)
+          ON DELETE CASCADE;
+    END;
+    $$
+  `;
+
   _migrated = true;
 }
 
