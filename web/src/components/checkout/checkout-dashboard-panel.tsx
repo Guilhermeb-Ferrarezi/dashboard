@@ -219,7 +219,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 pb-3">
-            {data.statusBreakdown.length === 0
+            {statusBreakdown.length === 0
               ? <p className="text-xs text-muted-foreground text-center py-4">Sem dados.</p>
               : <StatusBars data={statusBreakdown} />}
           </CardContent>
