@@ -13,3 +13,5 @@ web/out/
 web/build/
 web/tsconfig.tsbuildinfo
 web/*.log
+.tmp
+.claude
