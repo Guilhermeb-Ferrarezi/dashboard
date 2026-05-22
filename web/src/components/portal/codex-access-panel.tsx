@@ -31,8 +31,8 @@ import type {
 } from "@/types/user-access-token";
 import {
   SCOPE_GROUPS,
-  SCOPE_LABELS,
   SCOPE_PRESETS,
+  type TokenAction,
 } from "@/types/token-permissions";
 
 type UserAccessTokenResponse = {
@@ -87,7 +87,13 @@ function formatDateOnly(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(value));
 }
 
-// ——— Permission selector ————————————————————————————————————————————————
+// ——— Permission selector (tabela estilo Cloudflare) ————————————————————
+
+const ALL_ACTIONS: Array<{ action: TokenAction; label: string }> = [
+  { action: "read",  label: "Leitura" },
+  { action: "write", label: "Escrita" },
+  { action: "admin", label: "Admin" },
+];
 
 function PermissionSelector({
   selected,
@@ -96,6 +102,8 @@ function PermissionSelector({
   selected: string[];
   onChange: (perms: string[]) => void;
 }) {
+  const [search, setSearch] = useState("");
+
   function toggle(scope: string) {
     if (selected.includes(scope)) {
       onChange(selected.filter((s) => s !== scope));
@@ -104,35 +112,100 @@ function PermissionSelector({
     }
   }
 
+  const filtered = Object.entries(SCOPE_GROUPS).filter(([, { label, description }]) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return label.toLowerCase().includes(q) || description.toLowerCase().includes(q);
+  });
+
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-      {Object.entries(SCOPE_GROUPS).map(([key, { label, scopes }]) => (
-        <div key={key}>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {label}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {scopes.map((scope) => {
-              const active = selected.includes(scope);
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => toggle(scope)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
-                    active
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/20 hover:text-foreground",
-                  )}
-                >
-                  {SCOPE_LABELS[scope] ?? scope}
-                </button>
-              );
-            })}
-          </div>
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
+      {/* Search */}
+      <div className="border-b border-border px-3 py-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Pesquisar grupos de permissão..."
+          className="h-8 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+        />
+      </div>
+
+      {/* Header */}
+      <div className="grid border-b border-border bg-muted/40" style={{ gridTemplateColumns: "180px 1fr 120px" }}>
+        <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Recurso
         </div>
-      ))}
+        <div className="px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Descrição
+        </div>
+        <div className="flex items-center justify-end gap-4 px-4 py-2">
+          {ALL_ACTIONS.map(({ action, label }) => (
+            <span
+              key={action}
+              className="w-12 text-center text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div className="divide-y divide-border">
+        {filtered.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+            Nenhum grupo encontrado.
+          </div>
+        ) : (
+          filtered.map(([key, { label, description, actions }]) => {
+            const availableActions = new Set(actions.map((a) => a.action));
+            return (
+              <div
+                key={key}
+                className="grid items-center hover:bg-muted/20"
+                style={{ gridTemplateColumns: "180px 1fr 120px" }}
+              >
+                <div className="px-4 py-3 text-sm font-medium text-foreground">{label}</div>
+                <div className="px-4 py-3 text-xs text-muted-foreground">{description}</div>
+                <div className="flex items-center justify-end gap-4 px-4 py-3">
+                  {ALL_ACTIONS.map(({ action }) => {
+                    const scope = `${key}:${action}` as string;
+                    const available = availableActions.has(action);
+                    const checked = selected.includes(scope);
+
+                    return (
+                      <div key={action} className="flex w-12 items-center justify-center">
+                        {available ? (
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={checked}
+                            onClick={() => toggle(scope)}
+                            className={cn(
+                              "size-4 rounded border transition-colors",
+                              checked
+                                ? "border-primary bg-primary"
+                                : "border-border bg-background hover:border-primary/50",
+                            )}
+                          >
+                            {checked ? (
+                              <svg viewBox="0 0 12 12" className="size-full fill-primary-foreground p-0.5">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                              </svg>
+                            ) : null}
+                          </button>
+                        ) : (
+                          <div className="size-4" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

@@ -20,17 +20,73 @@ export const ALL_SCOPES: TokenScope[] = [
   "admin:admin",
 ];
 
-export const SCOPE_GROUPS: Record<string, { label: string; scopes: TokenScope[] }> = {
-  profile:  { label: "Perfil",     scopes: ["profile:read", "profile:write"] },
-  sessions: { label: "Sessões",    scopes: ["sessions:read", "sessions:admin"] },
-  checkout: { label: "Checkout",   scopes: ["checkout:read", "checkout:write", "checkout:admin"] },
-  projects: { label: "Projetos",   scopes: ["projects:read", "projects:write"] },
-  logs:     { label: "Logs",       scopes: ["logs:read"] },
-  codex:    { label: "Codex",      scopes: ["codex:read", "codex:write"] },
-  admin:    { label: "Admin",      scopes: ["admin:read", "admin:write", "admin:admin"] },
+export type ScopeGroupDef = {
+  label: string;
+  description: string;
+  actions: Array<{ action: TokenAction; label: string }>;
 };
 
-export const SCOPE_LABELS: Record<TokenScope, string> = {
+export const SCOPE_GROUPS: Record<string, ScopeGroupDef> = {
+  profile: {
+    label: "Perfil",
+    description: "Dados do perfil do usuário: nome, e-mail e preferências.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "write", label: "Escrita" },
+    ],
+  },
+  sessions: {
+    label: "Sessões",
+    description: "Sessões ativas e controle de acesso do usuário.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "admin", label: "Admin" },
+    ],
+  },
+  checkout: {
+    label: "Checkout",
+    description: "Pedidos, produtos e configurações do sistema de checkout.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "write", label: "Escrita" },
+      { action: "admin", label: "Admin" },
+    ],
+  },
+  projects: {
+    label: "Projetos",
+    description: "Projetos e recursos publicados no portal.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "write", label: "Escrita" },
+    ],
+  },
+  logs: {
+    label: "Logs",
+    description: "Logs de requisições e eventos do sistema.",
+    actions: [
+      { action: "read", label: "Leitura" },
+    ],
+  },
+  codex: {
+    label: "Codex",
+    description: "Acesso ao agente Codex e suas operações.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "write", label: "Escrita" },
+    ],
+  },
+  admin: {
+    label: "Admin",
+    description: "Área administrativa: usuários, tokens e configurações globais.",
+    actions: [
+      { action: "read",  label: "Leitura" },
+      { action: "write", label: "Escrita" },
+      { action: "admin", label: "Admin" },
+    ],
+  },
+};
+
+export const SCOPE_LABELS: Record<string, string> = {
   "profile:read":    "Perfil — leitura",
   "profile:write":   "Perfil — escrita",
   "sessions:read":   "Sessões — leitura",
