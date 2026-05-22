@@ -16,6 +16,7 @@ import vctRoutes from "./routes/vct.routes";
 import codexRoutes from "./routes/codex.routes";
 import portalRoutes from "./routes/portal.routes";
 import checkoutRoutes from "./routes/checkout.routes";
+import { runCheckoutMigrations } from "./db/index";
 import { startPortalRecentsFlushLoop } from "./lib/portal-recents-store";
 import {
   getCurrentUser,
@@ -246,6 +247,9 @@ async function start() {
 
     attachCodexGateway(server);
     startPortalRecentsFlushLoop();
+    runCheckoutMigrations().catch((err) =>
+      console.error("[checkout] migration error:", err)
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Falha ao conectar ao Mongo: ${message}`);
