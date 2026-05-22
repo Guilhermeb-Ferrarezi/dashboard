@@ -145,7 +145,7 @@ export interface CheckoutNovosPorMes {
 export interface CheckoutOrderSummary {
   id: number;
   userId: number;
-  productId: string;
+  userLogin: string;
   description: string;
   amountCents: number;
   status: CheckoutOrderStatus;
@@ -157,5 +157,12 @@ export interface CheckoutDashboardData {
   paidOrders: number;
   totalRevenueCents: number;
   totalClientes: number;
+  ticketMedioCents: number;
+  receitaHojeCents: number;
+  receitaSemanaCents: number;
+  pedidosHoje: number;
   recentOrders: CheckoutOrderSummary[];
+  receitaPorProduto: { produto: string; receita: number; qtd: number }[];
+  pedidosPorDia: { dia: string; total: number }[];
+  statusBreakdown: { status: string; total: number }[];
 }

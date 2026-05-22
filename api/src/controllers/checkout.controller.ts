@@ -72,21 +72,85 @@ export async function getDashboard(_req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
 
-    const [[totalOrders], [paidOrders], [revenue], [totalClientes], recentOrders] =
-      await Promise.all([
-        db.select({ value: count() }).from(schema.checkoutOrders),
-        db.select({ value: count() }).from(schema.checkoutOrders).where(eq(schema.checkoutOrders.status, "paid")),
-        db.select({ value: sum(schema.checkoutOrders.amountCents) }).from(schema.checkoutOrders).where(eq(schema.checkoutOrders.status, "paid")),
-        db.select({ value: count() }).from(schema.checkoutCustomers),
-        db.select().from(schema.checkoutOrders).orderBy(desc(schema.checkoutOrders.createdAt)).limit(10)
-      ]);
+    const [
+      [totalOrders],
+      [paidOrders],
+      [revenue],
+      [totalClientes],
+      [receitaHoje],
+      [receitaSemana],
+      [pedidosHoje],
+      recentOrdersRaw,
+      receitaPorProduto,
+      pedidosPorDia,
+      statusBreakdown
+    ] = await Promise.all([
+      db.select({ value: count() }).from(schema.checkoutOrders),
+      db.select({ value: count() }).from(schema.checkoutOrders).where(eq(schema.checkoutOrders.status, "paid")),
+      db.select({ value: sum(schema.checkoutOrders.amountCents) }).from(schema.checkoutOrders).where(eq(schema.checkoutOrders.status, "paid")),
+      db.select({ value: count() }).from(schema.checkoutCustomers),
+      db.execute(sql`SELECT COALESCE(SUM(amount_cents),0)::int AS value FROM checkout_orders WHERE status='paid' AND created_at >= CURRENT_DATE`),
+      db.execute(sql`SELECT COALESCE(SUM(amount_cents),0)::int AS value FROM checkout_orders WHERE status='paid' AND created_at >= date_trunc('week', NOW())`),
+      db.execute(sql`SELECT COUNT(*)::int AS value FROM checkout_orders WHERE created_at >= CURRENT_DATE`),
+      db.execute(sql`
+        SELECT o.id, o.user_id, o.description, o.amount_cents, o.status, o.created_at,
+               c.user_login
+        FROM checkout_orders o
+        LEFT JOIN checkout_customers c ON c.user_id = o.user_id
+        ORDER BY o.created_at DESC LIMIT 10
+      `),
+      db.execute(sql`
+        SELECT description AS produto, SUM(amount_cents)::int AS receita, COUNT(*)::int AS qtd
+        FROM checkout_orders WHERE status='paid'
+        GROUP BY description ORDER BY receita DESC LIMIT 6
+      `),
+      db.execute(sql`
+        SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS dia, COUNT(*)::int AS total
+        FROM checkout_orders
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY dia ORDER BY dia ASC
+      `),
+      db.execute(sql`
+        SELECT status, COUNT(*)::int AS total FROM checkout_orders GROUP BY status
+      `)
+    ]);
+
+    const totalRevenueCents = Number(revenue?.value ?? 0);
+    const paidCount = Number(paidOrders?.value ?? 0);
 
     return res.json({
-      totalOrders: totalOrders?.value ?? 0,
-      paidOrders: paidOrders?.value ?? 0,
-      totalRevenueCents: Number(revenue?.value ?? 0),
-      totalClientes: totalClientes?.value ?? 0,
-      recentOrders: recentOrders.map(serializeOrder)
+      totalOrders: Number(totalOrders?.value ?? 0),
+      paidOrders: paidCount,
+      totalRevenueCents,
+      totalClientes: Number(totalClientes?.value ?? 0),
+      ticketMedioCents: paidCount > 0 ? Math.round(totalRevenueCents / paidCount) : 0,
+      receitaHojeCents: Number((receitaHoje?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
+      receitaSemanaCents: Number((receitaSemana?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
+      pedidosHoje: Number((pedidosHoje?.rows?.[0] as { value: number } | undefined)?.value ?? 0),
+      recentOrders: (recentOrdersRaw?.rows ?? []).map((r) => {
+        const row = r as { id: number; user_id: number; description: string; amount_cents: number; status: string; created_at: Date; user_login: string | null };
+        return {
+          id: row.id,
+          userId: row.user_id,
+          userLogin: row.user_login ?? `user_${row.user_id}`,
+          description: row.description,
+          amountCents: row.amount_cents,
+          status: row.status,
+          createdAt: new Date(row.created_at).toISOString()
+        };
+      }),
+      receitaPorProduto: (receitaPorProduto?.rows ?? []).map((r) => {
+        const row = r as { produto: string; receita: number; qtd: number };
+        return { produto: row.produto, receita: Number(row.receita), qtd: Number(row.qtd) };
+      }),
+      pedidosPorDia: (pedidosPorDia?.rows ?? []).map((r) => {
+        const row = r as { dia: string; total: number };
+        return { dia: row.dia, total: Number(row.total) };
+      }),
+      statusBreakdown: (statusBreakdown?.rows ?? []).map((r) => {
+        const row = r as { status: string; total: number };
+        return { status: row.status, total: Number(row.total) };
+      })
     });
   } catch (error) {
     console.error("[checkout] getDashboard error:", error);
