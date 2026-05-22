@@ -225,7 +225,7 @@ export function CheckoutClientesPanel({
   const [editEmail, setEditEmail] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingCliente, setDeletingCliente] = useState<CheckoutClienteSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const allProducts = useMemo(() => {
@@ -383,12 +383,13 @@ export function CheckoutClientesPanel({
     }
   }
 
-  async function handleDelete(userId: number) {
+  async function handleDelete() {
+    if (!deletingCliente) return;
     setDeleting(true);
     try {
-      await clientApi(`/checkout/clientes/${userId}`, { method: "DELETE" });
-      setClientes((prev) => prev.filter((c) => c.userId !== userId));
-      setConfirmDeleteId(null);
+      await clientApi(`/checkout/clientes/${deletingCliente.userId}`, { method: "DELETE" });
+      setClientes((prev) => prev.filter((c) => c.userId !== deletingCliente.userId));
+      setDeletingCliente(null);
     } catch {
       // silently ignore; user can retry
     } finally {
@@ -441,6 +442,27 @@ export function CheckoutClientesPanel({
             </Button>
             <Button onClick={() => void handleSaveEdit()} disabled={editSaving}>
               {editSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingCliente} onOpenChange={(open) => { if (!open) setDeletingCliente(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir cliente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-1">
+            Tem certeza que deseja excluir{" "}
+            <span className="font-medium text-foreground">{deletingCliente?.userLogin}</span>?
+            Esta ação não pode ser desfeita.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingCliente(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={() => void handleDelete()} disabled={deleting}>
+              {deleting ? "Excluindo..." : "Excluir"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -724,28 +746,15 @@ export function CheckoutClientesPanel({
                           >
                             <PencilIcon className="size-3.5" />
                           </Button>
-                          {confirmDeleteId === cliente.userId ? (
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon-sm"
-                              title="Confirmar exclusão"
-                              disabled={deleting}
-                              onClick={() => void handleDelete(cliente.userId)}
-                            >
-                              <Trash2Icon className="size-3.5" />
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              title="Excluir cliente"
-                              onClick={() => setConfirmDeleteId(cliente.userId)}
-                            >
-                              <Trash2Icon className="size-3.5" />
-                            </Button>
-                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Excluir cliente"
+                            onClick={() => setDeletingCliente(cliente)}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
