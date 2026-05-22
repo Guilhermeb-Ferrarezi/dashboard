@@ -113,7 +113,7 @@ export async function listClientes(_req: Request, res: Response) {
       db
         .select({
           userId: schema.checkoutOrders.userId,
-          orderCount: count(schema.checkoutOrders.id),
+          orderCount: sql<number>`COUNT(CASE WHEN ${schema.checkoutOrders.status} = 'paid' THEN 1 END)::int`,
           totalSpentCents: sql<number>`COALESCE(SUM(CASE WHEN ${schema.checkoutOrders.status} = 'paid' THEN ${schema.checkoutOrders.amountCents} ELSE 0 END), 0)::int`,
           lastOrderAt: sql<string | null>`MAX(${schema.checkoutOrders.createdAt})`
         })
