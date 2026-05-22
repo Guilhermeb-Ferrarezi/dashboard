@@ -63,12 +63,10 @@ function BarChart({ data }: { data: { dia: string; total: number }[] }) {
           const label = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
           return (
             <Tooltip key={d.dia}>
-              <TooltipTrigger asChild>
-                <div
-                  className="flex-1 min-w-0 rounded-sm bg-primary/30 hover:bg-primary/60 transition-colors cursor-default"
-                  style={{ height: `${h}%` }}
-                />
-              </TooltipTrigger>
+              <TooltipTrigger
+                className="flex-1 min-w-0 rounded-sm bg-primary/30 hover:bg-primary/60 transition-colors cursor-default border-0 p-0"
+                style={{ height: `${h}%` }}
+              />
               <TooltipContent>{label}: {d.total} pedido{d.total !== 1 ? "s" : ""}</TooltipContent>
             </Tooltip>
           );
@@ -97,12 +95,10 @@ function StatusBars({ data }: { data: { status: string; total: number }[] }) {
             if (pct === 0) return null;
             return (
               <Tooltip key={s}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={`${colors[s]} rounded-sm cursor-default`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </TooltipTrigger>
+                <TooltipTrigger
+                  className={`${colors[s]} rounded-sm cursor-default border-0 p-0`}
+                  style={{ width: `${pct}%` }}
+                />
                 <TooltipContent>{STATUS_LABEL[s]}: {item?.total}</TooltipContent>
               </Tooltip>
             );
