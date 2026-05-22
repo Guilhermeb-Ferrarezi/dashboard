@@ -1,19 +1,26 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CalendarIcon,
   LayoutDashboardIcon,
   PackageIcon,
+  RefreshCcwIcon,
   ShoppingCartIcon,
   SparklesIcon,
   UsersIcon,
   ZapIcon
 } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { Spinner } from "@/components/ui/spinner";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CheckoutDashboardData, CheckoutOrderStatus } from "@/types/portal";
 
 function formatBRL(cents: number) {
@@ -48,21 +55,26 @@ function BarChart({ data }: { data: { dia: string; total: number }[] }) {
   if (data.length === 0) return <p className="text-xs text-muted-foreground py-4 text-center">Sem dados nos últimos 30 dias.</p>;
   const max = Math.max(...data.map((d) => d.total), 1);
   return (
-    <div className="flex items-end gap-[3px] h-16">
-      {data.map((d) => {
-        const h = Math.max((d.total / max) * 100, 4);
-        const date = new Date(d.dia + "T12:00:00");
-        const label = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-        return (
-          <div
-            key={d.dia}
-            className="flex-1 min-w-0 rounded-sm bg-primary/30 hover:bg-primary/60 transition-colors cursor-default"
-            style={{ height: `${h}%` }}
-            title={`${label}: ${d.total} pedido${d.total !== 1 ? "s" : ""}`}
-          />
-        );
-      })}
-    </div>
+    <TooltipProvider>
+      <div className="flex items-end gap-[3px] h-16">
+        {data.map((d) => {
+          const h = Math.max((d.total / max) * 100, 4);
+          const date = new Date(d.dia + "T12:00:00");
+          const label = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+          return (
+            <Tooltip key={d.dia}>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex-1 min-w-0 rounded-sm bg-primary/30 hover:bg-primary/60 transition-colors cursor-default"
+                  style={{ height: `${h}%` }}
+                />
+              </TooltipTrigger>
+              <TooltipContent>{label}: {d.total} pedido{d.total !== 1 ? "s" : ""}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -77,21 +89,26 @@ function StatusBars({ data }: { data: { status: string; total: number }[] }) {
   };
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex h-3 w-full overflow-hidden rounded-full gap-0.5">
-        {order.map((s) => {
-          const item = data.find((d) => d.status === s);
-          const pct = item ? (item.total / total) * 100 : 0;
-          if (pct === 0) return null;
-          return (
-            <div
-              key={s}
-              className={`${colors[s]} rounded-sm`}
-              style={{ width: `${pct}%` }}
-              title={`${STATUS_LABEL[s]}: ${item?.total}`}
-            />
-          );
-        })}
-      </div>
+      <TooltipProvider>
+        <div className="flex h-3 w-full overflow-hidden rounded-full gap-0.5">
+          {order.map((s) => {
+            const item = data.find((d) => d.status === s);
+            const pct = item ? (item.total / total) * 100 : 0;
+            if (pct === 0) return null;
+            return (
+              <Tooltip key={s}>
+                <TooltipTrigger asChild>
+                  <div
+                    className={`${colors[s]} rounded-sm cursor-default`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{STATUS_LABEL[s]}: {item?.total}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+      </TooltipProvider>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {order.map((s) => {
           const item = data.find((d) => d.status === s);
@@ -113,6 +130,13 @@ interface CheckoutDashboardPanelProps {
 }
 
 export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  function handleRefresh() {
+    startTransition(() => router.refresh());
+  }
+
   const conversionRate = data.totalOrders > 0
     ? Math.round((data.paidOrders / data.totalOrders) * 100)
     : 0;
@@ -128,11 +152,33 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
   const maxReceita = Math.max(...receitaPorProduto.map((p) => p.receita), 1);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={`flex flex-col gap-6 transition-opacity${isPending ? " pointer-events-none opacity-60" : ""}`}>
       <PageHeader
         eyebrow="Checkout"
         title="Dashboard"
         description="Visão geral de pagamentos e vendas."
+        actions={
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={handleRefresh}
+                  disabled={isPending}
+                  aria-label="Atualizar dashboard"
+                  className="group/refresh relative size-8 rounded-md"
+                >
+                  {isPending
+                    ? <Spinner size="sm" />
+                    : <RefreshCcwIcon className="size-3.5 transition-transform duration-300 group-hover/refresh:rotate-90" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Atualizar dashboard</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        }
       />
 
       {/* Linha 1 — totais */}
