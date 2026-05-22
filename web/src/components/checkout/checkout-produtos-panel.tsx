@@ -5,7 +5,6 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { AlertDialog } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -27,6 +26,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Spinner } from "@/components/ui/spinner";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -474,14 +474,16 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                       <TableCell>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <button
-                              onClick={() => handleToggleActive(produto)}
-                              className="cursor-pointer"
-                            >
-                              <Badge variant={produto.active ? "default" : "secondary"}>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={produto.active}
+                                onCheckedChange={() => handleToggleActive(produto)}
+                                label={produto.active ? "Desativar produto" : "Ativar produto"}
+                              />
+                              <span className="text-xs text-muted-foreground">
                                 {produto.active ? "Ativo" : "Inativo"}
-                              </Badge>
-                            </button>
+                              </span>
+                            </div>
                           </TooltipTrigger>
                           <TooltipContent>
                             {produto.active ? "Clique para desativar" : "Clique para ativar"}
