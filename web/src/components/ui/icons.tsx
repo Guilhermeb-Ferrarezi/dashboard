@@ -63,6 +63,8 @@ import {
   Star,
   Sun,
   Square,
+  Package,
+  ShoppingCart,
   Tag,
   Trash,
   Tray,
@@ -145,6 +147,8 @@ export const StarIcon = Star;
 export const StickyNoteIcon = Note;
 export const SunIcon = Sun;
 export const TagsIcon = Tag;
+export const PackageIcon = Package;
+export const ShoppingCartIcon = ShoppingCart;
 export const Trash2Icon = Trash;
 export const TriangleAlertIcon = WarningOctagon;
 export const UploadIcon = Upload;

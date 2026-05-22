@@ -100,3 +100,62 @@ export interface VctFormacaoSummary {
   membros: VctFormacaoMembroSummary[];
   createdAt?: string;
 }
+
+export type CheckoutOrderStatus = "pending" | "paid" | "failed" | "expired";
+
+export interface CheckoutProductSummary {
+  id: number;
+  name: string;
+  description: string;
+  amountCents: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CheckoutClienteSummary {
+  id: number;
+  userId: number;
+  userLogin: string;
+  userEmail: string | null;
+  abacateCustomerId: string;
+  createdAt: string;
+  orderCount: number;
+  totalSpentCents: number;
+  lastOrderAt: string | null;
+  lastPaidProduct: string | null;
+  purchasedProducts: string[];
+  isVip: boolean;
+}
+
+export interface CheckoutClientePedido {
+  id: number;
+  userId: number;
+  productId: string;
+  description: string;
+  amountCents: number;
+  status: CheckoutOrderStatus;
+  createdAt: string;
+}
+
+export interface CheckoutNovosPorMes {
+  mes: string;
+  total: number;
+}
+
+export interface CheckoutOrderSummary {
+  id: number;
+  userId: number;
+  productId: string;
+  description: string;
+  amountCents: number;
+  status: CheckoutOrderStatus;
+  createdAt: string;
+}
+
+export interface CheckoutDashboardData {
+  totalOrders: number;
+  paidOrders: number;
+  totalRevenueCents: number;
+  totalClientes: number;
+  recentOrders: CheckoutOrderSummary[];
+}

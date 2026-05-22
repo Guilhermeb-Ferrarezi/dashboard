@@ -7,9 +7,12 @@ import {
   LayoutGridIcon,
   LogsIcon,
   LinkIcon,
+  PackageIcon,
+  ShoppingCartIcon,
   SparklesIcon,
   ShieldIcon,
   UserRoundIcon,
+  UsersIcon,
 } from "@/components/ui/icons";
 
 export type PortalSidebarItem = {
@@ -51,6 +54,9 @@ export const portalIconMap = {
   admin: BadgeCheckIcon,
   link: LinkIcon,
   sparkles: SparklesIcon,
+  cart: ShoppingCartIcon,
+  package: PackageIcon,
+  clients: UsersIcon,
 } as const;
 
 function normalizeText(value: string) {
@@ -184,6 +190,40 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           icon: LayoutGridIcon,
           kind: "resource",
           keywords: ["publicador", "zip", "site", "rotas", "volume"],
+        }),
+        portalItem({
+          href: "/checkout",
+          label: "Checkout",
+          description: "Gestao de pagamentos, clientes e produtos",
+          icon: ShoppingCartIcon,
+          kind: "page",
+          keywords: ["checkout", "pagamento", "clientes", "produtos", "abacate", "pix"],
+          children: [
+            portalItem({
+              href: "/checkout",
+              label: "Dashboard",
+              description: "Visao geral do checkout",
+              icon: LayoutDashboardIcon,
+              kind: "page",
+              keywords: ["dashboard", "checkout", "visao geral", "resumo"],
+            }),
+            portalItem({
+              href: "/checkout/clientes",
+              label: "Clientes",
+              description: "Clientes cadastrados no checkout",
+              icon: UsersIcon,
+              kind: "resource",
+              keywords: ["clientes", "usuarios", "checkout", "abacate"],
+            }),
+            portalItem({
+              href: "/checkout/produtos",
+              label: "Produtos",
+              description: "Catalogo de produtos e planos",
+              icon: PackageIcon,
+              kind: "resource",
+              keywords: ["produtos", "catalogo", "planos", "checkout"],
+            }),
+          ],
         }),
       ],
     },
