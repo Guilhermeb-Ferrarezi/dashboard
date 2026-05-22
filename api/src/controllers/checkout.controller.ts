@@ -183,6 +183,26 @@ export async function updateCliente(req: Request, res: Response) {
   }
 }
 
+export async function deleteCliente(req: Request, res: Response) {
+  try {
+    const userId = Number(req.params.userId);
+    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    const [deleted] = await db
+      .delete(schema.checkoutCustomers)
+      .where(eq(schema.checkoutCustomers.userId, userId))
+      .returning();
+
+    if (!deleted) return res.status(404).json({ message: "Cliente não encontrado." });
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("[checkout] deleteCliente error:", error);
+    return res.status(500).json({ message: "Erro ao remover cliente." });
+  }
+}
+
 export async function listClientePedidos(req: Request, res: Response) {
   try {
     const userId = Number(req.params.userId);

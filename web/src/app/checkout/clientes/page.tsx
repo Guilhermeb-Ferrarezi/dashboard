@@ -22,7 +22,7 @@ export default async function CheckoutClientesPage() {
   ]);
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} title="Clientes" description="Clientes cadastrados no checkout.">
       <div className="p-6">
         <CheckoutClientesPanel initialClientes={clientes} novosPorMes={novosPorMes} />
       </div>

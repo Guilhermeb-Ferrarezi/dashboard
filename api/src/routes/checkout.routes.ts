@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   createProduto,
+  deleteCliente,
   deleteProduto,
   getDashboard,
   getNovosPorMes,
@@ -21,6 +22,7 @@ router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 router.get("/dashboard", getDashboard);
 router.get("/clientes", listClientes);
 router.patch("/clientes/:userId", updateCliente);
+router.delete("/clientes/:userId", deleteCliente);
 router.get("/clientes/:userId/pedidos", listClientePedidos);
 router.get("/novos-por-mes", getNovosPorMes);
 router.get("/produtos", listProdutos);

@@ -19,7 +19,7 @@ export default async function CheckoutProdutosPage() {
   const { produtos } = await serverApi<{ produtos: CheckoutProductSummary[] }>("/checkout/produtos", { cookieHeader });
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} title="Produtos" description="Produtos disponíveis no checkout.">
       <div className="p-6">
         <CheckoutProdutosPanel initialProdutos={produtos} />
       </div>

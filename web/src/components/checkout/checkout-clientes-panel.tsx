@@ -18,12 +18,12 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
-  CopyIcon,
   MailIcon,
   PackageIcon,
   PencilIcon,
   ShoppingCartIcon,
   SparklesIcon,
+  Trash2Icon,
   UsersIcon
 } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -225,6 +225,8 @@ export function CheckoutClientesPanel({
   const [editEmail, setEditEmail] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const allProducts = useMemo(() => {
     const set = new Set<string>();
@@ -378,6 +380,19 @@ export function CheckoutClientesPanel({
       setEditError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  async function handleDelete(userId: number) {
+    setDeleting(true);
+    try {
+      await clientApi(`/checkout/clientes/${userId}`, { method: "DELETE" });
+      setClientes((prev) => prev.filter((c) => c.userId !== userId));
+      setConfirmDeleteId(null);
+    } catch {
+      // silently ignore; user can retry
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -709,6 +724,28 @@ export function CheckoutClientesPanel({
                           >
                             <PencilIcon className="size-3.5" />
                           </Button>
+                          {confirmDeleteId === cliente.userId ? (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon-sm"
+                              title="Confirmar exclusão"
+                              disabled={deleting}
+                              onClick={() => void handleDelete(cliente.userId)}
+                            >
+                              <Trash2Icon className="size-3.5" />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              title="Excluir cliente"
+                              onClick={() => setConfirmDeleteId(cliente.userId)}
+                            >
+                              <Trash2Icon className="size-3.5" />
+                            </Button>
+                          )}
                           <Button
                             type="button"
                             variant="ghost"

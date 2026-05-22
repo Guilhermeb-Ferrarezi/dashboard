@@ -19,7 +19,7 @@ export default async function CheckoutDashboardPage() {
   const data = await serverApi<CheckoutDashboardData>("/checkout/dashboard", { cookieHeader });
 
   return (
-    <AppShell user={user}>
+    <AppShell user={user} title="Checkout" description="Visão geral do checkout.">
       <div className="p-6">
         <CheckoutDashboardPanel data={data} />
       </div>
