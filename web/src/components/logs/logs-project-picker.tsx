@@ -140,7 +140,7 @@ export function LogsProjectPicker() {
                   key={project.id}
                   href={`/logs/${project.id}`}
                   className={cn(
-                    "group rounded-2xl border border-border/70 bg-background/40 p-5 transition-all hover:border-primary/35 hover:bg-primary/6 hover:shadow-sm",
+                    "group rounded-2xl border border-border/70 bg-background/40 p-5 transition-all duration-200 will-change-transform hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary/6 hover:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.22),0_0_0_1px_color-mix(in_oklch,var(--primary)_18%,transparent)]",
                   )}
                 >
                   <div className="flex h-full flex-col gap-5">

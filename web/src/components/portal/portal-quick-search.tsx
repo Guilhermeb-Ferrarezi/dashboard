@@ -10,6 +10,8 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { SearchIcon, type LucideIcon } from "@/components/ui/icons";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { clearSearchHistory, getSearchHistory, pushSearchHistory } from "@/lib/search-history";
 import { toast } from "sonner";
 
 import {
@@ -56,7 +58,7 @@ type SearchResult = {
 
 const MAX_VISIBLE_RESULTS = 6;
 
-function openPortalQuickSearch() {
+export function openPortalQuickSearch() {
   dispatchPortalQuickSearchOpen();
 }
 
@@ -461,9 +463,10 @@ export function PortalSearchLauncher({
       <span className="min-w-0 flex-1 truncate">
         {label}
       </span>
-      <kbd className="hidden shrink-0 rounded-md border border-border/60 bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
-        Ctrl K
-      </kbd>
+      <KbdGroup className="hidden shrink-0 sm:inline-flex">
+        <Kbd>⌘</Kbd>
+        <Kbd>K</Kbd>
+      </KbdGroup>
     </button>
   );
 }
@@ -480,6 +483,7 @@ export function PortalQuickSearchDialog({
   const { setTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [projects, setProjects] = useState<PortalProject[]>([]);
   const [users, setUsers] = useState<PortalUserSummary[]>([]);
@@ -563,11 +567,15 @@ export function PortalQuickSearchDialog({
 
   useEffect(() => {
     if (open) {
+      setHistory(getSearchHistory());
       return;
     }
 
+    if (query.trim().length >= 2) {
+      pushSearchHistory(query);
+    }
     setQuery("");
-  }, [open]);
+  }, [open, query]);
 
   const normalizedQuery = useDeferredValue(normalizePortalText(query).trim());
 
@@ -645,12 +653,37 @@ export function PortalQuickSearchDialog({
               className="h-10 text-[0.95rem] text-zinc-100 placeholder:text-zinc-500"
             />
           </div>
-          <kbd className="mt-1 inline-flex shrink-0 items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-zinc-400">
+          <Kbd className="mt-1 border-white/10 bg-white/5 text-zinc-400 shadow-none">
             Esc
-          </kbd>
+          </Kbd>
         </div>
 
         <CommandList className="max-h-[min(58vh,24rem)] px-2 pb-1">
+          {query.trim().length === 0 && history.length > 0 ? (
+            <CommandGroup heading="Buscas recentes" className="text-[0.78rem] uppercase tracking-[0.14em] text-zinc-500">
+              {history.map((entry) => (
+                <CommandItem
+                  key={`history-${entry}`}
+                  value={`historico ${entry}`}
+                  onSelect={() => setQuery(entry)}
+                >
+                  <SearchIcon className="size-4 opacity-60" />
+                  <span className="min-w-0 flex-1 truncate text-[0.95rem]">{entry}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-500">recente</span>
+                </CommandItem>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  clearSearchHistory();
+                  setHistory([]);
+                }}
+                className="mt-1 inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500 transition-colors hover:text-zinc-300"
+              >
+                Limpar histórico
+              </button>
+            </CommandGroup>
+          ) : null}
           {searchResults.length || askAiResult ? (
             <>
               {goToResults.length ? (
@@ -742,17 +775,41 @@ export function PortalQuickSearchDialog({
               ) : null}
             </>
           ) : (
-            <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+            <CommandEmpty>
+              <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 24 24"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-foreground">Nada por aqui</p>
+                <p className="max-w-xs text-xs text-muted-foreground">
+                  Tente outro termo ou abra direto pelo menu lateral.
+                </p>
+              </div>
+            </CommandEmpty>
           )}
         </CommandList>
         <div className="flex items-center justify-between border-t border-white/10 px-4 py-2.5 text-[11px] text-zinc-500">
-          <div className="flex items-center gap-2">
-            <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↑</kbd>
-            <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↓</kbd>
+          <div className="flex items-center gap-1.5">
+            <KbdGroup>
+              <Kbd className="border-white/10 bg-white/5 text-zinc-400 shadow-none">↑</Kbd>
+              <Kbd className="border-white/10 bg-white/5 text-zinc-400 shadow-none">↓</Kbd>
+            </KbdGroup>
             <span>para navegar</span>
           </div>
-          <div className="flex items-center gap-2">
-            <kbd className="inline-flex items-center rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400">↵</kbd>
+          <div className="flex items-center gap-1.5">
+            <Kbd className="border-white/10 bg-white/5 text-zinc-400 shadow-none">↵</Kbd>
             <span>para selecionar</span>
           </div>
         </div>

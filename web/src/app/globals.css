@@ -172,4 +172,134 @@ html[data-density="spacious"] {
   html {
     @apply font-sans;
   }
+
+  /* Scrollbar refinada (WebKit) */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+    transition: background-color 150ms ease;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 28%, transparent) transparent;
+  }
+
+  /* Text selection refletindo a marca */
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+    color: var(--foreground);
+  }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-fade-in {
+  animation: pageFadeIn 240ms ease-out;
+}
+
+@media print {
+  *,
+  *::before,
+  *::after {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    color: #111 !important;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #111 !important;
+    font-size: 12pt;
+  }
+  [data-sidebar],
+  [data-slot="sidebar"],
+  header.sticky,
+  [aria-label="Paginação"],
+  [role="alert"][aria-live],
+  [data-slot="dialog-overlay"],
+  [data-slot="sheet-overlay"],
+  .toaster,
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+  }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .page-fade-in,
+  .list-fade-in > * {
+    animation: none !important;
+  }
+}
+
+@keyframes progressIndeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+@keyframes listItemFadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.list-fade-in > * {
+  animation: listItemFadeIn 220ms ease-out backwards;
+}
+.list-fade-in > *:nth-child(1) { animation-delay: 0ms; }
+.list-fade-in > *:nth-child(2) { animation-delay: 30ms; }
+.list-fade-in > *:nth-child(3) { animation-delay: 60ms; }
+.list-fade-in > *:nth-child(4) { animation-delay: 90ms; }
+.list-fade-in > *:nth-child(5) { animation-delay: 120ms; }
+.list-fade-in > *:nth-child(6) { animation-delay: 150ms; }
+.list-fade-in > *:nth-child(7) { animation-delay: 180ms; }
+.list-fade-in > *:nth-child(8) { animation-delay: 210ms; }
+.list-fade-in > *:nth-child(n+9) { animation-delay: 240ms; }
+
+/* Sonner toast — espaçamento consistente */
+.cn-toast {
+  min-height: 48px;
+  gap: 0.625rem !important;
+  align-items: flex-start !important;
+}
+.cn-toast [data-icon] {
+  margin-top: 2px;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
@@ -33,6 +33,14 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/session";
+import { useTrackRecentlyVisited } from "@/hooks/use-recently-visited";
+import { ApiHealthIndicator } from "@/components/portal/api-health-indicator";
+import { CommandPalette } from "@/components/portal/command-palette";
+import { ConnectivityToasts } from "@/components/portal/connectivity-toasts";
+import { KeyboardShortcutsOverlay } from "@/components/portal/keyboard-shortcuts-overlay";
+import { SkipToContent } from "@/components/portal/skip-to-content";
+import { SystemBanner } from "@/components/portal/system-banner";
+import { ThemeCycleButton } from "@/components/portal/theme-cycle-button";
 import { UserMenu } from "@/components/portal/user-menu";
 import {
   PortalQuickSearchDialog,
@@ -100,6 +108,8 @@ export function AppShell({
   lockViewport = false,
 }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  useTrackRecentlyVisited();
   const [logsHref, setLogsHref] = useState(() => {
     if (typeof window === "undefined") {
       return "/logs";
@@ -200,6 +210,46 @@ export function AppShell({
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  // Quick switch: ⌘1..⌘9 navega para o N-ésimo item primário visível
+  const quickSwitchHrefs = useMemo(() => {
+    const hrefs: string[] = ["/home"];
+    for (const group of visibleSidebarGroups) {
+      for (const item of group.items) {
+        if (item.href && !hrefs.includes(item.href)) hrefs.push(item.href);
+        if (hrefs.length >= 9) break;
+      }
+      if (hrefs.length >= 9) break;
+    }
+    return hrefs.slice(0, 9);
+  }, [visibleSidebarGroups]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable) return;
+      }
+      const digit = Number.parseInt(event.key, 10);
+      if (Number.isNaN(digit) || digit < 1 || digit > 9) return;
+      const href = quickSwitchHrefs[digit - 1];
+      if (!href) return;
+      event.preventDefault();
+      router.push(href);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [quickSwitchHrefs, router]);
+
+  // Scroll-to-top em troca de rota (respeitando navegação por âncoras)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash) return;
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [pathname]);
 
   const routeOpenMenus = useMemo(() => {
     const entries: Array<[string, boolean]> = [];
@@ -321,13 +371,18 @@ export function AppShell({
 
   return (
     <SidebarProvider>
+      <SkipToContent />
       <ThemePreferenceSync preferences={user.preferences} />
       <PortalQuickSearchDialog user={user} logsHref={logsHref} />
+      <KeyboardShortcutsOverlay />
+      <CommandPalette />
+      <ConnectivityToasts />
       <Sidebar variant="floating" collapsible="icon">
         <SidebarHeader>
-          <div className="overflow-hidden rounded-2xl border border-sidebar-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--sidebar-primary)_18%,transparent),color-mix(in_oklch,var(--sidebar)_92%,black))] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl text-sidebar-primary-foreground shadow-sm">
+          <div className="group relative overflow-hidden rounded-2xl border border-sidebar-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--sidebar-primary)_18%,transparent),color-mix(in_oklch,var(--sidebar)_92%,black))] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.12)] transition-[padding,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none hover:shadow-[0_14px_36px_rgba(0,0,0,0.18)] group-data-[collapsible=icon]:p-1.5">
+            <span aria-hidden className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-sidebar-primary/60 to-transparent" />
+            <div className="flex items-center gap-3 transition-[gap] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+              <div className="flex size-11 items-center justify-center rounded-2xl text-sidebar-primary-foreground ring-1 ring-sidebar-primary/30 shadow-sm transition-[width,height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none group-data-[collapsible=icon]:size-9">
                 <Image
                     src="/assets/Logo.png"
                     alt="Santos Tech"
@@ -336,10 +391,12 @@ export function AppShell({
                     priority
                   />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">Santos Tech</p>
-                <p className="truncate text-xs text-sidebar-foreground/70">
-                  Portal operacional
+              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <p className="truncate font-heading text-sm font-semibold tracking-tight">
+                  Santos Tech
+                </p>
+                <p className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-primary/90">
+                  Universal Home
                 </p>
               </div>
             </div>
@@ -355,6 +412,7 @@ export function AppShell({
             <SidebarMenuButton
               render={<Link href="/home" />}
               isActive={pathname === "/home"}
+              tooltip="Home"
               className="w-full h-10 !py-0 !pl-2 !pr-2 !flex items-center gap-2"
             >
               <portalIconMap.home className="size-4 shrink-0 text-sidebar-foreground/70" />
@@ -428,6 +486,9 @@ export function AppShell({
             }}
             onSettingsOpenChange={setSettingsOpen}
           />
+          <p className="px-2 pt-1 text-center text-[10px] font-medium tracking-[0.2em] uppercase text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">
+            Santos Tech · {new Date().getFullYear()}
+          </p>
         </SidebarFooter>
       </Sidebar>
 
@@ -439,7 +500,8 @@ export function AppShell({
           )}
         >
           <div className="flex min-w-0 flex-1 flex-col">
-            <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+            <SystemBanner />
+            <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 shadow-[0_1px_0_color-mix(in_oklch,var(--border)_60%,transparent),0_8px_24px_-16px_rgba(0,0,0,0.25)] backdrop-blur-xl">
               <div
                 className={cn(
                   "flex w-full items-center gap-4 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
@@ -454,22 +516,26 @@ export function AppShell({
                     </span>
                   ) : null}
                   <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-xl font-semibold md:text-2xl">{title}</h1>
-                    <Badge variant="secondary">{user.role.toUpperCase()}</Badge>
+                    <h1 className="font-heading text-lg font-semibold tracking-tight sm:text-xl md:text-2xl">{title}</h1>
+                    <Badge variant="secondary" className="hidden sm:inline-flex">{user.role.toUpperCase()}</Badge>
                   </div>
-                  <p className="truncate text-sm text-muted-foreground">{description}</p>
+                  <p className="hidden truncate text-sm text-muted-foreground sm:block">{description}</p>
                 </div>
-                {user.role === "admin" ? (
-                  <Button
-                    type="button"
-                    variant={codexOpen ? "default" : "outline"}
-                    className="gap-2"
-                    onClick={() => setCodexOpen((current) => !current)}
-                  >
-                    <PanelRightOpenIcon className="size-4" />
-                    {codexOpen ? "Fechar IA" : "Abrir IA"}
-                  </Button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  <ApiHealthIndicator className="hidden md:inline-flex" />
+                  <ThemeCycleButton />
+                  {user.role === "admin" ? (
+                    <Button
+                      type="button"
+                      variant={codexOpen ? "default" : "outline"}
+                      className="gap-2"
+                      onClick={() => setCodexOpen((current) => !current)}
+                    >
+                      <PanelRightOpenIcon className="size-4" />
+                      {codexOpen ? "Fechar IA" : "Abrir IA"}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </header>
 
@@ -480,8 +546,10 @@ export function AppShell({
               )}
             >
               <main
+                id="main-content"
+                key={pathname}
                 className={cn(
-                  "flex min-h-0 min-w-0 flex-1 flex-col",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-20",
                   lockViewport && "overflow-hidden",
                 )}
               >

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
+  ExternalLinkIcon,
   LogOutIcon,
   MailIcon,
   SettingsIcon,
@@ -110,9 +111,24 @@ export function UserMenu({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onOpenSettings}>
               <SettingsIcon />
-              Configuracoes
+              Configurações
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem
+              onClick={() => {
+                const subject = encodeURIComponent("Feedback do portal Santos Tech");
+                const body = encodeURIComponent(
+                  `\n\n---\nURL: ${typeof window !== "undefined" ? window.location.href : ""}\nUsuário: ${user.username} (${user.role})\nNavegador: ${typeof navigator !== "undefined" ? navigator.userAgent : ""}`,
+                );
+                window.open(`mailto:suporte@santos-tech.com?subject=${subject}&body=${body}`);
+              }}
+            >
+              <ExternalLinkIcon />
+              Reportar problema
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={handleLogout}
+            >
               <LogOutIcon />
               Sair
             </DropdownMenuItem>

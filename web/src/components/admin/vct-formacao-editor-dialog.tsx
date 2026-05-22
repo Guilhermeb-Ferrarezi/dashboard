@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LoaderCircleIcon, SaveIcon, UploadIcon } from "@/components/ui/icons";
+import { SaveIcon, UploadIcon } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -350,8 +351,8 @@ export function VctFormacaoEditorDialog({
           <Button variant="outline" disabled={pending} onClick={onClose}>
             Cancelar
           </Button>
-          <Button disabled={pending} onClick={handleSubmit}>
-            {pending ? <LoaderCircleIcon className="animate-spin" /> : <SaveIcon />}
+          <Button loading={pending} onClick={handleSubmit}>
+            {pending ? null : <SaveIcon />}
             {mode === "create" ? "Criar formação" : "Salvar alterações"}
           </Button>
         </DialogFooter>

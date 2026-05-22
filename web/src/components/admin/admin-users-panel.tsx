@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   InfoIcon,
-  LoaderCircleIcon,
   PlusIcon,
   ShieldIcon,
   User2Icon,
@@ -28,7 +27,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -90,9 +93,14 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Alert>
-        <ShieldIcon className="text-primary" />
-        <AlertTitle>Usuarios do home central</AlertTitle>
+      <PageHeader
+        eyebrow="Admin"
+        title="Usuários"
+        description="Gerencie as contas que acessam o portal universal e definem o piloto de SSO."
+      />
+      <Alert variant="info">
+        <ShieldIcon />
+        <AlertTitle>Usuários do home central</AlertTitle>
         <AlertDescription>
           Este cadastro controla contas do portal universal. O acesso ao sistema
           externo ainda depende do email existir no projeto de destino.
@@ -121,8 +129,8 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                 </DialogDescription>
               </DialogHeader>
               <form className="flex flex-col gap-4" onSubmit={handleCreateUser}>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">Nome de usuario</span>
+                <Label className="flex flex-col items-start gap-2">
+                  <span>Nome de usuário</span>
                   <Input
                     value={form.username}
                     onChange={(event) =>
@@ -131,11 +139,12 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                         username: event.target.value,
                       }))
                     }
+                    autoComplete="off"
                     required
                   />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">Email</span>
+                </Label>
+                <Label className="flex flex-col items-start gap-2">
+                  <span>Email</span>
                   <Input
                     type="email"
                     value={form.email}
@@ -145,11 +154,12 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                         email: event.target.value,
                       }))
                     }
+                    autoComplete="email"
                     required
                   />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">Senha</span>
+                </Label>
+                <Label className="flex flex-col items-start gap-2">
+                  <span>Senha</span>
                   <Input
                     type="password"
                     value={form.password}
@@ -159,9 +169,10 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                         password: event.target.value,
                       }))
                     }
+                    autoComplete="new-password"
                     required
                   />
-                </label>
+                </Label>
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Perfil</span>
@@ -207,8 +218,7 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                     </TabsList>
                   </Tabs>
                 </div>
-                <Button type="submit" disabled={pending}>
-                  {pending ? <LoaderCircleIcon className="animate-spin" /> : null}
+                <Button type="submit" loading={pending}>
                   Criar conta
                 </Button>
               </form>
@@ -216,6 +226,14 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
           </Dialog>
         </CardHeader>
         <CardContent>
+          {users.length === 0 ? (
+            <EmptyState
+              icon={User2Icon}
+              title="Nenhum usuário cadastrado"
+              description="Crie a primeira conta clicando em “Novo usuário”."
+              className="min-h-[220px]"
+            />
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -225,7 +243,7 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                 <TableHead>Criado em</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="list-fade-in">
               {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
@@ -251,6 +269,7 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>

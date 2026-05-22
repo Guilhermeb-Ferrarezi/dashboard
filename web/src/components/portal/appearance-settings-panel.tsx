@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   CheckIcon,
   CircleDotIcon,
-  LoaderCircleIcon,
   MonitorIcon,
   MoonIcon,
   PaletteIcon,
@@ -18,6 +17,7 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -84,11 +84,56 @@ function PreferenceSection({
           <Icon className="size-4" />
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <h3 className="font-heading text-sm font-semibold tracking-tight">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
       {children}
+    </section>
+  );
+}
+
+const DENSITY_KEY = "portal:density";
+
+function DensityPreferenceToggle() {
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(DENSITY_KEY);
+    if (stored === "compact") {
+      setCompact(true);
+      document.documentElement.dataset.density = "compact";
+    }
+  }, []);
+
+  function toggle(next: boolean) {
+    setCompact(next);
+    if (next) {
+      document.documentElement.dataset.density = "compact";
+      window.localStorage.setItem(DENSITY_KEY, "compact");
+    } else {
+      delete document.documentElement.dataset.density;
+      window.localStorage.removeItem(DENSITY_KEY);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-background p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="font-heading text-sm font-semibold tracking-tight">
+            Modo compacto
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Reduz paddings e gaps em todo o portal. Útil em telas menores.
+          </p>
+        </div>
+        <Switch
+          checked={compact}
+          onCheckedChange={toggle}
+          label="Alternar modo compacto"
+        />
+      </div>
     </section>
   );
 }
@@ -386,10 +431,11 @@ export function AppearanceSettingsPanel({
           </PreferenceSection>
         </div>
 
+        <DensityPreferenceToggle />
+
         <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-popover/95 pt-4 backdrop-blur">
-          <Button onClick={handleSave} disabled={pending}>
-            {pending ? <LoaderCircleIcon className="animate-spin" /> : null}
-            Salvar aparencia
+          <Button onClick={handleSave} disabled={pending} loading={pending}>
+            Salvar aparência
           </Button>
           <Button
             type="button"

@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
-import { KeyRoundIcon, LoaderCircleIcon, User2Icon } from "@/components/ui/icons";
+import { KeyRoundIcon, User2Icon } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -42,11 +43,13 @@ export function LoginForm({ error }: LoginFormProps) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const ssoErrorMessage = getSsoErrorMessage(error);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
+    setFormError(null);
 
     try {
       await clientApi("/auth/login", {
@@ -58,18 +61,31 @@ export function LoginForm({ error }: LoginFormProps) {
         router.refresh();
       });
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Nao foi possivel entrar.",
-      );
+      const message =
+        error instanceof Error ? error.message : "Nao foi possivel entrar.";
+      setFormError(message);
+      toast.error(message);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <div className="grid min-h-screen place-items-center px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]">
+    <div className="relative grid min-h-screen place-items-center overflow-hidden px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(255,117,24,0.18),_transparent_36%),linear-gradient(180deg,_rgba(255,255,255,0.04),_transparent)]" />
-      <Card className="w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 -right-16 -z-10 opacity-[0.04] select-none"
+      >
+        <Image
+          src="/assets/Logo.png"
+          alt=""
+          width={420}
+          height={420}
+          priority={false}
+        />
+      </div>
+      <Card className="page-fade-in w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
         <CardHeader className="gap-6">
           <div className="flex items-center gap-4">
             <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
@@ -97,6 +113,12 @@ export function LoginForm({ error }: LoginFormProps) {
               <AlertDescription>{ssoErrorMessage}</AlertDescription>
             </Alert>
           ) : null}
+          {formError ? (
+            <Alert variant="destructive" role="alert" id="login-error">
+              <AlertTitle>Não foi possível entrar</AlertTitle>
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
+          ) : null}
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
@@ -110,8 +132,14 @@ export function LoginForm({ error }: LoginFormProps) {
                   className="pl-9"
                   placeholder="voce@santos-tech.com"
                   value={identifier}
-                  onChange={(event) => setIdentifier(event.target.value)}
+                  onChange={(event) => {
+                    setIdentifier(event.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   autoComplete="username"
+                  autoFocus
+                  aria-invalid={formError ? true : undefined}
+                  aria-describedby={formError ? "login-error" : undefined}
                   required
                 />
               </div>
@@ -125,14 +153,18 @@ export function LoginForm({ error }: LoginFormProps) {
                   type="password"
                   placeholder="Sua senha"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   autoComplete="current-password"
+                  aria-invalid={formError ? true : undefined}
+                  aria-describedby={formError ? "login-error" : undefined}
                   required
                 />
               </div>
             </label>
-            <Button type="submit" size="lg" disabled={pending}>
-              {pending ? <LoaderCircleIcon className="animate-spin" /> : null}
+            <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto">
               Entrar no portal
             </Button>
           </form>

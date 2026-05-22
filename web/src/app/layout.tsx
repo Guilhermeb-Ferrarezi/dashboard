@@ -24,6 +24,21 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Santos Tech Portal",
   description: "Portal universal para os projetos internos da Santos Tech.",
+  applicationName: "Santos Tech Portal",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: "/assets/Logo.png",
+    apple: "/assets/Logo.png",
+  },
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f3eb" },
+    { media: "(prefers-color-scheme: dark)", color: "#10141d" },
+  ],
+  appleWebApp: {
+    capable: true,
+    title: "Santos Tech",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({

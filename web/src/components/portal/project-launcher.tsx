@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clientApi } from "@/lib/api";
@@ -214,7 +215,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
       <section className="grid gap-6 xl:grid-cols-[1fr_320px]">
         {/* Project grid */}
         <div className="flex flex-col gap-5">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="list-fade-in grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => {
               const ProjectIcon =
                 iconMap[project.icon as keyof typeof iconMap] ?? SparklesIcon;
@@ -223,7 +224,7 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
               return (
                 <div
                   key={project.id}
-                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/70 backdrop-blur-sm transition-all duration-300 hover:border-border/70 hover:bg-card/90 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
+                  className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/70 backdrop-blur-sm transition-all duration-300 will-change-transform hover:-translate-y-0.5 hover:border-primary/35 hover:bg-card/90 hover:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.22),0_0_0_1px_color-mix(in_oklch,var(--primary)_18%,transparent)]"
                 >
                   {/* Top accent line */}
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
@@ -315,17 +316,12 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
             })}
           </div>
           {filteredProjects.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/40 py-16 text-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-muted/30">
-                <SearchIcon className="size-5 text-muted-foreground/50" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Nenhum projeto encontrado</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Ajuste os filtros ou tente outro termo de busca.
-                </p>
-              </div>
-            </div>
+            <EmptyState
+              icon={SearchIcon}
+              title="Nenhum projeto encontrado"
+              description="Ajuste os filtros ou tente outro termo de busca."
+              className="min-h-[240px]"
+            />
           ) : null}
         </div>
 

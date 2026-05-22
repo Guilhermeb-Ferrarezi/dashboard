@@ -9,12 +9,12 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LoaderCircleIcon,
   LogOutIcon,
   PaletteIcon,
   ShieldIcon,
   UserRoundPenIcon,
 } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
 import { AppearanceSettingsPanel } from "@/components/portal/appearance-settings-panel";
@@ -233,7 +233,7 @@ export function AccountSettingsDialog({
                             required
                           />
                           <Button type="submit" size="sm" disabled={pending}>
-                            {pending ? <LoaderCircleIcon className="animate-spin" /> : null}
+                            {pending ? <Spinner size="sm" /> : null}
                             Salvar
                           </Button>
                         </label>

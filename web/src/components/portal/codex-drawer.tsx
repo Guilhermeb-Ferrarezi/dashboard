@@ -890,7 +890,7 @@ export function CodexDrawer({
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-destructive">
                 Codex bloqueado
               </p>
-              <h2 className="text-lg font-semibold">Crie um token de acesso</h2>
+              <h2 className="font-heading text-lg font-semibold tracking-tight">Crie um token de acesso</h2>
             </div>
           </div>
 

@@ -11,11 +11,11 @@ import {
   CheckIcon,
   CopyIcon,
   KeyRoundIcon,
-  LoaderCircleIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
 } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { clientApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { UserAccessTokenSummary, UserAccessTokenType } from "@/types/user-access-token";
@@ -123,7 +123,7 @@ function TokenRow({
             onClick={() => onRevoke(token.id)}
             disabled={isRevoked || revoking}
           >
-            {revoking ? <LoaderCircleIcon className="size-3.5 animate-spin" /> : <Trash2Icon className="size-3.5" />}
+            {revoking ? <Spinner size="sm" /> : <Trash2Icon className="size-3.5" />}
             Revogar
           </Button>
         </div>
@@ -271,7 +271,7 @@ export function CodexAccessPanel() {
             </label>
 
             <Button type="submit" size="lg" disabled={creatingToken}>
-              {creatingToken ? <LoaderCircleIcon className="size-4 animate-spin" /> : <PlusIcon className="size-4" />}
+              {creatingToken ? <Spinner size="md" /> : <PlusIcon className="size-4" />}
               {getModeButtonLabel(activeMode)}
             </Button>
           </div>

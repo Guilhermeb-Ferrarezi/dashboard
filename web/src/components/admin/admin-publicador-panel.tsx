@@ -12,18 +12,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Code } from "@/components/ui/code";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
 import {
   CopyIcon,
   BookOpenTextIcon,
   ExternalLinkIcon,
-  LoaderCircleIcon,
   RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
   XIcon,
 } from "@/components/ui/icons";
 import { getClientApiBaseUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 export type PublishedSiteSummary = {
   route: string;
@@ -79,7 +84,26 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
   const [deletingRoute, setDeletingRoute] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sites, setSites] = useState(initialSites);
+  const [isDragging, setIsDragging] = useState(false);
   const archiveInputRef = useRef<HTMLInputElement | null>(null);
+
+  function handleDroppedFile(file: File | undefined) {
+    if (!file) return;
+    const isZip =
+      file.name.toLowerCase().endsWith(".zip") ||
+      file.type.includes("zip") ||
+      file.type === "application/octet-stream";
+    if (!isZip) {
+      toast.error("Envie apenas arquivos ZIP.");
+      return;
+    }
+    setArchive(file);
+    if (archiveInputRef.current) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      archiveInputRef.current.files = dt.files;
+    }
+  }
 
   useEffect(() => {
     setSites(initialSites);
@@ -200,20 +224,13 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
     }
   }
 
-  async function handleDelete(siteRoute: string) {
-    if (!window.confirm(`Remover a rota ${siteRoute}?`)) {
-      return;
-    }
-
+  async function performDelete(siteRoute: string) {
     setDeletingRoute(siteRoute);
-
     try {
       const response = await fetch(`${getClientApiBaseUrl()}/admin/publicador/sites`, {
         method: "DELETE",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ route: siteRoute }),
       });
 
@@ -239,6 +256,27 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
     }
   }
 
+  function handleDelete(siteRoute: string) {
+    // Toast com "Desfazer" — só remove após 5s sem cancelamento
+    let cancelled = false;
+    const id = toast(`Removendo ${siteRoute}…`, {
+      description: "A rota some em 5 segundos. Clique em Desfazer para cancelar.",
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          cancelled = true;
+          toast.dismiss(id);
+          toast.message("Remoção cancelada.");
+        },
+      },
+    });
+    window.setTimeout(() => {
+      if (cancelled) return;
+      performDelete(siteRoute);
+    }, 5000);
+  }
+
   async function handleRefresh() {
     setRefreshing(true);
     try {
@@ -257,6 +295,11 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        eyebrow="Admin"
+        title="Publicador de sites"
+        description="Suba um ZIP com index.html na raiz para publicar conteúdo estático em uma rota da home."
+      />
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
         <Card className="overflow-hidden rounded-3xl border-border/70 bg-card/95 shadow-[0_24px_70px_-48px_rgba(0,0,0,0.5)]">
           <CardHeader className="border-b border-border/60 bg-gradient-to-b from-muted/30 to-transparent pb-5">
@@ -287,15 +330,45 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                   />
                   <p className="text-xs text-muted-foreground">
                     O arquivo vai ser servido em{" "}
-                    <span className="font-medium text-foreground">{routePath || "/"}</span>.
+                    <Code>{routePath || "/"}</Code>.
                   </p>
                 </label>
 
-                <label className="space-y-2">
+                <div className="space-y-2">
                   <span className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                     ZIP
                   </span>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 p-2 pl-3">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => archiveInputRef.current?.click()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        archiveInputRef.current?.click();
+                      }
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      if (!isDragging) setIsDragging(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      setIsDragging(false);
+                      handleDroppedFile(event.dataTransfer.files?.[0]);
+                    }}
+                    aria-label="Selecionar ou arrastar arquivo ZIP"
+                    className={cn(
+                      "group/dropzone relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-6 text-center transition-all duration-150 outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
+                      isDragging
+                        ? "border-primary bg-primary/8 ring-2 ring-primary/30"
+                        : "border-border/70 bg-background/60 hover:border-primary/60 hover:bg-primary/5",
+                    )}
+                  >
                     <input
                       ref={archiveInputRef}
                       type="file"
@@ -303,41 +376,48 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                       onChange={(event) => setArchive(event.target.files?.[0] ?? null)}
                       className="sr-only"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 rounded-xl border-border/70 bg-card/80 px-4 text-sm font-medium"
-                      onClick={() => archiveInputRef.current?.click()}
-                    >
-                      Escolher ZIP
-                    </Button>
-                    <div className="min-w-0 flex-1 text-sm text-muted-foreground">
-                      <span className="block truncate font-medium text-foreground">
-                        {archive?.name ?? "Nenhum arquivo selecionado"}
-                      </span>
-                    </div>
+                    <UploadIcon
+                      className={cn(
+                        "size-7 transition-transform duration-200",
+                        isDragging
+                          ? "text-primary scale-110"
+                          : "text-muted-foreground group-hover/dropzone:text-primary",
+                      )}
+                    />
                     {archive ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 shrink-0 rounded-lg text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          setArchive(null);
-                          if (archiveInputRef.current) {
-                            archiveInputRef.current.value = "";
-                          }
-                        }}
-                        aria-label="Remover arquivo selecionado"
-                      >
-                        <XIcon className="size-4" />
-                      </Button>
-                    ) : null}
+                      <div className="flex w-full min-w-0 items-center justify-center gap-2">
+                        <span className="block max-w-[18rem] truncate text-sm font-medium text-foreground">
+                          {archive.name}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-destructive"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setArchive(null);
+                            if (archiveInputRef.current) {
+                              archiveInputRef.current.value = "";
+                            }
+                          }}
+                          aria-label="Remover arquivo selecionado"
+                        >
+                          <XIcon className="size-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium text-foreground">
+                          {isDragging ? "Solte para enviar" : "Arraste o ZIP aqui ou clique para escolher"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Precisa conter <Code>index.html</Code> na raiz
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Precisa conter <span className="font-medium text-foreground">index.html</span> na raiz.
-                  </p>
-                </label>
+                </div>
               </div>
 
               <div className="rounded-3xl border border-border/70 bg-gradient-to-b from-muted/25 to-background p-4">
@@ -381,14 +461,23 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                 ) : null}
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                {pending ? (
+                  <Progress
+                    indeterminate
+                    value={0}
+                    className="flex-1"
+                    aria-label="Enviando arquivo"
+                  />
+                ) : null}
                 <Button
                   type="submit"
-                  disabled={pending || !archive}
+                  disabled={!archive}
+                  loading={pending}
                   className="h-11 w-full rounded-2xl sm:w-auto sm:min-w-[200px]"
                 >
-                  {pending ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
-                  Publicar
+                  {!pending ? <UploadIcon /> : null}
+                  {pending ? "Enviando…" : "Publicar"}
                 </Button>
               </div>
             </form>
@@ -412,15 +501,16 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="rounded-xl"
+                  className="group/refresh rounded-xl"
                   onClick={handleRefresh}
                   disabled={refreshing}
                   aria-label="Atualizar lista"
+                  title="Atualizar lista"
                 >
                   {refreshing ? (
-                    <LoaderCircleIcon className="size-4 animate-spin" />
+                    <Spinner size="md" />
                   ) : (
-                    <RefreshCwIcon className="size-4" />
+                    <RefreshCwIcon className="size-4 transition-transform duration-300 group-hover/refresh:rotate-90" />
                   )}
                 </Button>
               </div>
@@ -428,26 +518,25 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
           </CardHeader>
           <CardContent className="space-y-4 p-6">
             {sites.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-muted/20 text-center text-muted-foreground">
-                <BookOpenTextIcon className="size-9" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Nenhuma rota publicada</p>
-                  <p className="text-xs">Quando você enviar um ZIP, ele aparece aqui.</p>
-                </div>
-              </div>
+              <EmptyState
+                icon={BookOpenTextIcon}
+                title="Nenhuma rota publicada"
+                description="Envie um ZIP com index.html na raiz para começar. Ele aparece aqui assim que for processado."
+                className="min-h-[260px]"
+              />
             ) : (
-              <div className="space-y-3">
+              <div className="list-fade-in space-y-3">
                 {sites.map((site) => (
                   <div
                     key={site.route}
-                    className="group relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-muted/25 via-background to-background p-4 transition-colors hover:border-border"
+                    className="group relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-muted/25 via-background to-background p-4 transition-all duration-200 hover:-translate-y-px hover:border-primary/35 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
                   >
                     <div className="absolute inset-y-0 left-0 w-1 bg-primary/60" />
                     <div className="flex items-start justify-between gap-3 pl-2">
                       <div className="min-w-0 space-y-2">
                         <div className="space-y-1">
                           <p className="truncate text-sm font-semibold text-foreground">{site.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{site.route}</p>
+                          <Code className="inline-block max-w-full truncate text-[10.5px]">{site.route}</Code>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span className="rounded-full border border-border/70 bg-background/80 px-2 py-1">
@@ -499,7 +588,7 @@ export function AdminPublicadorPanel({ initialSites }: PublicadorPanelProps) {
                           aria-label={`Remover rota ${site.route}`}
                         >
                           {deletingRoute === site.route ? (
-                            <LoaderCircleIcon className="size-4 animate-spin" />
+                            <Spinner size="md" />
                           ) : (
                             <Trash2Icon className="size-4" />
                           )}

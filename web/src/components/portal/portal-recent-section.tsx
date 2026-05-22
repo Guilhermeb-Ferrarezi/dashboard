@@ -111,7 +111,7 @@ export function PortalRecentSection({
         </span>
       </Button>
       <SidebarGroupContent className="pb-1">
-        <SidebarMenuSub open={open} className="gap-0.5">
+        <SidebarMenuSub open={open} className="list-fade-in gap-0.5">
           {visibleRecents.length ? (
             visibleRecents.map((item) => {
               const Icon = portalIconMap[item.iconKey];
@@ -131,7 +131,7 @@ export function PortalRecentSection({
                       <span className="block truncate text-sm leading-5">
                         {item.label}
                       </span>
-                      <span className="block truncate text-[10px] leading-4 uppercase tracking-[0.16em] text-sidebar-foreground/45">
+                      <span className="block truncate text-[10px] leading-4 font-semibold uppercase tracking-[0.18em] text-sidebar-primary/75">
                         {item.group}
                       </span>
                     </div>

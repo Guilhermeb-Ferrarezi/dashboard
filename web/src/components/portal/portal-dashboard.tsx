@@ -15,6 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Tooltip,
   TooltipContent,
@@ -912,14 +914,12 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
       {/* Top bar minimalista estilo Cloudflare */}
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/40 pb-4">
         <div className="min-w-0 space-y-1.5">
-          <nav className="flex items-center gap-1.5 text-[11px] text-muted-foreground" aria-label="Trilha">
-            <Link href="/home" className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
-              <LayoutDashboardIcon className="size-3" />
-              Início
-            </Link>
-            <ChevronRightIcon className="size-3 opacity-50" />
-            <span>Dashboard</span>
-          </nav>
+          <Breadcrumb
+            items={[
+              { label: "Início", href: "/home", icon: LayoutDashboardIcon },
+              { label: "Dashboard" },
+            ]}
+          />
           <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
             Dashboard operacional
           </h1>
@@ -993,9 +993,9 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
             disabled={isPending}
             aria-label="Atualizar (R)"
             title="Atualizar dashboard · R"
-            className="relative size-8 rounded-md"
+            className="group/refresh-dash relative size-8 rounded-md"
           >
-            {isPending ? <LoaderCircleIcon className="size-3.5 animate-spin" /> : <RefreshCcwIcon className="size-3.5" />}
+            {isPending ? <Spinner size="sm" /> : <RefreshCcwIcon className="size-3.5 transition-transform duration-300 group-hover/refresh-dash:rotate-90" />}
             {hasRecentError && !isPending ? (
               <span className="absolute -top-0.5 -right-0.5 flex size-2" aria-hidden>
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75" />

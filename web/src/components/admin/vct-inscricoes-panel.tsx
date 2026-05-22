@@ -29,6 +29,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Card,
   CardContent,
@@ -1710,10 +1711,12 @@ export function VctInscricoesPanel({
           ) : null}
 
           {players.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center text-muted-foreground">
-              <UsersIcon className="size-8" />
-              <p className="text-sm">{emptyMessage}</p>
-            </div>
+            <EmptyState
+              icon={UsersIcon}
+              title="Sem inscrições"
+              description={emptyMessage}
+              className="min-h-[260px]"
+            />
           ) : (
             <div
               ref={(node) => {
@@ -1987,7 +1990,7 @@ export function VctInscricoesPanel({
               <InboxIcon className="size-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Inscritos</h2>
+              <h2 className="font-heading text-lg font-semibold tracking-tight">Inscritos</h2>
               <p className="text-xs text-muted-foreground">
                 {activeSemTime.length} aguardando time · {inactiveInscricoes.length} fora do campeonato
               </p>
@@ -2126,7 +2129,7 @@ export function VctInscricoesPanel({
               <CrosshairIcon className="size-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Times</h2>
+              <h2 className="font-heading text-lg font-semibold tracking-tight">Times</h2>
               <p className="text-xs text-muted-foreground">
                 {activeInscricoes.length - activeSemTime.length} jogadores distribuídos · {numTimes} times · {TIME_CAP} por time
               </p>

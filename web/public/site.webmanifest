@@ -1,0 +1,26 @@
+{
+  "name": "Santos Tech Portal",
+  "short_name": "Santos Tech",
+  "description": "Portal universal para os projetos internos da Santos Tech.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#10141d",
+  "theme_color": "#10141d",
+  "icons": [
+    {
+      "src": "/assets/Logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/Logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "productivity"]
+}

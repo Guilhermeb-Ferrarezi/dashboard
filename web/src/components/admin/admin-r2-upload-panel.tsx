@@ -11,15 +11,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
   CopyIcon,
   ExternalLinkIcon,
   FolderSearch2Icon,
   ImageIcon,
-  LoaderCircleIcon,
   UploadIcon,
 } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { getClientApiBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -124,9 +126,9 @@ export function AdminR2UploadPanel() {
               <UploadIcon className="size-5" />
             </div>
             <div className="space-y-1">
-              <CardTitle>Upload para o R2</CardTitle>
+              <CardTitle className="font-heading text-base font-semibold tracking-tight">Upload para o R2</CardTitle>
               <CardDescription>
-                Escolha uma pasta e envie uma imagem. O sistema retorna a chave e a URL publica.
+                Escolha uma pasta e envie uma imagem. O sistema retorna a chave e a URL pública.
               </CardDescription>
             </div>
           </div>
@@ -139,37 +141,45 @@ export function AdminR2UploadPanel() {
                   Pasta
                 </span>
                 <div className="relative">
-                  <FolderSearch2Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <select
+                  <FolderSearch2Icon className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Combobox
                     value={folder}
-                    onChange={(event) => setFolder(event.target.value)}
-                    className="h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {FOLDER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setFolder}
+                    options={FOLDER_OPTIONS}
+                    inputClassName="pl-9"
+                    placeholder="Selecione a pasta…"
+                  />
                 </div>
                 <p className="text-xs text-muted-foreground">
                   O prefixo é gravado no nome do arquivo dentro do bucket.
                 </p>
               </label>
 
-              <label className="space-y-2">
+              <div className="space-y-2">
                 <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   Imagem
                 </span>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setImage(event.target.files?.[0] ?? null)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  PNG, JPG e WEBP. Limite de 5 MB.
-                </p>
-              </label>
+                <label
+                  className={cn(
+                    "group/dropzone flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-border/70 bg-background/60 px-4 py-5 text-center transition-all duration-150 hover:border-primary/60 hover:bg-primary/5",
+                    image && "border-primary/40 bg-primary/5",
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(event) => setImage(event.target.files?.[0] ?? null)}
+                  />
+                  <UploadIcon className="size-6 text-muted-foreground transition-colors group-hover/dropzone:text-primary" />
+                  <p className="text-sm font-medium text-foreground">
+                    {image ? image.name : "Clique para escolher uma imagem"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPG e WEBP · até 5 MB
+                  </p>
+                </label>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
@@ -210,8 +220,8 @@ export function AdminR2UploadPanel() {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={pending || !image}>
-                  {pending ? <LoaderCircleIcon className="animate-spin" /> : <UploadIcon />}
+                <Button type="submit" disabled={!image} loading={pending}>
+                  {pending ? null : <UploadIcon />}
                   Enviar imagem
                 </Button>
               </div>
@@ -222,22 +232,19 @@ export function AdminR2UploadPanel() {
 
       <Card className="border-border/60 bg-card/90 shadow-sm">
         <CardHeader>
-          <CardTitle>Envios recentes</CardTitle>
+          <CardTitle className="font-heading text-base font-semibold tracking-tight">Envios recentes</CardTitle>
           <CardDescription>
-            As ultimas imagens enviadas nessa sessao.
+            As últimas imagens enviadas nessa sessão.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {uploads.length === 0 ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 text-center text-muted-foreground">
-              <ImageIcon className="size-9" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Nenhum envio ainda</p>
-                <p className="text-xs">
-                  Assim que voce enviar uma imagem, a URL publica aparece aqui.
-                </p>
-              </div>
-            </div>
+            <EmptyState
+              icon={ImageIcon}
+              title="Nenhum envio ainda"
+              description="Assim que você enviar uma imagem, a URL pública aparece aqui."
+              className="min-h-[220px]"
+            />
           ) : (
             <div className="space-y-3">
               {uploads.map((upload) => (

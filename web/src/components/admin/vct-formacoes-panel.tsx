@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircleIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
+import { LayoutGridIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeader } from "@/components/ui/section-header";
 import {
   Card,
   CardContent,
@@ -141,19 +144,19 @@ export function VctFormacoesPanel({ initialFormacoes, modalidade = "valorant" }:
 
   if (formacoes.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle>Nenhuma formação recebida</CardTitle>
-            <CardDescription>
-              Quando a nova rota enviar um time completo, ele aparece aqui com os jogadores e a logo.
-            </CardDescription>
-          </div>
-          <Button onClick={openCreateFormacao}>
-            <PlusIcon />
-            Criar formação
-          </Button>
-        </CardHeader>
+      <>
+        <EmptyState
+          icon={LayoutGridIcon}
+          title="Nenhuma formação recebida"
+          description="Quando a nova rota enviar um time completo, ele aparece aqui com os jogadores e a logo."
+          action={
+            <Button onClick={openCreateFormacao}>
+              <PlusIcon />
+              Criar formação
+            </Button>
+          }
+          className="min-h-[280px]"
+        />
         <VctFormacaoEditorDialog
           open={editorMode !== null}
           mode={editorMode ?? "create"}
@@ -162,24 +165,22 @@ export function VctFormacoesPanel({ initialFormacoes, modalidade = "valorant" }:
           onClose={closeEditor}
           onSaved={handleFormacaoSaved}
         />
-      </Card>
+      </>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">Formações</h2>
-          <p className="text-xs text-muted-foreground">
-            {formacoes.length} formações cadastradas
-          </p>
-        </div>
-        <Button onClick={openCreateFormacao}>
-          <PlusIcon />
-          Criar formação
-        </Button>
-      </div>
+      <SectionHeader
+        title="Formações"
+        description={`${formacoes.length} formações cadastradas`}
+        actions={
+          <Button onClick={openCreateFormacao}>
+            <PlusIcon />
+            Criar formação
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {formacoes.map((formacao) => {
@@ -434,7 +435,7 @@ export function VctFormacoesPanel({ initialFormacoes, modalidade = "valorant" }:
                 Cancelar
               </Button>
               <Button variant="destructive" disabled={deletePending} onClick={handleDeleteFormacao}>
-                {deletePending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+                {deletePending ? <Spinner size="sm" /> : <Trash2Icon />}
                 Excluir
               </Button>
             </DialogFooter>
