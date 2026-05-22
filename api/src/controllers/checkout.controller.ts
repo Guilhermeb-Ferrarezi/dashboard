@@ -152,6 +152,37 @@ export async function listClientes(_req: Request, res: Response) {
   }
 }
 
+export async function updateCliente(req: Request, res: Response) {
+  try {
+    const userId = Number(req.params.userId);
+    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+
+    const { userLogin, userEmail } = req.body as { userLogin?: string; userEmail?: string };
+
+    const updates: Record<string, string | null> = {};
+    if (userLogin !== undefined) updates.userLogin = userLogin.trim() || null;
+    if (userEmail !== undefined) updates.userEmail = userEmail.trim() || null;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "Nenhum campo para atualizar." });
+    }
+
+    const db = getCheckoutDb();
+    const [updated] = await db
+      .update(schema.checkoutCustomers)
+      .set(updates)
+      .where(eq(schema.checkoutCustomers.userId, userId))
+      .returning();
+
+    if (!updated) return res.status(404).json({ message: "Cliente não encontrado." });
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("[checkout] updateCliente error:", error);
+    return res.status(500).json({ message: "Erro ao atualizar cliente." });
+  }
+}
+
 export async function listClientePedidos(req: Request, res: Response) {
   try {
     const userId = Number(req.params.userId);

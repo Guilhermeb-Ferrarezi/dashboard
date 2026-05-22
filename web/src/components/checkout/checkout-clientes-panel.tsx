@@ -5,6 +5,13 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   CalendarIcon,
@@ -14,6 +21,7 @@ import {
   CopyIcon,
   MailIcon,
   PackageIcon,
+  PencilIcon,
   ShoppingCartIcon,
   SparklesIcon,
   UsersIcon
@@ -211,27 +219,33 @@ export function CheckoutClientesPanel({
     new Map()
   );
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [clientes, setClientes] = useState(initialClientes);
+  const [editingCliente, setEditingCliente] = useState<CheckoutClienteSummary | null>(null);
+  const [editLogin, setEditLogin] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const allProducts = useMemo(() => {
     const set = new Set<string>();
-    for (const c of initialClientes) {
+    for (const c of clientes) {
       for (const p of c.purchasedProducts) {
         if (p) set.add(p);
       }
     }
     return [...set].sort();
-  }, [initialClientes]);
+  }, [clientes]);
 
   // Stats
-  const totalClientes = initialClientes.length;
-  const totalRecebido = initialClientes.reduce((acc, c) => acc + c.totalSpentCents, 0);
-  const vipCount = initialClientes.filter((c) => c.isVip).length;
+  const totalClientes = clientes.length;
+  const totalRecebido = clientes.reduce((acc, c) => acc + c.totalSpentCents, 0);
+  const vipCount = clientes.filter((c) => c.isVip).length;
   const topCliente = useMemo(() => {
-    if (initialClientes.length === 0) return null;
-    return initialClientes.reduce((best, c) =>
+    if (clientes.length === 0) return null;
+    return clientes.reduce((best, c) =>
       c.totalSpentCents > best.totalSpentCents ? c : best
     );
-  }, [initialClientes]);
+  }, [clientes]);
 
   const periodCutoff = useMemo((): Date | null => {
     const now = new Date();
@@ -244,7 +258,7 @@ export function CheckoutClientesPanel({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let result = initialClientes.filter((c) => {
+    let result = clientes.filter((c) => {
       if (
         q &&
         !c.userLogin.toLowerCase().includes(q) &&
@@ -274,7 +288,7 @@ export function CheckoutClientesPanel({
     });
 
     return result;
-  }, [initialClientes, query, filterProduct, periodCutoff, sortBy, sortDir]);
+  }, [clientes, query, filterProduct, periodCutoff, sortBy, sortDir]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -336,6 +350,37 @@ export function CheckoutClientesPanel({
     URL.revokeObjectURL(url);
   }
 
+  function handleOpenEdit(cliente: CheckoutClienteSummary) {
+    setEditingCliente(cliente);
+    setEditLogin(cliente.userLogin);
+    setEditEmail(cliente.userEmail ?? "");
+    setEditError(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingCliente) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await clientApi(`/checkout/clientes/${editingCliente.userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ userLogin: editLogin, userEmail: editEmail })
+      });
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.userId === editingCliente.userId
+            ? { ...c, userLogin: editLogin.trim() || c.userLogin, userEmail: editEmail.trim() || null }
+            : c
+        )
+      );
+      setEditingCliente(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   function SortIcon({ col }: { col: SortBy }) {
     if (sortBy !== col)
       return <span className="ml-1 opacity-30 text-[10px]">↕</span>;
@@ -348,6 +393,44 @@ export function CheckoutClientesPanel({
 
   return (
     <div className="flex flex-col gap-6">
+      <Dialog open={!!editingCliente} onOpenChange={(open) => { if (!open) setEditingCliente(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar cliente</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-1">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">Login</label>
+              <Input
+                value={editLogin}
+                onChange={(e) => setEditLogin(e.target.value)}
+                placeholder="login do usuário"
+                disabled={editSaving}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <Input
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+                type="email"
+                disabled={editSaving}
+              />
+            </div>
+            {editError && <p className="text-xs text-destructive">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCliente(null)} disabled={editSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleSaveEdit()} disabled={editSaving}>
+              {editSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <PageHeader
         eyebrow="Checkout"
         title="Clientes"
@@ -616,6 +699,15 @@ export function CheckoutClientesPanel({
                             onClick={() => void handleCopyEmail(cliente)}
                           >
                             <MailIcon className="size-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            title="Editar cliente"
+                            onClick={() => handleOpenEdit(cliente)}
+                          >
+                            <PencilIcon className="size-3.5" />
                           </Button>
                           <Button
                             type="button"
