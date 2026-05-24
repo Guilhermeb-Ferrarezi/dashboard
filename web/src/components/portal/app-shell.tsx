@@ -537,7 +537,7 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 rounded-tl-xl bg-card",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 rounded-tl-[24px] bg-card",
                   lockViewport && "overflow-hidden",
                 )}
               >
