@@ -488,7 +488,7 @@ export function AppShell({
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className={cn(lockViewport && "h-screen overflow-hidden")}>
+      <SidebarInset className={cn("bg-sidebar", lockViewport && "h-screen overflow-hidden")}>
         <div
           className={cn(
             "relative flex min-h-screen",
@@ -497,7 +497,7 @@ export function AppShell({
         >
           <div className="flex min-w-0 flex-1 flex-col">
             <SystemBanner />
-            <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-xl">
+            <header className="sticky top-0 z-20 bg-sidebar backdrop-blur-xl">
               <div className="flex w-full items-center gap-3 px-4 py-3">
                 <SidebarTrigger />
                 <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
@@ -537,7 +537,7 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 bg-card",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 rounded-tl-xl bg-card",
                   lockViewport && "overflow-hidden",
                 )}
               >
