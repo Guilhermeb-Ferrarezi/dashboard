@@ -529,7 +529,7 @@ export function AppShell({
 
             <div
               className={cn(
-                "flex w-full flex-1 min-h-0 p-0",
+                "flex w-full flex-1 min-h-0 p-[24px]",
                 lockViewport && "overflow-hidden",
               )}
             >
@@ -537,7 +537,7 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-col scroll-mt-14 rounded-tl-[24px] bg-card border-t border-l border-border/30 p-6",
+                  "page-fade-in flex min-h-0 min-w-0 flex-col scroll-mt-14 rounded-[24px] bg-card border border-border/30 p-[24px] shadow-sm",
                   lockViewport && "overflow-hidden",
                 )}
               >
