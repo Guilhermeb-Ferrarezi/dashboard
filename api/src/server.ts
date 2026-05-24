@@ -17,7 +17,7 @@ import codexRoutes from "./routes/codex.routes";
 import portalRoutes from "./routes/portal.routes";
 import checkoutRoutes from "./routes/checkout.routes";
 import { runCheckoutMigrations } from "./db/index";
-import { startPortalRecentsFlushLoop } from "./lib/portal-recents-store";
+import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -252,6 +252,15 @@ async function start() {
     runCheckoutMigrations().catch((err) =>
       console.error("[checkout] migration error:", err)
     );
+
+    function shutdown() {
+      console.log("Shutting down…");
+      stopPortalRecentsFlushLoop();
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(1), 5000);
+    }
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Falha ao conectar ao Mongo: ${message}`);

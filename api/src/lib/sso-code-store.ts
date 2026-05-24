@@ -125,6 +125,7 @@ export async function storePendingSsoCode(
   }
 
   pruneExpiredMemoryCodes();
+  if (memoryPendingCodes.size >= MAX_PENDING) return;
   memoryPendingCodes.set(code, payload);
 }
 

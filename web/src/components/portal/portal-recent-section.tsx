@@ -72,16 +72,20 @@ export function PortalRecentSection({
       return;
     }
 
+    let innerTimer: number;
     const startTimer = window.setTimeout(() => {
       setFlashRecentId(recentItem.id);
-      window.setTimeout(() => {
+      innerTimer = window.setTimeout(() => {
         setFlashRecentId((current) => (current === recentItem.id ? null : current));
       }, 1200);
     }, 0);
 
     trackPortalRecent(userId, recentItem);
 
-    return () => window.clearTimeout(startTimer);
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(innerTimer);
+    };
   }, [recentItem, userId]);
 
   useEffect(() => {
