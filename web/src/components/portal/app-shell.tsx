@@ -379,26 +379,23 @@ export function AppShell({
       <ConnectivityToasts />
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader>
-          <div className="group relative overflow-hidden rounded-2xl border border-sidebar-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--sidebar-primary)_18%,transparent),color-mix(in_oklch,var(--sidebar)_92%,black))] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.12)] transition-[padding,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none hover:shadow-[0_14px_36px_rgba(0,0,0,0.18)] group-data-[collapsible=icon]:p-1.5">
-            <span aria-hidden className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-sidebar-primary/60 to-transparent" />
-            <div className="flex items-center gap-3 transition-[gap] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
-              <div className="flex size-11 items-center justify-center rounded-2xl text-sidebar-primary-foreground ring-1 ring-sidebar-primary/30 shadow-sm transition-[width,height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none group-data-[collapsible=icon]:size-9">
-                <Image
-                    src="/assets/Logo.png"
-                    alt="Santos Tech"
-                    width={48}
-                    height={48}
-                    priority
-                  />
-              </div>
-              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="truncate font-heading text-sm font-semibold tracking-tight">
-                  Santos Tech
-                </p>
-                <p className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-primary/90">
-                  Universal Home
-                </p>
-              </div>
+          <div className="flex items-center gap-3 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
+            <div className="flex size-9 shrink-0 items-center justify-center">
+              <Image
+                src="/assets/Logo.png"
+                alt="Santos Tech"
+                width={36}
+                height={36}
+                priority
+              />
+            </div>
+            <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+              <p className="truncate font-heading text-sm font-semibold tracking-tight">
+                Santos Tech
+              </p>
+              <p className="truncate text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/50">
+                Universal Home
+              </p>
             </div>
           </div>
         </SidebarHeader>
@@ -472,7 +469,6 @@ export function AppShell({
             </SidebarGroup>
           ))}
 
-          <div className="mx-2 my-2 h-px shrink-0 bg-sidebar-border/60" />
         </SidebarContent>
 
         <SidebarFooter>
