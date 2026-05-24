@@ -4,12 +4,14 @@ import {
   createProduto,
   deleteCliente,
   deleteProduto,
+  getComprovante,
   getDashboard,
   getNovosPorMes,
   listClienteAssinaturas,
   listClientePedidos,
   listClientes,
   listProdutos,
+  refundOrder,
   updateCliente,
   updateProduto
 } from "../controllers/checkout.controller";
@@ -26,6 +28,8 @@ router.patch("/clientes/:userId", updateCliente);
 router.delete("/clientes/:userId", deleteCliente);
 router.get("/clientes/:userId/pedidos", listClientePedidos);
 router.get("/clientes/:userId/assinaturas", listClienteAssinaturas);
+router.get("/pedidos/:id/comprovante", getComprovante);
+router.post("/pedidos/:id/refund", refundOrder);
 router.get("/novos-por-mes", getNovosPorMes);
 router.get("/produtos", listProdutos);
 router.post("/produtos", createProduto);

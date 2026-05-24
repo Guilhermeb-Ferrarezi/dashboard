@@ -17,6 +17,9 @@ export const checkoutCustomers = pgTable("checkout_customers", {
   abacateCustomerId: text("abacate_customer_id").notNull(),
   userLogin: text("user_login"),
   userEmail: text("user_email"),
+  name: text("name"),
+  taxId: text("tax_id"),
+  cellphone: text("cellphone"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
@@ -28,7 +31,7 @@ export const checkoutOrders = pgTable("checkout_orders", {
   productId: text("product_id").notNull(),
   description: text("description").notNull(),
   amountCents: integer("amount_cents").notNull(),
-  status: text("status", { enum: ["pending", "paid", "failed", "expired"] })
+  status: text("status", { enum: ["pending", "paid", "failed", "expired", "refunded"] })
     .notNull()
     .default("pending"),
   abacateBillingId: text("abacate_billing_id"),

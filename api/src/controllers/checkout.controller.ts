@@ -23,7 +23,10 @@ function serializeOrder(row: typeof schema.checkoutOrders.$inferSelect) {
     description: row.description,
     amountCents: row.amountCents,
     status: row.status,
-    createdAt: row.createdAt.toISOString()
+    abacateBillingId: row.abacateBillingId ?? null,
+    checkoutUrl: row.checkoutUrl ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
   };
 }
 
@@ -58,6 +61,9 @@ function serializeClienteEnriquecido(
     userId: customer.userId,
     userLogin: customer.userLogin ?? `user_${customer.userId}`,
     userEmail: customer.userEmail ?? null,
+    userName: customer.name ?? null,
+    userTaxId: customer.taxId ?? null,
+    userPhone: customer.cellphone ?? null,
     abacateCustomerId: customer.abacateCustomerId,
     createdAt: customer.createdAt.toISOString(),
     orderCount,
@@ -280,15 +286,104 @@ export async function listClientePedidos(req: Request, res: Response) {
 
     const db = getCheckoutDb();
     const pedidos = await db
-      .select()
+      .select({
+        order: schema.checkoutOrders,
+        paidAt: schema.checkoutPayments.paidAt
+      })
       .from(schema.checkoutOrders)
+      .leftJoin(schema.checkoutPayments, eq(schema.checkoutOrders.id, schema.checkoutPayments.orderId))
       .where(eq(schema.checkoutOrders.userId, userId))
       .orderBy(desc(schema.checkoutOrders.createdAt));
 
-    return res.json({ pedidos: pedidos.map(serializeOrder) });
+    const seen = new Set<number>();
+    const unique = pedidos.filter((r) => {
+      if (seen.has(r.order.id)) return false;
+      seen.add(r.order.id);
+      return true;
+    });
+
+    return res.json({ pedidos: unique.map((r) => ({
+      ...serializeOrder(r.order),
+      paidAt: r.paidAt?.toISOString() ?? null
+    })) });
   } catch (error) {
     console.error("[checkout] listClientePedidos error:", error);
     return res.status(500).json({ message: "Erro ao listar pedidos do cliente." });
+  }
+}
+
+export async function getComprovante(req: Request, res: Response) {
+  try {
+    const orderId = Number(req.params.id);
+    if (isNaN(orderId)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    const [order] = await db
+      .select()
+      .from(schema.checkoutOrders)
+      .where(eq(schema.checkoutOrders.id, orderId))
+      .limit(1);
+
+    if (!order) return res.status(404).json({ message: "Pedido não encontrado." });
+    if (order.status !== "paid") return res.status(400).json({ message: "Pedido não foi pago." });
+
+    const [customer] = await db
+      .select()
+      .from(schema.checkoutCustomers)
+      .where(eq(schema.checkoutCustomers.userId, order.userId))
+      .limit(1);
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Comprovante #${order.id}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#1a1a1a}
+h1{font-size:20px;border-bottom:2px solid #22c55e;padding-bottom:8px}
+.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}
+.label{color:#666}.value{font-weight:600}
+.status{background:#f0fdf4;color:#16a34a;padding:2px 10px;border-radius:12px;font-size:13px}
+@media print{body{margin:0}}</style></head><body>
+<h1>Comprovante de pagamento</h1>
+<div class="row"><span class="label">ID do pedido</span><span class="value">#${order.id}</span></div>
+<div class="row"><span class="label">Produto</span><span class="value">${order.description}</span></div>
+<div class="row"><span class="label">Valor</span><span class="value">R$ ${(order.amountCents / 100).toFixed(2).replace(".", ",")}</span></div>
+<div class="row"><span class="label">Status</span><span class="status">Pago</span></div>
+<div class="row"><span class="label">Data</span><span class="value">${order.createdAt.toLocaleDateString("pt-BR")}</span></div>
+<div class="row"><span class="label">Cliente</span><span class="value">${customer?.userLogin ?? "—"}</span></div>
+<div class="row"><span class="label">E-mail</span><span class="value">${customer?.userEmail ?? "—"}</span></div>
+${order.abacateBillingId ? `<div class="row"><span class="label">Billing ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.abacateBillingId}</span></div>` : ""}
+<p style="margin-top:24px;font-size:12px;color:#999;text-align:center">Santos Tech · Comprovante gerado em ${new Date().toLocaleString("pt-BR")}</p>
+</body></html>`;
+
+    return res.type("html").send(html);
+  } catch (error) {
+    console.error("[checkout] getComprovante error:", error);
+    return res.status(500).json({ message: "Erro ao gerar comprovante." });
+  }
+}
+
+export async function refundOrder(req: Request, res: Response) {
+  try {
+    const orderId = Number(req.params.id);
+    if (isNaN(orderId)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    const [order] = await db
+      .select()
+      .from(schema.checkoutOrders)
+      .where(eq(schema.checkoutOrders.id, orderId))
+      .limit(1);
+
+    if (!order) return res.status(404).json({ message: "Pedido não encontrado." });
+    if (order.status !== "paid") return res.status(400).json({ message: "Apenas pedidos pagos podem ser reembolsados." });
+
+    await db
+      .update(schema.checkoutOrders)
+      .set({ status: "refunded", updatedAt: new Date() })
+      .where(eq(schema.checkoutOrders.id, orderId));
+
+    return res.json({ message: "Reembolso realizado.", orderId });
+  } catch (error) {
+    console.error("[checkout] refundOrder error:", error);
+    return res.status(500).json({ message: "Erro ao reembolsar." });
   }
 }
 

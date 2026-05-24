@@ -57,12 +57,18 @@ import {
   type PortalSidebarItem,
 } from "@/components/portal/portal-shell-data";
 
+interface BreadcrumbItem {
+  label: string;
+  href: string;
+}
+
 interface AppShellProps {
   user: SessionUser;
   children: React.ReactNode;
   title: string;
   description: string;
   eyebrow?: string;
+  breadcrumb?: BreadcrumbItem[];
   fullWidth?: boolean;
   lockViewport?: boolean;
 }
@@ -79,6 +85,10 @@ function clampCodexDrawerWidth(width: number) {
 function isItemActive(item: PortalSidebarItem, pathname: string, logsHref: string) {
   if (item.href === logsHref) {
     return pathname === "/logs" || pathname.startsWith("/logs/");
+  }
+
+  if (item.href === "/checkout") {
+    return pathname === "/checkout";
   }
 
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -104,6 +114,7 @@ export function AppShell({
   title,
   description,
   eyebrow,
+  breadcrumb,
   fullWidth = true,
   lockViewport = false,
 }: AppShellProps) {
@@ -488,26 +499,34 @@ export function AppShell({
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className={cn("bg-sidebar", lockViewport && "h-screen overflow-hidden")}>
-        <div
-          className={cn(
-            "relative flex min-h-screen",
-            lockViewport && "h-screen min-h-0 overflow-hidden",
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset className="bg-sidebar h-screen overflow-hidden">
+        <div className="relative flex h-full">
+          <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
             <SystemBanner />
-            <header className="sticky top-0 z-20 bg-sidebar backdrop-blur-xl">
-              <div className="flex w-full items-center gap-3 px-4 py-3">
+            <header className="shrink-0 z-20 bg-sidebar">
+              <div className="flex w-full items-center gap-4 px-6 py-4">
                 <SidebarTrigger />
-                <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
-                  {eyebrow ? (
-                    <>
-                      <span>{eyebrow}</span>
-                      <span className="text-muted-foreground/50">/</span>
-                    </>
+                <nav className="flex min-w-0 flex-1 items-center gap-2 text-base text-muted-foreground">
+                  {breadcrumb ? (
+                    breadcrumb.map((item, i) => (
+                      <span key={i} className="flex items-center gap-2">
+                        <Link href={item.href} className="hover:text-foreground transition-colors">
+                          {item.label}
+                        </Link>
+                        <span className="text-muted-foreground/40">/</span>
+                      </span>
+                    ))
+                  ) : eyebrow ? (
+                    eyebrow.split("›").map((segment, i, arr) => (
+                      <span key={i} className="flex items-center gap-2">
+                        <span>{segment.trim()}</span>
+                        {i < arr.length - 1 || title ? (
+                          <span className="text-muted-foreground/40">/</span>
+                        ) : null}
+                      </span>
+                    ))
                   ) : null}
-                  <span className="truncate font-medium text-foreground">{title}</span>
+                  <span className="truncate font-semibold text-foreground">{title}</span>
                 </nav>
                 <div className="flex items-center gap-2">
                   <ApiHealthIndicator className="hidden md:inline-flex" />
@@ -529,15 +548,14 @@ export function AppShell({
 
             <div
               className={cn(
-                "flex w-full flex-1 min-h-0 p-[24px]",
-                lockViewport && "overflow-hidden",
+                "flex w-full flex-1 min-h-0 overflow-hidden p-[24px]",
               )}
             >
               <main
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-col scroll-mt-14 rounded-[24px] bg-card border border-border/30 p-[24px] shadow-sm",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col rounded-[24px] bg-card border border-border/30 p-[24px] shadow-sm overflow-y-auto",
                   lockViewport && "overflow-hidden",
                 )}
               >

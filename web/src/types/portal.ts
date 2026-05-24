@@ -101,7 +101,7 @@ export interface VctFormacaoSummary {
   createdAt?: string;
 }
 
-export type CheckoutOrderStatus = "pending" | "paid" | "failed" | "expired" | "cancelled";
+export type CheckoutOrderStatus = "pending" | "paid" | "failed" | "expired" | "cancelled" | "refunded";
 
 export interface CheckoutProductSummary {
   id: number;
@@ -118,6 +118,9 @@ export interface CheckoutClienteSummary {
   userId: number;
   userLogin: string;
   userEmail: string | null;
+  userName: string | null;
+  userTaxId: string | null;
+  userPhone: string | null;
   abacateCustomerId: string;
   createdAt: string;
   orderCount: number;
@@ -135,7 +138,11 @@ export interface CheckoutClientePedido {
   description: string;
   amountCents: number;
   status: CheckoutOrderStatus;
+  abacateBillingId: string | null;
+  checkoutUrl: string | null;
   createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
 }
 
 export type CheckoutSubscriptionStatus = "active" | "cancelled" | "expired" | "paused";

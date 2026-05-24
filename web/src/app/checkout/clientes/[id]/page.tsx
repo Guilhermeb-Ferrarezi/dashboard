@@ -33,10 +33,8 @@ export default async function CheckoutClienteDetalhePage({
   }
 
   return (
-    <AppShell user={user} title={cliente.userLogin} description="Detalhe do cliente.">
-      <div className="p-6">
-        <CheckoutClienteDetalhe cliente={cliente} />
-      </div>
+    <AppShell user={user} breadcrumb={[{ label: "Checkout", href: "/checkout" }, { label: "Clientes", href: "/checkout/clientes" }]} title={cliente.userLogin} description="Detalhe do cliente.">
+      <CheckoutClienteDetalhe cliente={cliente} />
     </AppShell>
   );
 }

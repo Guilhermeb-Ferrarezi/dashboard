@@ -75,7 +75,7 @@ export function LoginForm({ error }: LoginFormProps) {
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(255,117,24,0.18),_transparent_36%),linear-gradient(180deg,_rgba(255,255,255,0.04),_transparent)]" />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-16 -z-10 opacity-[0.04] select-none"
+        className="pointer-events-none absolute bottom-0 right-0 -z-10 opacity-[0.04] select-none"
       >
         <Image
           src="/assets/Logo.png"

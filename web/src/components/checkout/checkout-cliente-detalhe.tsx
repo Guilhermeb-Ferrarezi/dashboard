@@ -8,9 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyButton } from "@/components/ui/copy-button";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,7 +37,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { clientApi } from "@/lib/api";
+import { clientApi, getClientApiBaseUrl } from "@/lib/api";
 import type {
   CheckoutClienteAssinatura,
   CheckoutClientePedido,
@@ -75,6 +83,8 @@ function getStatusConfig(status: string): { label: string; className: string } {
       return { label: "Cancelado", className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
     case "failed":
       return { label: "Falhou", className: "bg-red-500/15 text-red-400 border-red-500/30" };
+    case "refunded":
+      return { label: "Reembolsado", className: "bg-purple-500/15 text-purple-400 border-purple-500/30" };
     default:
       return { label: status, className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
   }
@@ -118,6 +128,9 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
 
   const [assinaturas, setAssinaturas] = useState<CheckoutClienteAssinatura[] | null>(null);
   const [loadingAssinaturas, setLoadingAssinaturas] = useState(false);
+  const [detailPedido, setDetailPedido] = useState<CheckoutClientePedido | null>(null);
+  const [refundPedido, setRefundPedido] = useState<CheckoutClientePedido | null>(null);
+  const [refunding, setRefunding] = useState(false);
 
   const behavior = getBehaviorLabel(cliente);
 
@@ -153,7 +166,8 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
 
   useEffect(() => {
     void loadPedidos();
-  }, [loadPedidos]);
+    void loadAssinaturas();
+  }, [loadPedidos, loadAssinaturas]);
 
   const filteredPedidos = useMemo(() => {
     if (!pedidos) return [];
@@ -172,49 +186,166 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
     return [...new Set(cliente.purchasedProducts)].sort();
   }, [cliente.purchasedProducts]);
 
-  function handleMenuAction(action: string, pedido: CheckoutClientePedido) {
-    switch (action) {
-      case "details":
-        toast.info(
-          `Pedido #${pedido.id} — ${pedido.description}\n${formatBRL(pedido.amountCents)} — ${getStatusConfig(pedido.status).label}\n${formatDate(pedido.createdAt)}`
-        );
-        break;
-      case "receipt":
-        toast("Comprovante — em breve");
-        break;
-      case "refund":
-        toast("Reembolsar — em breve");
-        break;
-      case "invoice":
-        toast("Emitir nota fiscal — em breve");
-        break;
+  async function handleRefund() {
+    if (!refundPedido) return;
+    setRefunding(true);
+    try {
+      await clientApi<{ message: string }>(`/checkout/pedidos/${refundPedido.id}/refund`, { method: "POST" });
+      toast.success("Reembolso solicitado com sucesso.");
+      setPedidos((prev) =>
+        prev?.map((p) => p.id === refundPedido.id ? { ...p, status: "refunded" as const } : p) ?? null
+      );
+      setRefundPedido(null);
+    } catch {
+      toast.error("Erro ao solicitar reembolso. Endpoint ainda não implementado.");
+    } finally {
+      setRefunding(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        eyebrow="Checkout › Clientes"
-        title={cliente.userLogin}
-      />
+      {/* Dialog: Ver detalhes */}
+      <Dialog open={!!detailPedido} onOpenChange={(open) => { if (!open) setDetailPedido(null); }}>
+        <DialogContent className="sm:!max-w-lg !gap-0 !p-0 overflow-hidden">
+          <DialogHeader className="border-b border-border px-5 py-4">
+            <DialogTitle>Detalhes da cobrança</DialogTitle>
+          </DialogHeader>
+          {detailPedido && (
+            <div className="flex flex-col divide-y divide-border overflow-y-auto max-h-[70vh]">
+              <div className="flex items-center justify-between px-5 py-4">
+                <div>
+                  <p className="text-base font-semibold">Cobrança — {formatBRL(detailPedido.amountCents)}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {detailPedido.abacateBillingId ?? detailPedido.id}</p>
+                </div>
+                <Badge variant="outline" className={getStatusConfig(detailPedido.status).className}>
+                  {getStatusConfig(detailPedido.status).label}
+                </Badge>
+              </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-        <span className="flex items-center gap-1.5">
+              <div className="px-5 py-4">
+                <p className="text-sm font-semibold mb-3">Informações da cobrança</p>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Valor</p>
+                    <p>{formatBRL(detailPedido.amountCents)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Método</p>
+                    <p>Pix</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Tipo</p>
+                    <p>Cobrança única</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Criação</p>
+                    <p>{formatDate(detailPedido.createdAt)}</p>
+                  </div>
+                  {detailPedido.paidAt && (
+                    <div>
+                      <p className="text-muted-foreground text-xs">Pago em</p>
+                      <p>{formatDate(detailPedido.paidAt)}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground text-xs">Última atualização</p>
+                    <p>{formatDate(detailPedido.updatedAt)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Product ID</p>
+                    <p className="font-mono text-xs">{detailPedido.productId}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-sm font-semibold mb-3">Cliente</p>
+                <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Nome</p>
+                    <p>{cliente.userLogin}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">E-mail</p>
+                    <p>{cliente.userEmail ?? "—"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {detailPedido.checkoutUrl && (
+                <div className="px-5 py-4">
+                  <p className="text-sm font-semibold mb-3">Links</p>
+                  <div className="text-sm">
+                    <p className="text-muted-foreground text-xs">URL do checkout</p>
+                    <p className="text-xs font-mono break-all">{detailPedido.checkoutUrl}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Reembolsar */}
+      <Dialog open={!!refundPedido} onOpenChange={(open) => { if (!open) setRefundPedido(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar reembolso</DialogTitle>
+          </DialogHeader>
+          {refundPedido && (
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja reembolsar o pedido{" "}
+              <span className="font-medium text-foreground">#{refundPedido.id}</span>{" "}
+              no valor de{" "}
+              <span className="font-medium text-foreground">{formatBRL(refundPedido.amountCents)}</span>?
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundPedido(null)} disabled={refunding}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={() => void handleRefund()} disabled={refunding}>
+              {refunding ? "Reembolsando…" : "Confirmar reembolso"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex flex-col gap-2">
+        <h2 className="text-2xl font-bold">{cliente.userName ?? cliente.userLogin}</h2>
+        <div className="flex items-center gap-1.5 text-sm">
           <span className="text-muted-foreground">ID:</span>
           <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{cliente.abacateCustomerId}</code>
           <CopyButton value={cliente.abacateCustomerId} label="Copiar ID" />
-        </span>
-        {cliente.userEmail && (
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          {cliente.userEmail && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">E-mail:</span>
+              <span>{cliente.userEmail}</span>
+              <CopyButton value={cliente.userEmail} label="Copiar e-mail" />
+            </span>
+          )}
+          {cliente.userTaxId && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">CPF/CNPJ:</span>
+              <span>{cliente.userTaxId}</span>
+              <CopyButton value={cliente.userTaxId} label="Copiar CPF/CNPJ" />
+            </span>
+          )}
+          {cliente.userPhone && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">Telefone:</span>
+              <span>{cliente.userPhone}</span>
+              <CopyButton value={cliente.userPhone} label="Copiar telefone" />
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">E-mail:</span>
-            <span className="font-medium">{cliente.userEmail}</span>
-            <CopyButton value={cliente.userEmail} label="Copiar e-mail" />
+            <span className="text-muted-foreground">Criado em:</span>
+            <span>{formatDate(cliente.createdAt)}</span>
           </span>
-        )}
-        <span className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">Criado em:</span>
-          <span>{formatDate(cliente.createdAt)}</span>
-        </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -226,13 +357,40 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
         </Card>
         <Card className="border-border/60">
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground mb-1">Pedidos</p>
-            <p className="text-xl font-bold tabular-nums">{cliente.orderCount}</p>
+            <p className="text-xs text-muted-foreground mb-1">Pagamentos</p>
+            <p className="text-xl font-bold tabular-nums">{pedidos?.filter((p) => p.status === "paid").length ?? 0}</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground mb-1">Último produto</p>
+            <p className="text-xs text-muted-foreground mb-1">Reembolsos</p>
+            <p className="text-xl font-bold tabular-nums">{pedidos?.filter((p) => p.status === "refunded").length ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground mb-1">Disputas</p>
+            <p className="text-xl font-bold tabular-nums">0</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Card className="border-border/60">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground mb-1">Assinaturas ativas</p>
+            <p className="text-xl font-bold tabular-nums">{assinaturas?.filter((a) => a.status === "active").length ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground mb-1">Total de assinaturas</p>
+            <p className="text-xl font-bold tabular-nums">{assinaturas?.length ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground mb-1">Produto mais comprado</p>
             <p className="text-sm font-medium mt-1">{cliente.lastPaidProduct ?? "Nenhum"}</p>
           </CardContent>
         </Card>
@@ -303,8 +461,13 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                   <TableBody>
                     {paginatedPedidos.map((pedido) => {
                       const statusCfg = getStatusConfig(pedido.status);
+                      const isPaid = pedido.status === "paid";
                       return (
-                        <TableRow key={pedido.id}>
+                        <TableRow
+                          key={pedido.id}
+                          className="cursor-pointer"
+                          onClick={() => setDetailPedido(pedido)}
+                        >
                           <TableCell className="text-sm">{pedido.description}</TableCell>
                           <TableCell className="text-sm tabular-nums">{formatBRL(pedido.amountCents)}</TableCell>
                           <TableCell>
@@ -318,7 +481,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDateShort(pedido.createdAt)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon-sm">
@@ -326,18 +489,27 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleMenuAction("details", pedido)}>
+                                <DropdownMenuItem onClick={() => setDetailPedido(pedido)}>
                                   Ver detalhes
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleMenuAction("receipt", pedido)}>
-                                  Comprovante
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleMenuAction("refund", pedido)}>
-                                  Reembolsar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleMenuAction("invoice", pedido)}>
-                                  Emitir nota fiscal
-                                </DropdownMenuItem>
+                                {isPaid && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => {
+                                      window.open(`${getClientApiBaseUrl()}/checkout/pedidos/${pedido.id}/comprovante`, "_blank");
+                                    }}>
+                                      Comprovante
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setRefundPedido(pedido)}>
+                                      Reembolsar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                      toast("Emitir nota fiscal — em breve");
+                                    }}>
+                                      Emitir nota fiscal
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

@@ -108,7 +108,7 @@ export function AccountSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid h-[min(760px,calc(100vh-2rem))] max-h-[calc(100vh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-5xl">
+      <DialogContent className="grid h-[min(760px,calc(100vh-2rem))] max-h-[calc(100vh-2rem)] !gap-0 overflow-hidden !p-0 sm:!max-w-5xl">
         <div className="grid min-h-0 md:grid-cols-[250px_1fr]">
           <aside className="flex min-h-0 flex-col border-b border-border bg-muted/35 p-4 md:border-r md:border-b-0">
             <div className="flex items-center gap-3">

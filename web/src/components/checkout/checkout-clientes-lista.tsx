@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UsersIcon } from "@/components/ui/icons";
 import {
   Table,
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { clientApi } from "@/lib/api";
 import type { CheckoutClienteSummary } from "@/types/portal";
 
 const PAGE_SIZE = 20;
@@ -34,16 +36,47 @@ function truncateId(id: string, maxLen = 20) {
   return id.length > maxLen ? id.slice(0, maxLen) + "…" : id;
 }
 
-interface CheckoutClientesListaProps {
-  clientes: CheckoutClienteSummary[];
+function ListSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1.5 border-b border-border/40 pb-4">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-7 w-36" />
+      </div>
+      <Skeleton className="h-9 w-72" />
+      <div className="rounded-lg border border-border/60 overflow-hidden">
+        <div className="flex gap-8 border-b border-border/40 px-4 py-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-3 w-24" />
+          ))}
+        </div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex gap-8 border-b border-border/20 px-4 py-3.5">
+            {Array.from({ length: 4 }).map((_, j) => (
+              <Skeleton key={j} className="h-4 w-28" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-export function CheckoutClientesLista({ clientes }: CheckoutClientesListaProps) {
+export function CheckoutClientesLista() {
   const router = useRouter();
+  const [clientes, setClientes] = useState<CheckoutClienteSummary[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    clientApi<{ clientes: CheckoutClienteSummary[] }>("/checkout/clientes")
+      .then((res) => setClientes(res.clientes))
+      .finally(() => setLoading(false));
+  }, []);
+
   const filtered = useMemo(() => {
+    if (!clientes) return [];
     const q = query.trim().toLowerCase();
     if (!q) return clientes;
     return clientes.filter(
@@ -56,6 +89,8 @@ export function CheckoutClientesLista({ clientes }: CheckoutClientesListaProps) 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  if (loading) return <ListSkeleton />;
 
   return (
     <div className="flex flex-col gap-6">
