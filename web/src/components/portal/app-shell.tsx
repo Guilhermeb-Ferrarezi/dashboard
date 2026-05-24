@@ -501,26 +501,18 @@ export function AppShell({
         >
           <div className="flex min-w-0 flex-1 flex-col">
             <SystemBanner />
-            <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 shadow-[0_1px_0_color-mix(in_oklch,var(--border)_60%,transparent),0_8px_24px_-16px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-              <div
-                className={cn(
-                  "flex w-full items-center gap-4 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
-                  fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
-                )}
-              >
+            <header className="sticky top-0 z-20 border-b border-border/60 bg-background/85 backdrop-blur-xl">
+              <div className="flex w-full items-center gap-3 px-4 py-2.5">
                 <SidebarTrigger />
-                <div className="flex min-w-0 flex-1 flex-col">
+                <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
                   {eyebrow ? (
-                    <span className="text-xs font-medium uppercase tracking-[0.22em] text-primary">
-                      {eyebrow}
-                    </span>
+                    <>
+                      <span>{eyebrow}</span>
+                      <span className="text-muted-foreground/50">/</span>
+                    </>
                   ) : null}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="font-heading text-lg font-semibold tracking-tight sm:text-xl md:text-2xl">{title}</h1>
-                    <Badge variant="secondary" className="hidden sm:inline-flex">{user.role.toUpperCase()}</Badge>
-                  </div>
-                  <p className="hidden truncate text-sm text-muted-foreground sm:block">{description}</p>
-                </div>
+                  <span className="truncate font-medium text-foreground">{title}</span>
+                </nav>
                 <div className="flex items-center gap-2">
                   <ApiHealthIndicator className="hidden md:inline-flex" />
                   <ThemeCycleButton />
@@ -541,7 +533,7 @@ export function AppShell({
 
             <div
               className={cn(
-                "flex w-full flex-1 min-h-0 px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
+                "flex w-full flex-1 min-h-0 px-4 py-4",
                 lockViewport && "overflow-hidden",
               )}
             >
@@ -549,45 +541,12 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-20",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14",
                   lockViewport && "overflow-hidden",
                 )}
               >
-                <div
-                  className={cn(
-                    "mx-auto mb-4 flex w-full flex-wrap gap-2",
-                    fullWidth ? "max-w-none" : "max-w-7xl",
-                  )}
-                >
-                  {primaryNavigation.map((item) => {
-                    const Icon = item.icon;
-                    const active =
-                      item.href === "/home"
-                        ? pathname === "/home"
-                        : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                    return (
-                      <Button
-                        key={item.href}
-                        render={<Link href={item.href} />}
-                        variant={active ? "default" : "outline"}
-                        className="gap-2 rounded-full px-4"
-                      >
-                        <Icon className="size-4" />
-                        {item.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-                <div
-                  className={cn(
-                    "flex min-h-0 w-full flex-1 flex-col",
-                    fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
-                  )}
-                >
-                  <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border/60 bg-card/50 shadow-sm">
-                    {children}
-                  </div>
+                <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-border/40 bg-card shadow-sm">
+                  {children}
                 </div>
               </main>
             </div>
