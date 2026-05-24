@@ -104,7 +104,7 @@ export function AppShell({
   title,
   description,
   eyebrow,
-  fullWidth = false,
+  fullWidth = true,
   lockViewport = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -585,7 +585,9 @@ export function AppShell({
                     fullWidth ? "max-w-none" : "mx-auto max-w-7xl",
                   )}
                 >
-                  {children}
+                  <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border/60 bg-card/50 shadow-sm">
+                    {children}
+                  </div>
                 </div>
               </main>
             </div>
