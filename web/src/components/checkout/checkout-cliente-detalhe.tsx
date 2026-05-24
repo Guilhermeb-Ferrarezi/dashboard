@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clientApi } from "@/lib/api";
 import type {
+  CheckoutClienteAssinatura,
   CheckoutClientePedido,
   CheckoutClienteSummary
 } from "@/types/portal";
@@ -84,6 +85,21 @@ function truncateId(id: string | number, maxLen = 24) {
   return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
 }
 
+function getSubscriptionStatusConfig(status: string): { label: string; className: string } {
+  switch (status) {
+    case "active":
+      return { label: "Ativa", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
+    case "cancelled":
+      return { label: "Cancelada", className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
+    case "expired":
+      return { label: "Expirada", className: "bg-red-500/15 text-red-400 border-red-500/30" };
+    case "paused":
+      return { label: "Pausada", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
+    default:
+      return { label: status, className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
+  }
+}
+
 function getBehaviorLabel(cliente: CheckoutClienteSummary): { text: string; tone: string } {
   if (cliente.isVip) return { text: "VIP", tone: "bg-amber-500/15 text-amber-400" };
   if (cliente.orderCount > 1) return { text: "Recompra", tone: "bg-emerald-500/15 text-emerald-400" };
@@ -99,6 +115,9 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
   const [loading, setLoading] = useState(false);
   const [pedidosPage, setPedidosPage] = useState(1);
   const [filterProduct, setFilterProduct] = useState("all");
+
+  const [assinaturas, setAssinaturas] = useState<CheckoutClienteAssinatura[] | null>(null);
+  const [loadingAssinaturas, setLoadingAssinaturas] = useState(false);
 
   const behavior = getBehaviorLabel(cliente);
 
@@ -116,6 +135,21 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
       setLoading(false);
     }
   }, [cliente.userId, pedidos, loading]);
+
+  const loadAssinaturas = useCallback(async () => {
+    if (assinaturas !== null || loadingAssinaturas) return;
+    setLoadingAssinaturas(true);
+    try {
+      const res = await clientApi<{ assinaturas: CheckoutClienteAssinatura[] }>(
+        `/checkout/clientes/${cliente.userId}/assinaturas`
+      );
+      setAssinaturas(res.assinaturas);
+    } catch {
+      toast.error("Erro ao carregar assinaturas.");
+    } finally {
+      setLoadingAssinaturas(false);
+    }
+  }, [cliente.userId, assinaturas, loadingAssinaturas]);
 
   useEffect(() => {
     void loadPedidos();
@@ -215,8 +249,8 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
           <TabsTrigger value="pedidos" className="flex-1">
             Pedidos
           </TabsTrigger>
-          <TabsTrigger value="produtos" className="flex-1">
-            Produtos comprados
+          <TabsTrigger value="assinaturas" className="flex-1" onClick={() => void loadAssinaturas()}>
+            Assinaturas
           </TabsTrigger>
         </TabsList>
 
@@ -321,24 +355,62 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
           </div>
         </TabsContent>
 
-        <TabsContent value="produtos">
-          <div className="mt-4">
-            {cliente.purchasedProducts.length === 0 ? (
-              <EmptyState
-                icon={ShoppingCartIcon}
-                title="Nenhum produto"
-                description="Este cliente ainda não comprou nenhum produto."
-                className="m-4"
-              />
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {cliente.purchasedProducts.map((p) => (
-                  <Badge key={p} variant="secondary" className="text-sm px-3 py-1">
-                    {p}
-                  </Badge>
-                ))}
-              </div>
-            )}
+        <TabsContent value="assinaturas">
+          <div className="flex flex-col gap-4 mt-4">
+            <div className="rounded-lg border border-border/60 overflow-hidden">
+              {loadingAssinaturas && (
+                <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                  Carregando assinaturas…
+                </div>
+              )}
+
+              {!loadingAssinaturas && assinaturas !== null && assinaturas.length === 0 && (
+                <EmptyState
+                  icon={ShoppingCartIcon}
+                  title="Nenhuma assinatura"
+                  description="Este cliente ainda não tem assinaturas."
+                  className="m-4"
+                />
+              )}
+
+              {!loadingAssinaturas && assinaturas && assinaturas.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead>Expira em</TableHead>
+                      <TableHead>Criado em</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {assinaturas.map((assinatura) => {
+                      const statusCfg = getSubscriptionStatusConfig(assinatura.status);
+                      return (
+                        <TableRow key={assinatura.id}>
+                          <TableCell className="text-sm font-medium">{assinatura.productName}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={statusCfg.className}>
+                              {statusCfg.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDateShort(assinatura.startedAt)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {assinatura.expiresAt ? formatDateShort(assinatura.expiresAt) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDateShort(assinatura.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
           </div>
         </TabsContent>
       </Tabs>

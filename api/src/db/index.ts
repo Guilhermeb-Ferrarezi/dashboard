@@ -57,6 +57,21 @@ export async function runCheckoutMigrations(): Promise<void> {
     ADD COLUMN IF NOT EXISTS features jsonb NOT NULL DEFAULT '[]'
   `;
 
+  await _raw`
+    CREATE TABLE IF NOT EXISTS checkout_subscriptions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES checkout_customers(user_id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES checkout_products(id) ON DELETE SET NULL,
+      product_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ,
+      cancelled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
   _migrated = true;
 }
 

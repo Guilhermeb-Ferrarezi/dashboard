@@ -37,6 +37,24 @@ export const checkoutOrders = pgTable("checkout_orders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
 
+export const checkoutSubscriptions = pgTable("checkout_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => checkoutCustomers.userId, { onDelete: "cascade" }),
+  productId: integer("product_id")
+    .references(() => checkoutProducts.id, { onDelete: "set null" }),
+  productName: text("product_name").notNull(),
+  status: text("status", { enum: ["active", "cancelled", "expired", "paused"] })
+    .notNull()
+    .default("active"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
 export const checkoutPayments = pgTable("checkout_payments", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id")

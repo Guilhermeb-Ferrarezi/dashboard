@@ -292,6 +292,37 @@ export async function listClientePedidos(req: Request, res: Response) {
   }
 }
 
+export async function listClienteAssinaturas(req: Request, res: Response) {
+  try {
+    const userId = Number(req.params.userId);
+    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    const assinaturas = await db
+      .select()
+      .from(schema.checkoutSubscriptions)
+      .where(eq(schema.checkoutSubscriptions.userId, userId))
+      .orderBy(desc(schema.checkoutSubscriptions.createdAt));
+
+    return res.json({
+      assinaturas: assinaturas.map((s) => ({
+        id: s.id,
+        userId: s.userId,
+        productId: s.productId,
+        productName: s.productName,
+        status: s.status,
+        startedAt: s.startedAt.toISOString(),
+        expiresAt: s.expiresAt?.toISOString() ?? null,
+        cancelledAt: s.cancelledAt?.toISOString() ?? null,
+        createdAt: s.createdAt.toISOString()
+      }))
+    });
+  } catch (error) {
+    console.error("[checkout] listClienteAssinaturas error:", error);
+    return res.status(500).json({ message: "Erro ao listar assinaturas do cliente." });
+  }
+}
+
 export async function getNovosPorMes(_req: Request, res: Response) {
   try {
     const db = getCheckoutDb();

@@ -6,6 +6,7 @@ import {
   deleteProduto,
   getDashboard,
   getNovosPorMes,
+  listClienteAssinaturas,
   listClientePedidos,
   listClientes,
   listProdutos,
@@ -24,6 +25,7 @@ router.get("/clientes", listClientes);
 router.patch("/clientes/:userId", updateCliente);
 router.delete("/clientes/:userId", deleteCliente);
 router.get("/clientes/:userId/pedidos", listClientePedidos);
+router.get("/clientes/:userId/assinaturas", listClienteAssinaturas);
 router.get("/novos-por-mes", getNovosPorMes);
 router.get("/produtos", listProdutos);
 router.post("/produtos", createProduto);

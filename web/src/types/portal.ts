@@ -138,6 +138,20 @@ export interface CheckoutClientePedido {
   createdAt: string;
 }
 
+export type CheckoutSubscriptionStatus = "active" | "cancelled" | "expired" | "paused";
+
+export interface CheckoutClienteAssinatura {
+  id: number;
+  userId: number;
+  productId: number | null;
+  productName: string;
+  status: CheckoutSubscriptionStatus;
+  startedAt: string;
+  expiresAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+}
+
 export interface CheckoutNovosPorMes {
   mes: string;
   total: number;
