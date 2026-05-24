@@ -531,16 +531,23 @@ export function AppShell({
               </div>
             </header>
 
-            <main
-              id="main-content"
-              key={pathname}
+            <div
               className={cn(
-                "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 bg-card",
+                "flex w-full flex-1 min-h-0 p-3 pt-0",
                 lockViewport && "overflow-hidden",
               )}
             >
-              {children}
-            </main>
+              <main
+                id="main-content"
+                key={pathname}
+                className={cn(
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 rounded-xl bg-card shadow-sm",
+                  lockViewport && "overflow-hidden",
+                )}
+              >
+                {children}
+              </main>
+            </div>
           </div>
 
           {user.role === "admin" && codexOpen ? (
