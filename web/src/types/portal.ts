@@ -101,7 +101,7 @@ export interface VctFormacaoSummary {
   createdAt?: string;
 }
 
-export type CheckoutOrderStatus = "pending" | "paid" | "failed" | "expired";
+export type CheckoutOrderStatus = "pending" | "paid" | "failed" | "expired" | "cancelled";
 
 export interface CheckoutProductSummary {
   id: number;

@@ -41,14 +41,16 @@ const STATUS_LABEL: Record<CheckoutOrderStatus, string> = {
   pending: "Pendente",
   paid: "Pago",
   failed: "Falhou",
-  expired: "Expirado"
+  expired: "Expirado",
+  cancelled: "Cancelado"
 };
 
-const STATUS_VARIANT: Record<CheckoutOrderStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  paid: "default",
-  pending: "secondary",
-  failed: "destructive",
-  expired: "outline"
+const STATUS_CLASS: Record<CheckoutOrderStatus, string> = {
+  paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  pending: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  cancelled: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  expired: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  failed: "bg-red-500/15 text-red-400 border-red-500/30"
 };
 
 function BarChart({ data }: { data: { dia: string; total: number }[] }) {
@@ -78,11 +80,12 @@ function BarChart({ data }: { data: { dia: string; total: number }[] }) {
 
 function StatusBars({ data }: { data: { status: string; total: number }[] }) {
   const total = data.reduce((s, d) => s + d.total, 0) || 1;
-  const order: CheckoutOrderStatus[] = ["paid", "pending", "expired", "failed"];
+  const order: CheckoutOrderStatus[] = ["paid", "pending", "cancelled", "expired", "failed"];
   const colors: Record<string, string> = {
     paid: "bg-emerald-500",
     pending: "bg-amber-400",
-    expired: "bg-zinc-500",
+    cancelled: "bg-zinc-500",
+    expired: "bg-orange-400",
     failed: "bg-red-500"
   };
   return (
@@ -339,7 +342,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
                       {formatBRL(order.amountCents)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANT[order.status as CheckoutOrderStatus]}>
+                      <Badge variant="outline" className={STATUS_CLASS[order.status as CheckoutOrderStatus] ?? "bg-zinc-500/15 text-zinc-400 border-zinc-500/30"}>
                         {STATUS_LABEL[order.status as CheckoutOrderStatus] ?? order.status}
                       </Badge>
                     </TableCell>

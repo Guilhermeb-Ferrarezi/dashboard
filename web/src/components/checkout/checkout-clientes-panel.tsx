@@ -100,18 +100,19 @@ function getOrderBadgeVariant(count: number): "default" | "secondary" | "outline
   return "outline";
 }
 
-function getStatusBadgeVariant(
-  status: string
-): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "paid") return "default";
-  if (status === "pending") return "secondary";
-  if (status === "failed" || status === "expired") return "destructive";
-  return "outline";
+function getStatusClass(status: string): string {
+  if (status === "paid") return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+  if (status === "pending") return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+  if (status === "cancelled") return "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
+  if (status === "expired") return "bg-orange-500/15 text-orange-400 border-orange-500/30";
+  if (status === "failed") return "bg-red-500/15 text-red-400 border-red-500/30";
+  return "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
 }
 
 function getStatusLabel(status: string): string {
   if (status === "paid") return "Pago";
   if (status === "pending") return "Pendente";
+  if (status === "cancelled") return "Cancelado";
   if (status === "failed") return "Falhou";
   if (status === "expired") return "Expirado";
   return status;
@@ -189,7 +190,7 @@ function PedidosSubRow({
           </TableCell>
           <TableCell className="text-xs tabular-nums">{formatBRL(p.amountCents)}</TableCell>
           <TableCell className="text-xs">
-            <Badge variant={getStatusBadgeVariant(p.status)}>{getStatusLabel(p.status)}</Badge>
+            <Badge variant="outline" className={getStatusClass(p.status)}>{getStatusLabel(p.status)}</Badge>
           </TableCell>
           <TableCell className="text-xs text-muted-foreground">{formatDate(p.createdAt)}</TableCell>
           <TableCell />
