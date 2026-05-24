@@ -410,7 +410,7 @@ export function CheckoutClientesPanel({
   return (
     <div className="flex flex-col gap-6">
       <Dialog open={!!editingCliente} onOpenChange={(open) => { if (!open) setEditingCliente(null); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar cliente</DialogTitle>
           </DialogHeader>
@@ -448,7 +448,7 @@ export function CheckoutClientesPanel({
       </Dialog>
 
       <Dialog open={!!deletingCliente} onOpenChange={(open) => { if (!open) setDeletingCliente(null); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Excluir cliente</DialogTitle>
           </DialogHeader>

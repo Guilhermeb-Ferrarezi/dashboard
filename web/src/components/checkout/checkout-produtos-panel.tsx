@@ -453,7 +453,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                   <PlusIcon />
                   Novo produto
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Criar produto</DialogTitle>
                   </DialogHeader>
@@ -522,7 +522,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
 
       {/* Dialogs */}
       <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar produto</DialogTitle>
           </DialogHeader>
