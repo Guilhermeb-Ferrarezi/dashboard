@@ -24,6 +24,7 @@ import {
   DotOutline,
   DotsThree,
   EnvelopeSimple,
+  Eye,
   FileText,
   FloppyDisk,
   FolderOpen,
@@ -35,6 +36,7 @@ import {
   Key,
   Lightning,
   Link,
+  Minus,
   ListMagnifyingGlass,
   MagicWand,
   MagnifyingGlass,
@@ -116,7 +118,9 @@ export const Loader2Icon = Spinner;
 export const LoaderCircleIcon = Spinner;
 export const LogOutIcon = SignOut;
 export const LogsIcon = Rows;
+export const EyeIcon = Eye;
 export const MailIcon = EnvelopeSimple;
+export const MinusIcon = Minus;
 export const MonitorIcon = Monitor;
 export const MoonIcon = Moon;
 export const MoreHorizontalIcon = DotsThree;

@@ -52,6 +52,11 @@ export async function runCheckoutMigrations(): Promise<void> {
     $$
   `;
 
+  await _raw`
+    ALTER TABLE checkout_products
+    ADD COLUMN IF NOT EXISTS features jsonb NOT NULL DEFAULT '[]'
+  `;
+
   _migrated = true;
 }
 

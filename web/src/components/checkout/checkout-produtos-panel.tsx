@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   ArrowUpDownIcon,
   CopyIcon,
+  EyeIcon,
+  MinusIcon,
   PackageIcon,
   PencilIcon,
   PlusIcon,
@@ -28,7 +30,6 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { clientApi } from "@/lib/api";
 import type { CheckoutProductSummary } from "@/types/portal";
@@ -47,18 +48,18 @@ function formatDate(iso: string) {
 
 type ProductFormValues = {
   name: string;
-  description: string;
+  features: string[];
   amountReais: string;
 };
 
 function emptyForm(): ProductFormValues {
-  return { name: "", description: "", amountReais: "" };
+  return { name: "", features: [""], amountReais: "" };
 }
 
 function formFromProduct(p: CheckoutProductSummary): ProductFormValues {
   return {
     name: p.name,
-    description: p.description,
+    features: p.features?.length > 0 ? p.features : [p.description],
     amountReais: (p.amountCents / 100).toFixed(2)
   };
 }
@@ -79,6 +80,22 @@ interface ProductFormProps {
 }
 
 function ProductForm({ form, setForm, pending, onSubmit, onCancel }: ProductFormProps) {
+  function setFeature(index: number, value: string) {
+    setForm((f) => {
+      const updated = [...f.features];
+      updated[index] = value;
+      return { ...f, features: updated };
+    });
+  }
+
+  function addFeature() {
+    setForm((f) => ({ ...f, features: [...f.features, ""] }));
+  }
+
+  function removeFeature(index: number) {
+    setForm((f) => ({ ...f, features: f.features.filter((_, i) => i !== index) }));
+  }
+
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="space-y-1.5">
@@ -90,16 +107,43 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel }: ProductForm
           required
         />
       </label>
-      <label className="space-y-1.5">
-        <span className="text-xs font-medium">Descrição</span>
-        <Textarea
-          value={form.description}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          placeholder="Ex: Acesso completo por 1 mês"
-          rows={3}
-          required
-        />
-      </label>
+
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium">Benefícios</span>
+        <div className="flex flex-col gap-2">
+          {form.features.map((feat, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input
+                value={feat}
+                onChange={(e) => setFeature(i, e.target.value)}
+                placeholder={`Ex: Acesso ao campeonato`}
+              />
+              {form.features.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => removeFeature(i)}
+                >
+                  <MinusIcon className="size-3.5" />
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit gap-1.5 text-xs"
+            onClick={addFeature}
+          >
+            <PlusIcon className="size-3" />
+            Adicionar benefício
+          </Button>
+        </div>
+      </div>
+
       <label className="space-y-1.5">
         <span className="text-xs font-medium">Valor (R$)</span>
         <Input
@@ -119,6 +163,78 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel }: ProductForm
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+function formatCurrencyPreview(cents: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
+function ProductPreviewModal({
+  produto,
+  open,
+  onClose
+}: {
+  produto: CheckoutProductSummary;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const features = produto.features?.length > 0
+    ? produto.features
+    : [produto.description, "Acesso imediato após confirmação", "Pagamento PIX sem juros"].filter(Boolean);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm p-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/40">
+          <DialogTitle className="text-sm font-medium flex items-center gap-2">
+            <EyeIcon className="size-4 text-primary" />
+            Pré-visualização — visão do comprador
+          </DialogTitle>
+        </DialogHeader>
+        <div className="p-5 flex flex-col gap-4 bg-[oklch(0.17_0.008_250)]">
+          <h2 className="text-2xl font-bold tracking-tight text-white" style={{ fontFamily: "'Barlow Condensed', sans-serif" }}>
+            {produto.name}
+          </h2>
+
+          <div className="flex flex-col gap-1">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 mb-1">
+              O que está incluso
+            </p>
+            {features.map((f, i) => (
+              <div key={i} className="flex items-start gap-2 py-0.5">
+                <span className="mt-0.5 text-[#32BCAD] text-xs">✓</span>
+                <span className="text-sm text-zinc-300">{f}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-white/10 pt-3 flex flex-col gap-1.5 text-sm text-zinc-400">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatCurrencyPreview(produto.amountCents)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Taxa (0%)</span>
+              <span>R$ 0,00</span>
+            </div>
+          </div>
+          <div className="border-t border-white/10 pt-3 flex justify-between font-semibold text-white">
+            <span>Total hoje</span>
+            <span style={{ color: "oklch(0.62 0.21 22)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: "1.1rem" }}>
+              {formatCurrencyPreview(produto.amountCents)}
+            </span>
+          </div>
+
+          <p className="text-[10px] text-zinc-500 leading-relaxed">
+            Pagamento único. Ao pagar, você concorda com os termos de uso da Santos Games.
+          </p>
+        </div>
+        <div className="px-5 pb-5">
+          <Button variant="outline" className="w-full" onClick={onClose}>Fechar</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -142,6 +258,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CheckoutProductSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CheckoutProductSummary | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<CheckoutProductSummary | null>(null);
   const [createForm, setCreateForm] = useState<ProductFormValues>(emptyForm());
   const [editForm, setEditForm] = useState<ProductFormValues>(emptyForm());
   const [pending, setPending] = useState(false);
@@ -203,7 +320,8 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     const amountCents = parseReais(createForm.amountReais);
-    if (!createForm.name.trim() || !createForm.description.trim() || !amountCents) {
+    const features = createForm.features.map((f) => f.trim()).filter(Boolean);
+    if (!createForm.name.trim() || !amountCents) {
       toast.error("Preencha todos os campos corretamente.");
       return;
     }
@@ -211,7 +329,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     try {
       const { produto } = await clientApi<{ produto: CheckoutProductSummary }>("/checkout/produtos", {
         method: "POST",
-        body: JSON.stringify({ name: createForm.name.trim(), description: createForm.description.trim(), amountCents })
+        body: JSON.stringify({ name: createForm.name.trim(), features, amountCents })
       });
       setProdutos((prev) => [produto, ...prev]);
       setCreateOpen(false);
@@ -227,7 +345,8 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     e.preventDefault();
     if (!editTarget) return;
     const amountCents = parseReais(editForm.amountReais);
-    if (!editForm.name.trim() || !editForm.description.trim() || !amountCents) {
+    const features = editForm.features.map((f) => f.trim()).filter(Boolean);
+    if (!editForm.name.trim() || !amountCents) {
       toast.error("Preencha todos os campos corretamente.");
       return;
     }
@@ -235,7 +354,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     try {
       const { produto } = await clientApi<{ produto: CheckoutProductSummary }>(`/checkout/produtos/${editTarget.id}`, {
         method: "PUT",
-        body: JSON.stringify({ name: editForm.name.trim(), description: editForm.description.trim(), amountCents })
+        body: JSON.stringify({ name: editForm.name.trim(), features, amountCents })
       });
       setProdutos((prev) => prev.map((p) => (p.id === produto.id ? produto : p)));
       setEditTarget(null);
@@ -397,6 +516,12 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
         </DialogContent>
       </Dialog>
 
+      <ProductPreviewModal
+        produto={previewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, active: true, createdAt: "" }}
+        open={!!previewTarget}
+        onClose={() => setPreviewTarget(null)}
+      />
+
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
@@ -495,6 +620,19 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-7"
+                                onClick={() => setPreviewTarget(produto)}
+                              >
+                                <EyeIcon className="size-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Pré-visualizar</TooltipContent>
+                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

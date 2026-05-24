@@ -8,6 +8,7 @@ function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
     id: row.id,
     name: row.name,
     description: row.description,
+    features: (row.features as string[]) ?? [],
     amountCents: row.amountCents,
     active: row.active,
     createdAt: row.createdAt.toISOString()
@@ -328,14 +329,15 @@ export async function listProdutos(_req: Request, res: Response) {
 
 export async function createProduto(req: Request, res: Response) {
   try {
-    const { name, description, amountCents } = req.body as {
+    const { name, description, amountCents, features } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
+      features?: unknown;
     };
 
-    if (!name?.trim() || !description?.trim()) {
-      return res.status(400).json({ message: "Nome e descrição são obrigatórios." });
+    if (!name?.trim()) {
+      return res.status(400).json({ message: "Nome é obrigatório." });
     }
 
     const cents = Number(amountCents);
@@ -343,10 +345,13 @@ export async function createProduto(req: Request, res: Response) {
       return res.status(400).json({ message: "Valor inválido." });
     }
 
+    const featuresArr = Array.isArray(features) ? (features as string[]).map(String).filter(Boolean) : [];
+    const desc = description?.trim() || featuresArr[0] || name.trim();
+
     const db = getCheckoutDb();
     const [produto] = await db
       .insert(schema.checkoutProducts)
-      .values({ name: name.trim(), description: description.trim(), amountCents: cents })
+      .values({ name: name.trim(), description: desc, features: featuresArr, amountCents: cents })
       .returning();
 
     return res.status(201).json({ produto: serializeProduct(produto!) });
@@ -361,11 +366,12 @@ export async function updateProduto(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { name, description, amountCents, active } = req.body as {
+    const { name, description, amountCents, active, features } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
       active?: unknown;
+      features?: unknown;
     };
 
     const db = getCheckoutDb();
@@ -375,6 +381,11 @@ export async function updateProduto(req: Request, res: Response) {
 
     if (name !== undefined) updates.name = name.trim();
     if (description !== undefined) updates.description = description.trim();
+    if (features !== undefined) {
+      const featuresArr = Array.isArray(features) ? (features as string[]).map(String).filter(Boolean) : [];
+      updates.features = featuresArr;
+      if (description === undefined && featuresArr.length > 0) updates.description = featuresArr[0];
+    }
     if (amountCents !== undefined) {
       const cents = Number(amountCents);
       if (!Number.isInteger(cents) || cents <= 0) {

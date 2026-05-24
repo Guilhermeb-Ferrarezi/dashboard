@@ -107,6 +107,7 @@ export interface CheckoutProductSummary {
   id: number;
   name: string;
   description: string;
+  features: string[];
   amountCents: number;
   active: boolean;
   createdAt: string;

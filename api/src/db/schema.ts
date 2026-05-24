@@ -4,6 +4,7 @@ export const checkoutProducts = pgTable("checkout_products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull(),
+  features: jsonb("features").$type<string[]>().notNull().default([]),
   amountCents: integer("amount_cents").notNull(),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
