@@ -377,7 +377,7 @@ export function AppShell({
       <KeyboardShortcutsOverlay />
       <CommandPalette />
       <ConnectivityToasts />
-      <Sidebar variant="floating" collapsible="icon">
+      <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader>
           <div className="group relative overflow-hidden rounded-2xl border border-sidebar-border/60 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--sidebar-primary)_18%,transparent),color-mix(in_oklch,var(--sidebar)_92%,black))] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.12)] transition-[padding,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none hover:shadow-[0_14px_36px_rgba(0,0,0,0.18)] group-data-[collapsible=icon]:p-1.5">
             <span aria-hidden className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-sidebar-primary/60 to-transparent" />
