@@ -498,7 +498,7 @@ export function AppShell({
           <div className="flex min-w-0 flex-1 flex-col">
             <SystemBanner />
             <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-xl">
-              <div className="flex w-full items-center gap-3 px-4 py-2.5">
+              <div className="flex w-full items-center gap-3 px-4 py-3">
                 <SidebarTrigger />
                 <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
                   {eyebrow ? (
@@ -529,7 +529,7 @@ export function AppShell({
 
             <div
               className={cn(
-                "flex w-full flex-1 min-h-0 p-3 pt-0",
+                "flex w-full flex-1 min-h-0 p-0",
                 lockViewport && "overflow-hidden",
               )}
             >
@@ -537,7 +537,7 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 rounded-xl bg-card shadow-sm",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col scroll-mt-14 bg-card",
                   lockViewport && "overflow-hidden",
                 )}
               >
