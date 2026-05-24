@@ -77,9 +77,23 @@ interface ProductFormProps {
   pending: boolean;
   onSubmit: (e: React.FormEvent) => Promise<void>;
   onCancel: () => void;
+  onPreview: (produto: CheckoutProductSummary) => void;
 }
 
-function ProductForm({ form, setForm, pending, onSubmit, onCancel }: ProductFormProps) {
+function ProductForm({ form, setForm, pending, onSubmit, onCancel, onPreview }: ProductFormProps) {
+  function buildPreview(): CheckoutProductSummary {
+    const cents = parseReais(form.amountReais) ?? 0;
+    const features = form.features.map((f) => f.trim()).filter(Boolean);
+    return {
+      id: 0,
+      name: form.name || "Nome do produto",
+      description: features[0] ?? "",
+      features,
+      amountCents: cents,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+  }
   function setFeature(index: number, value: string) {
     setForm((f) => {
       const updated = [...f.features];
@@ -155,6 +169,10 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel }: ProductForm
         />
       </label>
       <DialogFooter>
+        <Button type="button" variant="ghost" size="sm" className="mr-auto gap-1.5" onClick={() => onPreview(buildPreview())}>
+          <EyeIcon className="size-3.5" />
+          Pré-visualizar
+        </Button>
         <Button type="button" variant="outline" disabled={pending} onClick={onCancel}>
           Cancelar
         </Button>
@@ -259,6 +277,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
   const [editTarget, setEditTarget] = useState<CheckoutProductSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CheckoutProductSummary | null>(null);
   const [previewTarget, setPreviewTarget] = useState<CheckoutProductSummary | null>(null);
+  const [formPreviewTarget, setFormPreviewTarget] = useState<CheckoutProductSummary | null>(null);
   const [createForm, setCreateForm] = useState<ProductFormValues>(emptyForm());
   const [editForm, setEditForm] = useState<ProductFormValues>(emptyForm());
   const [pending, setPending] = useState(false);
@@ -444,6 +463,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                     pending={pending}
                     onSubmit={handleCreate}
                     onCancel={() => setCreateOpen(false)}
+                    onPreview={setFormPreviewTarget}
                   />
                 </DialogContent>
               </Dialog>
@@ -512,6 +532,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
             pending={pending}
             onSubmit={handleEdit}
             onCancel={() => setEditTarget(null)}
+            onPreview={setFormPreviewTarget}
           />
         </DialogContent>
       </Dialog>
@@ -520,6 +541,12 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
         produto={previewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, active: true, createdAt: "" }}
         open={!!previewTarget}
         onClose={() => setPreviewTarget(null)}
+      />
+
+      <ProductPreviewModal
+        produto={formPreviewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, active: true, createdAt: "" }}
+        open={!!formPreviewTarget}
+        onClose={() => setFormPreviewTarget(null)}
       />
 
       <AlertDialog
