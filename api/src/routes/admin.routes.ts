@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { createUser, listUsers } from "../controllers/admin.controller";
+import { createUser, deleteUser, listUsers, updateUser } from "../controllers/admin.controller";
 import { uploadAdminR2Image } from "../controllers/admin-r2.controller";
 import {
   deleteAdminSiteHandler,
@@ -21,6 +21,8 @@ const router = Router();
 router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 router.get("/users", listUsers);
 router.post("/users", createUser);
+router.patch("/users/:id", updateUser);
+router.delete("/users/:id", deleteUser);
 router.get("/tokens", listAdminAccessTokensHandler);
 router.post("/tokens", createAdminAccessTokenHandler);
 router.post("/tokens/:tokenId/revoke", revokeAdminAccessTokenHandler);

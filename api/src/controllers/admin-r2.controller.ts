@@ -11,6 +11,7 @@ const ALLOWED_FOLDERS = [
   "vct/formacoes",
   "vct/layout",
   "public/assets",
+  "checkout/products",
 ] as const;
 
 const upload = multer({

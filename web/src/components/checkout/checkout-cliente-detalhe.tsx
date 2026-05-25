@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,8 @@ import type {
 } from "@/types/portal";
 
 const PEDIDOS_PAGE_SIZE = 15;
+
+type PedidosPagination = { page: number; limit: number; total: number; pages: number };
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
@@ -121,9 +123,17 @@ interface CheckoutClienteDetalheProps {
 }
 
 export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps) {
-  const [pedidos, setPedidos] = useState<CheckoutClientePedido[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pedidos, setPedidos] = useState<CheckoutClientePedido[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pedidosPage, setPedidosPage] = useState(1);
+  const [pedidosPagination, setPedidosPagination] = useState<PedidosPagination>({
+    page: 1,
+    limit: PEDIDOS_PAGE_SIZE,
+    total: 0,
+    pages: 1
+  });
+  const [paidCount, setPaidCount] = useState(0);
+  const [refundedCount, setRefundedCount] = useState(0);
   const [filterProduct, setFilterProduct] = useState("all");
 
   const [assinaturas, setAssinaturas] = useState<CheckoutClienteAssinatura[] | null>(null);
@@ -134,20 +144,26 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
 
   const behavior = getBehaviorLabel(cliente);
 
-  const loadPedidos = useCallback(async () => {
-    if (pedidos !== null || loading) return;
+  useEffect(() => {
     setLoading(true);
-    try {
-      const res = await clientApi<{ pedidos: CheckoutClientePedido[] }>(
-        `/checkout/clientes/${cliente.userId}/pedidos`
-      );
-      setPedidos(res.pedidos);
-    } catch {
-      toast.error("Erro ao carregar pedidos.");
-    } finally {
-      setLoading(false);
-    }
-  }, [cliente.userId, pedidos, loading]);
+    const params = new URLSearchParams({ page: String(pedidosPage), limit: String(PEDIDOS_PAGE_SIZE) });
+    if (filterProduct !== "all") params.set("description", filterProduct);
+
+    clientApi<{
+      pedidos: CheckoutClientePedido[];
+      paidCount: number;
+      refundedCount: number;
+      pagination: PedidosPagination;
+    }>(`/checkout/clientes/${cliente.userId}/pedidos?${params.toString()}`)
+      .then((res) => {
+        setPedidos(res.pedidos);
+        setPedidosPagination(res.pagination);
+        setPaidCount(res.paidCount);
+        setRefundedCount(res.refundedCount);
+      })
+      .catch(() => toast.error("Erro ao carregar pedidos."))
+      .finally(() => setLoading(false));
+  }, [cliente.userId, pedidosPage, filterProduct]);
 
   const loadAssinaturas = useCallback(async () => {
     if (assinaturas !== null || loadingAssinaturas) return;
@@ -165,26 +181,10 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
   }, [cliente.userId, assinaturas, loadingAssinaturas]);
 
   useEffect(() => {
-    void loadPedidos();
     void loadAssinaturas();
-  }, [loadPedidos, loadAssinaturas]);
+  }, [loadAssinaturas]);
 
-  const filteredPedidos = useMemo(() => {
-    if (!pedidos) return [];
-    if (filterProduct === "all") return pedidos;
-    return pedidos.filter((p) => p.description === filterProduct);
-  }, [pedidos, filterProduct]);
-
-  const pedidosPageCount = Math.max(1, Math.ceil(filteredPedidos.length / PEDIDOS_PAGE_SIZE));
-  const safePedidosPage = Math.min(pedidosPage, pedidosPageCount);
-  const paginatedPedidos = filteredPedidos.slice(
-    (safePedidosPage - 1) * PEDIDOS_PAGE_SIZE,
-    safePedidosPage * PEDIDOS_PAGE_SIZE
-  );
-
-  const productOptions = useMemo(() => {
-    return [...new Set(cliente.purchasedProducts)].sort();
-  }, [cliente.purchasedProducts]);
+  const productOptions = [...new Set(cliente.purchasedProducts)].sort();
 
   async function handleRefund() {
     if (!refundPedido) return;
@@ -193,8 +193,9 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
       await clientApi<{ message: string }>(`/checkout/pedidos/${refundPedido.id}/refund`, { method: "POST" });
       toast.success("Reembolso solicitado com sucesso.");
       setPedidos((prev) =>
-        prev?.map((p) => p.id === refundPedido.id ? { ...p, status: "refunded" as const } : p) ?? null
+        prev.map((p) => p.id === refundPedido.id ? { ...p, status: "refunded" as const } : p)
       );
+      setRefundedCount((c) => c + 1);
       setRefundPedido(null);
     } catch {
       toast.error("Erro ao solicitar reembolso. Endpoint ainda não implementado.");
@@ -358,13 +359,13 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
         <Card className="border-border/60">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Pagamentos</p>
-            <p className="text-xl font-bold tabular-nums">{pedidos?.filter((p) => p.status === "paid").length ?? 0}</p>
+            <p className="text-xl font-bold tabular-nums">{paidCount}</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Reembolsos</p>
-            <p className="text-xl font-bold tabular-nums">{pedidos?.filter((p) => p.status === "refunded").length ?? 0}</p>
+            <p className="text-xl font-bold tabular-nums">{refundedCount}</p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
@@ -430,6 +431,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
               </select>
             )}
 
+
             <div className="rounded-lg border border-border/60 overflow-hidden">
               {loading && (
                 <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
@@ -437,7 +439,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                 </div>
               )}
 
-              {!loading && pedidos !== null && filteredPedidos.length === 0 && (
+              {!loading && pedidos.length === 0 && (
                 <EmptyState
                   icon={ShoppingCartIcon}
                   title="Nenhum pedido"
@@ -446,7 +448,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                 />
               )}
 
-              {!loading && filteredPedidos.length > 0 && (
+              {!loading && pedidos.length > 0 && (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -459,7 +461,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedPedidos.map((pedido) => {
+                    {pedidos.map((pedido) => {
                       const statusCfg = getStatusConfig(pedido.status);
                       const isPaid = pedido.status === "paid";
                       return (
@@ -521,8 +523,8 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
               )}
             </div>
 
-            {pedidosPageCount > 1 && (
-              <Pagination page={safePedidosPage} pageCount={pedidosPageCount} onPageChange={setPedidosPage} />
+            {pedidosPagination.pages > 1 && (
+              <Pagination page={pedidosPage} pageCount={pedidosPagination.pages} onPageChange={setPedidosPage} />
             )}
           </div>
         </TabsContent>

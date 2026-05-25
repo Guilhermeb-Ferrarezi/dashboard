@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/empty-state";
@@ -21,6 +21,8 @@ import { clientApi } from "@/lib/api";
 import type { CheckoutClienteSummary } from "@/types/portal";
 
 const PAGE_SIZE = 20;
+
+type Pagination = { page: number; limit: number; total: number; pages: number };
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
@@ -64,33 +66,37 @@ function ListSkeleton() {
 
 export function CheckoutClientesLista() {
   const router = useRouter();
-  const [clientes, setClientes] = useState<CheckoutClienteSummary[] | null>(null);
+  const [clientes, setClientes] = useState<CheckoutClienteSummary[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: PAGE_SIZE, total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleSearch(value: string) {
+    setQuery(value);
+    setPage(1);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedQuery(value), 400);
+  }
 
   useEffect(() => {
-    clientApi<{ clientes: CheckoutClienteSummary[] }>("/checkout/clientes")
-      .then((res) => setClientes(res.clientes))
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+    if (debouncedQuery) params.set("q", debouncedQuery);
+
+    clientApi<{ clientes: CheckoutClienteSummary[]; pagination: Pagination }>(
+      `/checkout/clientes?${params.toString()}`
+    )
+      .then((res) => {
+        setClientes(res.clientes);
+        setPagination(res.pagination);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, debouncedQuery]);
 
-  const filtered = useMemo(() => {
-    if (!clientes) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return clientes;
-    return clientes.filter(
-      (c) =>
-        c.userLogin.toLowerCase().includes(q) ||
-        (c.userEmail?.toLowerCase().includes(q) ?? false)
-    );
-  }, [clientes, query]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  if (loading) return <ListSkeleton />;
+  if (loading && clientes.length === 0) return <ListSkeleton />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,16 +106,13 @@ export function CheckoutClientesLista() {
         <Input
           placeholder="Pesquisar por login, e-mail…"
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => handleSearch(e.target.value)}
           className="h-9 text-sm"
         />
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
-        {filtered.length === 0 ? (
+        {!loading && clientes.length === 0 ? (
           <EmptyState
             icon={UsersIcon}
             title="Nenhum cliente encontrado"
@@ -127,31 +130,41 @@ export function CheckoutClientesLista() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginated.map((cliente) => (
-                <TableRow
-                  key={cliente.id}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/checkout/clientes/${cliente.userId}`)}
-                >
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {truncateId(cliente.abacateCustomerId)}
-                  </TableCell>
-                  <TableCell className="font-medium">{cliente.userLogin}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {cliente.userEmail ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(cliente.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {loading
+                ? Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-28" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                : clientes.map((cliente) => (
+                    <TableRow
+                      key={cliente.id}
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/checkout/clientes/${cliente.userId}`)}
+                    >
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {truncateId(cliente.abacateCustomerId)}
+                      </TableCell>
+                      <TableCell className="font-medium">{cliente.userLogin}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cliente.userEmail ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(cliente.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
         )}
       </div>
 
-      {pageCount > 1 && (
-        <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
+      {pagination.pages > 1 && (
+        <Pagination page={page} pageCount={pagination.pages} onPageChange={setPage} />
       )}
     </div>
   );
