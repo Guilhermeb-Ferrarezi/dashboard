@@ -165,6 +165,19 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
       ],
     },
     {
+      label: "Henrique",
+      iconKey: "sparkles",
+      items: [
+        portalItem({
+          href: "/henrique/teste",
+          label: "Teste",
+          description: "Item de teste",
+          icon: SparklesIcon,
+          kind: "page",
+        }),
+      ],
+    },
+    {
       label: "Administracao",
       iconKey: "admin",
       items: [
