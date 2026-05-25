@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql, sum } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
@@ -10,6 +10,22 @@ function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
     description: row.description,
     features: (row.features as string[]) ?? [],
     amountCents: row.amountCents,
+    discountPercent: row.discountPercent ?? null,
+    active: row.active,
+    imageKey: row.imageKey ?? null,
+    imageUrl: row.imageUrl ?? null,
+    createdAt: row.createdAt.toISOString()
+  };
+}
+
+function serializeCupom(row: typeof schema.checkoutCoupons.$inferSelect) {
+  return {
+    id: row.id,
+    code: row.code,
+    discountPercent: row.discountPercent,
+    maxUses: row.maxUses ?? null,
+    usedCount: row.usedCount,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
     active: row.active,
     createdAt: row.createdAt.toISOString()
   };
@@ -170,17 +186,39 @@ export async function getDashboard(_req: Request, res: Response) {
   }
 }
 
-export async function listClientes(_req: Request, res: Response) {
+export async function listClientes(req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 20);
+    const offset = (page - 1) * limit;
+    const q = String(req.query.q || "").trim();
 
-    const customers = await db
-      .select()
-      .from(schema.checkoutCustomers)
-      .orderBy(desc(schema.checkoutCustomers.createdAt));
+    const searchFilter = q
+      ? or(
+          ilike(schema.checkoutCustomers.userLogin, `%${q}%`),
+          ilike(schema.checkoutCustomers.userEmail, `%${q}%`)
+        )
+      : undefined;
+
+    const [[totalRow], customers] = await Promise.all([
+      db.select({ value: count() }).from(schema.checkoutCustomers).where(searchFilter),
+      db
+        .select()
+        .from(schema.checkoutCustomers)
+        .where(searchFilter)
+        .orderBy(desc(schema.checkoutCustomers.createdAt))
+        .limit(limit)
+        .offset(offset)
+    ]);
+
+    const total = Number(totalRow?.value ?? 0);
 
     if (customers.length === 0) {
-      return res.json({ clientes: [] });
+      return res.json({
+        clientes: [],
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+      });
     }
 
     const userIds = customers.map((c) => c.userId);
@@ -220,7 +258,8 @@ export async function listClientes(_req: Request, res: Response) {
     }));
 
     return res.json({
-      clientes: customers.map((c) => serializeClienteEnriquecido(c, typedStats, paidOrders))
+      clientes: customers.map((c) => serializeClienteEnriquecido(c, typedStats, paidOrders)),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     console.error("[checkout] listClientes error:", error);
@@ -285,27 +324,62 @@ export async function listClientePedidos(req: Request, res: Response) {
     if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
 
     const db = getCheckoutDb();
-    const pedidos = await db
-      .select({
-        order: schema.checkoutOrders,
-        paidAt: schema.checkoutPayments.paidAt
-      })
-      .from(schema.checkoutOrders)
-      .leftJoin(schema.checkoutPayments, eq(schema.checkoutOrders.id, schema.checkoutPayments.orderId))
-      .where(eq(schema.checkoutOrders.userId, userId))
-      .orderBy(desc(schema.checkoutOrders.createdAt));
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 15);
+    const offset = (page - 1) * limit;
+    const descriptionFilter = String(req.query.description || "").trim();
 
-    const seen = new Set<number>();
-    const unique = pedidos.filter((r) => {
-      if (seen.has(r.order.id)) return false;
-      seen.add(r.order.id);
-      return true;
+    const baseFilter = descriptionFilter
+      ? and(
+          eq(schema.checkoutOrders.userId, userId),
+          eq(schema.checkoutOrders.description, descriptionFilter)
+        )
+      : eq(schema.checkoutOrders.userId, userId);
+
+    const [[totalRow], statusCounts, orders] = await Promise.all([
+      db.select({ value: count() }).from(schema.checkoutOrders).where(baseFilter),
+      db
+        .select({
+          status: schema.checkoutOrders.status,
+          total: sql<number>`COUNT(*)::int`
+        })
+        .from(schema.checkoutOrders)
+        .where(eq(schema.checkoutOrders.userId, userId))
+        .groupBy(schema.checkoutOrders.status),
+      db
+        .select()
+        .from(schema.checkoutOrders)
+        .where(baseFilter)
+        .orderBy(desc(schema.checkoutOrders.createdAt))
+        .limit(limit)
+        .offset(offset)
+    ]);
+
+    const total = Number(totalRow?.value ?? 0);
+
+    const orderIds = orders.map((o) => o.id);
+    const payments =
+      orderIds.length > 0
+        ? await db
+            .select({ orderId: schema.checkoutPayments.orderId, paidAt: schema.checkoutPayments.paidAt })
+            .from(schema.checkoutPayments)
+            .where(inArray(schema.checkoutPayments.orderId, orderIds))
+        : [];
+
+    const paidAtMap = new Map(payments.map((p) => [p.orderId, p.paidAt]));
+
+    const paidCount = Number(statusCounts.find((s) => s.status === "paid")?.total ?? 0);
+    const refundedCount = Number(statusCounts.find((s) => s.status === "refunded")?.total ?? 0);
+
+    return res.json({
+      pedidos: orders.map((o) => ({
+        ...serializeOrder(o),
+        paidAt: paidAtMap.get(o.id)?.toISOString() ?? null
+      })),
+      paidCount,
+      refundedCount,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
-
-    return res.json({ pedidos: unique.map((r) => ({
-      ...serializeOrder(r.order),
-      paidAt: r.paidAt?.toISOString() ?? null
-    })) });
   } catch (error) {
     console.error("[checkout] listClientePedidos error:", error);
     return res.status(500).json({ message: "Erro ao listar pedidos do cliente." });
@@ -455,11 +529,14 @@ export async function listProdutos(_req: Request, res: Response) {
 
 export async function createProduto(req: Request, res: Response) {
   try {
-    const { name, description, amountCents, features } = req.body as {
+    const { name, description, amountCents, discountPercent, features, imageKey, imageUrl } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
+      discountPercent?: unknown;
       features?: unknown;
+      imageKey?: string;
+      imageUrl?: string;
     };
 
     if (!name?.trim()) {
@@ -471,13 +548,29 @@ export async function createProduto(req: Request, res: Response) {
       return res.status(400).json({ message: "Valor inválido." });
     }
 
+    let discPct: number | null = null;
+    if (discountPercent !== undefined && discountPercent !== null && discountPercent !== "") {
+      discPct = Number(discountPercent);
+      if (!Number.isInteger(discPct) || discPct < 0 || discPct > 99) {
+        return res.status(400).json({ message: "Desconto deve ser entre 0 e 99%." });
+      }
+    }
+
     const featuresArr = Array.isArray(features) ? (features as string[]).map(String).filter(Boolean) : [];
     const desc = description?.trim() || featuresArr[0] || name.trim();
 
     const db = getCheckoutDb();
     const [produto] = await db
       .insert(schema.checkoutProducts)
-      .values({ name: name.trim(), description: desc, features: featuresArr, amountCents: cents })
+      .values({
+        name: name.trim(),
+        description: desc,
+        features: featuresArr,
+        amountCents: cents,
+        discountPercent: discPct,
+        imageKey: imageKey?.trim() || null,
+        imageUrl: imageUrl?.trim() || null
+      })
       .returning();
 
     return res.status(201).json({ produto: serializeProduct(produto!) });
@@ -492,12 +585,15 @@ export async function updateProduto(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { name, description, amountCents, active, features } = req.body as {
+    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
+      discountPercent?: unknown;
       active?: unknown;
       features?: unknown;
+      imageKey?: string | null;
+      imageUrl?: string | null;
     };
 
     const db = getCheckoutDb();
@@ -519,7 +615,20 @@ export async function updateProduto(req: Request, res: Response) {
       }
       updates.amountCents = cents;
     }
+    if (discountPercent !== undefined) {
+      if (discountPercent === null || discountPercent === "") {
+        updates.discountPercent = null;
+      } else {
+        const discPct = Number(discountPercent);
+        if (!Number.isInteger(discPct) || discPct < 0 || discPct > 99) {
+          return res.status(400).json({ message: "Desconto deve ser entre 0 e 99%." });
+        }
+        updates.discountPercent = discPct;
+      }
+    }
     if (active !== undefined) updates.active = Boolean(active);
+    if (imageKey !== undefined) updates.imageKey = imageKey?.trim() || null;
+    if (imageUrl !== undefined) updates.imageUrl = imageUrl?.trim() || null;
 
     const [produto] = await db
       .update(schema.checkoutProducts)
@@ -553,5 +662,148 @@ export async function deleteProduto(req: Request, res: Response) {
   } catch (error) {
     console.error("[checkout] deleteProduto error:", error);
     return res.status(500).json({ message: "Erro ao remover produto." });
+  }
+}
+
+// ── Cupons ────────────────────────────────────────────────────────────────────
+
+export async function listCupons(_req: Request, res: Response) {
+  try {
+    const db = getCheckoutDb();
+    const cupons = await db
+      .select()
+      .from(schema.checkoutCoupons)
+      .orderBy(desc(schema.checkoutCoupons.createdAt));
+    return res.json({ cupons: cupons.map(serializeCupom) });
+  } catch (error) {
+    console.error("[checkout] listCupons error:", error);
+    return res.status(500).json({ message: "Erro ao listar cupons." });
+  }
+}
+
+export async function createCupom(req: Request, res: Response) {
+  try {
+    const { code, discountPercent, maxUses, expiresAt } = req.body as {
+      code?: string;
+      discountPercent?: unknown;
+      maxUses?: unknown;
+      expiresAt?: string | null;
+    };
+
+    if (!code?.trim()) {
+      return res.status(400).json({ message: "Código é obrigatório." });
+    }
+
+    const discPct = Number(discountPercent);
+    if (!Number.isInteger(discPct) || discPct < 1 || discPct > 99) {
+      return res.status(400).json({ message: "Desconto deve ser entre 1 e 99%." });
+    }
+
+    let maxUsesVal: number | null = null;
+    if (maxUses !== undefined && maxUses !== null && maxUses !== "") {
+      maxUsesVal = Number(maxUses);
+      if (!Number.isInteger(maxUsesVal) || maxUsesVal < 1) {
+        return res.status(400).json({ message: "Limite de usos inválido." });
+      }
+    }
+
+    const expiresAtVal = expiresAt ? new Date(expiresAt) : null;
+
+    const db = getCheckoutDb();
+    const [cupom] = await db
+      .insert(schema.checkoutCoupons)
+      .values({
+        code: code.trim().toUpperCase(),
+        discountPercent: discPct,
+        maxUses: maxUsesVal,
+        expiresAt: expiresAtVal
+      })
+      .returning();
+
+    return res.status(201).json({ cupom: serializeCupom(cupom!) });
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "23505") {
+      return res.status(409).json({ message: "Já existe um cupom com esse código." });
+    }
+    console.error("[checkout] createCupom error:", error);
+    return res.status(500).json({ message: "Erro ao criar cupom." });
+  }
+}
+
+export async function updateCupom(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+
+    const { discountPercent, maxUses, expiresAt, active } = req.body as {
+      discountPercent?: unknown;
+      maxUses?: unknown;
+      expiresAt?: string | null;
+      active?: unknown;
+    };
+
+    const updates: Partial<typeof schema.checkoutCoupons.$inferInsert> = {
+      updatedAt: new Date()
+    };
+
+    if (discountPercent !== undefined) {
+      const discPct = Number(discountPercent);
+      if (!Number.isInteger(discPct) || discPct < 1 || discPct > 99) {
+        return res.status(400).json({ message: "Desconto deve ser entre 1 e 99%." });
+      }
+      updates.discountPercent = discPct;
+    }
+
+    if (maxUses !== undefined) {
+      if (maxUses === null || maxUses === "") {
+        updates.maxUses = null;
+      } else {
+        const val = Number(maxUses);
+        if (!Number.isInteger(val) || val < 1) {
+          return res.status(400).json({ message: "Limite de usos inválido." });
+        }
+        updates.maxUses = val;
+      }
+    }
+
+    if (expiresAt !== undefined) {
+      updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    }
+
+    if (active !== undefined) updates.active = Boolean(active);
+
+    const db = getCheckoutDb();
+    const [cupom] = await db
+      .update(schema.checkoutCoupons)
+      .set(updates)
+      .where(eq(schema.checkoutCoupons.id, id))
+      .returning();
+
+    if (!cupom) return res.status(404).json({ message: "Cupom não encontrado." });
+
+    return res.json({ cupom: serializeCupom(cupom) });
+  } catch (error) {
+    console.error("[checkout] updateCupom error:", error);
+    return res.status(500).json({ message: "Erro ao atualizar cupom." });
+  }
+}
+
+export async function deleteCupom(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    const [deleted] = await db
+      .delete(schema.checkoutCoupons)
+      .where(eq(schema.checkoutCoupons.id, id))
+      .returning();
+
+    if (!deleted) return res.status(404).json({ message: "Cupom não encontrado." });
+
+    return res.json({ message: "Cupom removido." });
+  } catch (error) {
+    console.error("[checkout] deleteCupom error:", error);
+    return res.status(500).json({ message: "Erro ao remover cupom." });
   }
 }

@@ -6,6 +6,21 @@ export const checkoutProducts = pgTable("checkout_products", {
   description: text("description").notNull(),
   features: jsonb("features").$type<string[]>().notNull().default([]),
   amountCents: integer("amount_cents").notNull(),
+  discountPercent: integer("discount_percent"),
+  active: boolean("active").notNull().default(true),
+  imageKey: text("image_key"),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const checkoutCoupons = pgTable("checkout_coupons", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  discountPercent: integer("discount_percent").notNull(),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
@@ -31,6 +46,9 @@ export const checkoutOrders = pgTable("checkout_orders", {
   productId: text("product_id").notNull(),
   description: text("description").notNull(),
   amountCents: integer("amount_cents").notNull(),
+  originalAmountCents: integer("original_amount_cents"),
+  couponCode: text("coupon_code"),
+  discountCents: integer("discount_cents"),
   status: text("status", { enum: ["pending", "paid", "failed", "expired", "refunded"] })
     .notNull()
     .default("pending"),

@@ -109,6 +109,20 @@ export interface CheckoutProductSummary {
   description: string;
   features: string[];
   amountCents: number;
+  discountPercent: number | null;
+  active: boolean;
+  imageKey: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
+export interface CheckoutCupomSummary {
+  id: number;
+  code: string;
+  discountPercent: number;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
   active: boolean;
   createdAt: string;
 }

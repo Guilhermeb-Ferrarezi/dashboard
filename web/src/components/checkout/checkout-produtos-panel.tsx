@@ -31,7 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { clientApi } from "@/lib/api";
+import { clientApi, getClientApiBaseUrl } from "@/lib/api";
 import type { CheckoutProductSummary } from "@/types/portal";
 
 function formatCurrency(cents: number) {
@@ -50,18 +50,49 @@ type ProductFormValues = {
   name: string;
   features: string[];
   amountReais: string;
+  discountPercent: string;
+  imageKey: string | null;
+  imageUrl: string | null;
 };
 
 function emptyForm(): ProductFormValues {
-  return { name: "", features: [""], amountReais: "" };
+  return { name: "", features: [""], amountReais: "", discountPercent: "", imageKey: null, imageUrl: null };
 }
 
 function formFromProduct(p: CheckoutProductSummary): ProductFormValues {
   return {
     name: p.name,
     features: p.features?.length > 0 ? p.features : [p.description],
-    amountReais: (p.amountCents / 100).toFixed(2)
+    amountReais: (p.amountCents / 100).toFixed(2),
+    discountPercent: p.discountPercent != null ? String(p.discountPercent) : "",
+    imageKey: p.imageKey,
+    imageUrl: p.imageUrl
   };
+}
+
+function applyDiscount(cents: number, discountPercent: number | null): number {
+  if (!discountPercent) return cents;
+  return Math.round(cents * (1 - discountPercent / 100));
+}
+
+async function uploadProductImage(file: File): Promise<{ imageKey: string; imageUrl: string }> {
+  const formData = new FormData();
+  formData.append("image", file);
+  formData.append("folder", "checkout/products");
+
+  const response = await fetch(`${getClientApiBaseUrl()}/admin/r2/images`, {
+    method: "POST",
+    body: formData,
+    credentials: "include"
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(data.message ?? "Erro ao enviar imagem.");
+  }
+
+  const data = await response.json() as { image: { key: string; url: string } };
+  return { imageKey: data.image.key, imageUrl: data.image.url };
 }
 
 function parseReais(value: string): number | null {
@@ -81,18 +112,39 @@ interface ProductFormProps {
 }
 
 function ProductForm({ form, setForm, pending, onSubmit, onCancel, onPreview }: ProductFormProps) {
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   function buildPreview(): CheckoutProductSummary {
     const cents = parseReais(form.amountReais) ?? 0;
     const features = form.features.map((f) => f.trim()).filter(Boolean);
+    const discPct = form.discountPercent ? parseInt(form.discountPercent, 10) : null;
     return {
       id: 0,
       name: form.name || "Nome do produto",
       description: features[0] ?? "",
       features,
       amountCents: cents,
+      discountPercent: discPct && discPct >= 1 && discPct <= 99 ? discPct : null,
       active: true,
+      imageKey: form.imageKey,
+      imageUrl: form.imageUrl,
       createdAt: new Date().toISOString()
     };
+  }
+
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const { imageKey, imageUrl } = await uploadProductImage(file);
+      setForm((f) => ({ ...f, imageKey, imageUrl }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao enviar imagem.");
+    } finally {
+      setUploadingImage(false);
+      e.target.value = "";
+    }
   }
   function setFeature(index: number, value: string) {
     setForm((f) => {
@@ -158,16 +210,75 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel, onPreview }: 
         </div>
       </div>
 
-      <label className="space-y-1.5">
-        <span className="text-xs font-medium">Valor (R$)</span>
-        <Input
-          value={form.amountReais}
-          onChange={(e) => setForm((f) => ({ ...f, amountReais: e.target.value }))}
-          placeholder="Ex: 29.90"
-          inputMode="decimal"
-          required
-        />
-      </label>
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium">Imagem do produto</span>
+        <div className="flex items-center gap-3">
+          {form.imageUrl && (
+            <div className="relative size-16 shrink-0 overflow-hidden rounded-md border border-border/60">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.imageUrl} alt="" className="size-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, imageKey: null, imageUrl: null }))}
+                className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                aria-label="Remover imagem"
+              >
+                <MinusIcon className="size-2.5" />
+              </button>
+            </div>
+          )}
+          <label className={`flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border/60 px-3 py-2 text-xs text-muted-foreground transition hover:border-primary/50 hover:text-foreground ${uploadingImage ? "pointer-events-none opacity-60" : ""}`}>
+            {uploadingImage ? (
+              <><Spinner size="sm" /> Enviando…</>
+            ) : (
+              <><PlusIcon className="size-3" /> {form.imageUrl ? "Trocar imagem" : "Adicionar imagem"}</>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleImageChange}
+              disabled={uploadingImage || pending}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <label className="flex-1 space-y-1.5">
+          <span className="text-xs font-medium">Valor (R$)</span>
+          <Input
+            value={form.amountReais}
+            onChange={(e) => setForm((f) => ({ ...f, amountReais: e.target.value }))}
+            placeholder="Ex: 29.90"
+            inputMode="decimal"
+            required
+          />
+        </label>
+        <label className="w-28 space-y-1.5">
+          <span className="text-xs font-medium">Desconto (%)</span>
+          <Input
+            value={form.discountPercent}
+            onChange={(e) => setForm((f) => ({ ...f, discountPercent: e.target.value }))}
+            placeholder="Ex: 20"
+            inputMode="numeric"
+          />
+        </label>
+      </div>
+      {form.discountPercent && form.amountReais && (() => {
+        const base = parseReais(form.amountReais);
+        const pct = parseInt(form.discountPercent, 10);
+        if (base && pct >= 1 && pct <= 99) {
+          return (
+            <p className="text-xs text-muted-foreground -mt-2">
+              De <span className="line-through">{formatCurrency(base)}</span> por{" "}
+              <span className="text-green-600 font-medium">{formatCurrency(applyDiscount(base, pct))}</span>
+            </p>
+          );
+        }
+        return null;
+      })()}
+
       <DialogFooter>
         <Button type="button" variant="ghost" size="sm" className="mr-auto gap-1.5" onClick={() => onPreview(buildPreview())}>
           <EyeIcon className="size-3.5" />
@@ -227,20 +338,29 @@ function ProductPreviewModal({
             ))}
           </div>
 
+          {produto.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={produto.imageUrl} alt={produto.name} className="w-full h-36 object-cover rounded-md" />
+          )}
+
           <div className="border-t border-white/10 pt-3 flex flex-col gap-1.5 text-sm text-zinc-400">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span>{formatCurrencyPreview(produto.amountCents)}</span>
+              <span className={produto.discountPercent ? "line-through opacity-60" : ""}>
+                {formatCurrencyPreview(produto.amountCents)}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span>Taxa (0%)</span>
-              <span>R$ 0,00</span>
-            </div>
+            {produto.discountPercent ? (
+              <div className="flex justify-between text-green-400">
+                <span>Desconto ({produto.discountPercent}%)</span>
+                <span>-{formatCurrencyPreview(produto.amountCents - applyDiscount(produto.amountCents, produto.discountPercent))}</span>
+              </div>
+            ) : null}
           </div>
           <div className="border-t border-white/10 pt-3 flex justify-between font-semibold text-white">
             <span>Total hoje</span>
             <span style={{ color: "oklch(0.62 0.21 22)", fontFamily: "'Barlow Condensed', sans-serif", fontSize: "1.1rem" }}>
-              {formatCurrencyPreview(produto.amountCents)}
+              {formatCurrencyPreview(applyDiscount(produto.amountCents, produto.discountPercent))}
             </span>
           </div>
 
@@ -348,7 +468,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     try {
       const { produto } = await clientApi<{ produto: CheckoutProductSummary }>("/checkout/produtos", {
         method: "POST",
-        body: JSON.stringify({ name: createForm.name.trim(), features, amountCents })
+        body: JSON.stringify({ name: createForm.name.trim(), features, amountCents, discountPercent: createForm.discountPercent ? parseInt(createForm.discountPercent, 10) : null, imageKey: createForm.imageKey, imageUrl: createForm.imageUrl })
       });
       setProdutos((prev) => [produto, ...prev]);
       setCreateOpen(false);
@@ -373,7 +493,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     try {
       const { produto } = await clientApi<{ produto: CheckoutProductSummary }>(`/checkout/produtos/${editTarget.id}`, {
         method: "PUT",
-        body: JSON.stringify({ name: editForm.name.trim(), features, amountCents })
+        body: JSON.stringify({ name: editForm.name.trim(), features, amountCents, discountPercent: editForm.discountPercent ? parseInt(editForm.discountPercent, 10) : null, imageKey: editForm.imageKey, imageUrl: editForm.imageUrl })
       });
       setProdutos((prev) => prev.map((p) => (p.id === produto.id ? produto : p)));
       setEditTarget(null);
@@ -538,13 +658,13 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
       </Dialog>
 
       <ProductPreviewModal
-        produto={previewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, active: true, createdAt: "" }}
+        produto={previewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, discountPercent: null, active: true, imageKey: null, imageUrl: null, createdAt: "" }}
         open={!!previewTarget}
         onClose={() => setPreviewTarget(null)}
       />
 
       <ProductPreviewModal
-        produto={formPreviewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, active: true, createdAt: "" }}
+        produto={formPreviewTarget ?? { id: 0, name: "", description: "", features: [], amountCents: 0, discountPercent: null, active: true, imageKey: null, imageUrl: null, createdAt: "" }}
         open={!!formPreviewTarget}
         onClose={() => setFormPreviewTarget(null)}
       />
@@ -596,6 +716,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
+                    <TableHead className="w-12" />
                     <TableHead>
                       <SortButton k="name" label="Nome" />
                     </TableHead>
@@ -616,12 +737,29 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                       <TableCell className="font-mono text-xs text-muted-foreground">
                         {produto.id}
                       </TableCell>
+                      <TableCell>
+                        {produto.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={produto.imageUrl} alt="" className="size-9 rounded object-cover border border-border/40" />
+                        ) : (
+                          <div className="flex size-9 items-center justify-center rounded border border-border/30 bg-muted/30 text-muted-foreground/40">
+                            <PackageIcon className="size-4" />
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">{produto.name}</TableCell>
                       <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
                         {produto.description}
                       </TableCell>
-                      <TableCell className="tabular-nums font-medium">
-                        {formatCurrency(produto.amountCents)}
+                      <TableCell className="tabular-nums">
+                        {produto.discountPercent ? (
+                          <div className="flex flex-col">
+                            <span className="text-xs line-through text-muted-foreground">{formatCurrency(produto.amountCents)}</span>
+                            <span className="font-medium text-green-600">{formatCurrency(applyDiscount(produto.amountCents, produto.discountPercent))}</span>
+                          </div>
+                        ) : (
+                          <span className="font-medium">{formatCurrency(produto.amountCents)}</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Tooltip>

@@ -1,7 +1,9 @@
 import { Router } from "express";
 
 import {
+  createCupom,
   createProduto,
+  deleteCupom,
   deleteCliente,
   deleteProduto,
   getComprovante,
@@ -10,9 +12,11 @@ import {
   listClienteAssinaturas,
   listClientePedidos,
   listClientes,
+  listCupons,
   listProdutos,
   refundOrder,
   updateCliente,
+  updateCupom,
   updateProduto
 } from "../controllers/checkout.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
@@ -35,5 +39,10 @@ router.get("/produtos", listProdutos);
 router.post("/produtos", createProduto);
 router.put("/produtos/:id", updateProduto);
 router.delete("/produtos/:id", deleteProduto);
+
+router.get("/cupons", listCupons);
+router.post("/cupons", createCupom);
+router.put("/cupons/:id", updateCupom);
+router.delete("/cupons/:id", deleteCupom);
 
 export default router;
