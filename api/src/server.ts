@@ -81,7 +81,7 @@ function isAllowedLocalDevOrigin(origin: string) {
     return (
       url.protocol === "http:" &&
       ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
-      ["3000", "3001", "3002", "5173"].includes(url.port)
+      ["3000", "3001", "3002", "3003", "5173"].includes(url.port)
     );
   } catch {
     return false;

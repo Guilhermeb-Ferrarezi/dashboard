@@ -83,8 +83,11 @@ export const corujaoClientes = pgTable("corujao_clientes", {
   name: text("name").notNull(),
   phone: text("phone"),
   instagram: text("instagram"),
-  notes: text("notes"),
   active: boolean("active").notNull().default(true),
+  respondeu: boolean("respondeu").notNull().default(false),
+  jaVeio: boolean("ja_veio").notNull().default(false),
+  ultimaVisita: date("ultima_visita"),
+  confirmouData: date("confirmou_data"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });

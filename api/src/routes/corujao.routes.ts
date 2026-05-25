@@ -10,6 +10,7 @@ import {
   deleteCorujaoSessao,
   getSessaoPresencas,
   upsertPresenca,
+  removePresenca,
   getCorujaoStats,
   getClienteHistorico
 } from "../controllers/corujao.controller";
@@ -34,5 +35,6 @@ router.delete("/sessoes/:id", deleteCorujaoSessao);
 
 router.get("/sessoes/:id/presencas", getSessaoPresencas);
 router.patch("/sessoes/:sessaoId/presencas/:clienteId", upsertPresenca);
+router.delete("/sessoes/:sessaoId/presencas/:clienteId", removePresenca);
 
 export default router;

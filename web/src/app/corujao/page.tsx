@@ -17,19 +17,23 @@ export default async function CorujaoClientesPage() {
 
   const cookieHeader = (await cookies()).toString();
 
+  const defaultStats: CorujaoStats = { totalClientes: 0, clientesAtivos: 0, totalSessoes: 0, jaVieram: 0 };
+
   const [clientesData, statsData] = await Promise.all([
     serverApi<{ clientes: CorujaoClienteSummary[] }>("/corujao/clientes?limit=200", { cookieHeader }).catch(() => ({ clientes: [] })),
-    serverApi<{ stats: CorujaoStats }>("/corujao/stats", { cookieHeader }).catch(() => ({
-      stats: { totalClientes: 0, clientesAtivos: 0, totalSessoes: 0, jaVieram: 0 }
-    }))
+    serverApi<{ totalClientes: number; totalAtivos: number; totalSessoes: number; jaVieram: number }>("/corujao/stats", { cookieHeader }).catch(() => null)
   ]);
+
+  const stats: CorujaoStats = statsData
+    ? { totalClientes: statsData.totalClientes, clientesAtivos: statsData.totalAtivos, totalSessoes: statsData.totalSessoes, jaVieram: statsData.jaVieram }
+    : defaultStats;
 
   return (
     <AppShell user={user} title="Corujão — Clientes" description="Clientes do serviço Corujão.">
       <div className="p-6">
         <CorujaoClientesPanel
           initialClientes={clientesData.clientes}
-          initialStats={statsData.stats}
+          initialStats={stats}
         />
       </div>
     </AppShell>

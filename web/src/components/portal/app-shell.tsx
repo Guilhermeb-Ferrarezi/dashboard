@@ -91,6 +91,10 @@ function isItemActive(item: PortalSidebarItem, pathname: string, logsHref: strin
     return pathname === "/checkout";
   }
 
+  if (item.href === "/corujao") {
+    return pathname === "/corujao";
+  }
+
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 

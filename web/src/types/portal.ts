@@ -210,11 +210,11 @@ export interface CorujaoClienteSummary {
   name: string;
   phone: string | null;
   instagram: string | null;
-  notes: string | null;
   active: boolean;
-  visitouAlgumaDia: boolean;
+  respondeu: boolean;
+  jaVeio: boolean;
   ultimaVisita: string | null;
-  totalConfirmacoes: number;
+  confirmouData: string | null;
   createdAt: string;
 }
 

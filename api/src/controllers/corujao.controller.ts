@@ -3,21 +3,17 @@ import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
 
-function serializeCliente(row: typeof schema.corujaoClientes.$inferSelect & {
-  visitouAlgumaVez?: boolean;
-  ultimaVisita?: string | null;
-  totalConfirmacoes?: number;
-}) {
+function serializeCliente(row: typeof schema.corujaoClientes.$inferSelect) {
   return {
     id: row.id,
     name: row.name,
     phone: row.phone ?? null,
     instagram: row.instagram ?? null,
-    notes: row.notes ?? null,
     active: row.active,
-    visitouAlgumaVez: row.visitouAlgumaVez ?? false,
+    respondeu: row.respondeu,
+    jaVeio: row.jaVeio,
     ultimaVisita: row.ultimaVisita ?? null,
-    totalConfirmacoes: row.totalConfirmacoes ?? 0,
+    confirmouData: row.confirmouData ?? null,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -69,40 +65,8 @@ export async function listCorujaoClientes(req: Request, res: Response) {
 
     const total = totalRow?.value ?? 0;
 
-    if (clientes.length === 0) {
-      return res.json({
-        clientes: [],
-        pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
-      });
-    }
-
-    const ids = clientes.map((c) => c.id);
-
-    const statsRows = await db.execute<{
-      cliente_id: number;
-      visitou: boolean;
-      ultima_visita: string | null;
-      total_confirmacoes: number;
-    }>(sql`
-      SELECT
-        c.id AS cliente_id,
-        BOOL_OR(p.status = 'attended') AS visitou,
-        MAX(CASE WHEN p.status = 'attended' THEN s.date END) AS ultima_visita,
-        COUNT(CASE WHEN p.status IN ('confirmed', 'attended') THEN 1 END)::int AS total_confirmacoes
-      FROM corujao_clientes c
-      LEFT JOIN corujao_presencas p ON p.cliente_id = c.id
-      LEFT JOIN corujao_sessoes s ON s.id = p.sessao_id
-      WHERE c.id = ANY(${sql.raw(`ARRAY[${ids.join(",")}]`)})
-      GROUP BY c.id
-    `);
-
-    const statsMap = new Map(Array.from(statsRows).map((r) => [
-      r.cliente_id,
-      { visitouAlgumaVez: r.visitou, ultimaVisita: r.ultima_visita ?? null, totalConfirmacoes: r.total_confirmacoes }
-    ]));
-
     return res.json({
-      clientes: clientes.map((c) => serializeCliente({ ...c, ...statsMap.get(c.id) })),
+      clientes: clientes.map(serializeCliente),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
     });
   } catch (error) {
@@ -113,11 +77,14 @@ export async function listCorujaoClientes(req: Request, res: Response) {
 
 export async function createCorujaoCliente(req: Request, res: Response) {
   try {
-    const { name, phone, instagram, notes } = req.body as {
+    const { name, phone, instagram, respondeu, jaVeio, ultimaVisita, confirmouData } = req.body as {
       name?: string;
       phone?: string;
       instagram?: string;
-      notes?: string;
+      respondeu?: boolean;
+      jaVeio?: boolean;
+      ultimaVisita?: string | null;
+      confirmouData?: string | null;
     };
 
     if (!name?.trim()) return res.status(400).json({ message: "Nome é obrigatório." });
@@ -129,7 +96,10 @@ export async function createCorujaoCliente(req: Request, res: Response) {
         name: name.trim(),
         phone: phone?.trim() || null,
         instagram: instagram?.trim().replace(/^@/, "") || null,
-        notes: notes?.trim() || null
+        respondeu: Boolean(respondeu),
+        jaVeio: Boolean(jaVeio),
+        ultimaVisita: ultimaVisita || null,
+        confirmouData: confirmouData || null
       })
       .returning();
 
@@ -145,20 +115,26 @@ export async function updateCorujaoCliente(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { name, phone, instagram, notes, active } = req.body as {
+    const { name, phone, instagram, active, respondeu, jaVeio, ultimaVisita, confirmouData } = req.body as {
       name?: string;
       phone?: string | null;
       instagram?: string | null;
-      notes?: string | null;
       active?: unknown;
+      respondeu?: unknown;
+      jaVeio?: unknown;
+      ultimaVisita?: string | null;
+      confirmouData?: string | null;
     };
 
     const updates: Partial<typeof schema.corujaoClientes.$inferInsert> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name.trim();
     if (phone !== undefined) updates.phone = phone?.trim() || null;
     if (instagram !== undefined) updates.instagram = instagram?.trim().replace(/^@/, "") || null;
-    if (notes !== undefined) updates.notes = notes?.trim() || null;
     if (active !== undefined) updates.active = Boolean(active);
+    if (respondeu !== undefined) updates.respondeu = Boolean(respondeu);
+    if (jaVeio !== undefined) updates.jaVeio = Boolean(jaVeio);
+    if (ultimaVisita !== undefined) updates.ultimaVisita = ultimaVisita || null;
+    if (confirmouData !== undefined) updates.confirmouData = confirmouData || null;
 
     const db = getCheckoutDb();
     const [cliente] = await db
@@ -248,10 +224,11 @@ export async function listCorujaoSessoes(_req: Request, res: Response) {
 
 export async function createCorujaoSessao(req: Request, res: Response) {
   try {
-    const { date, title, status } = req.body as {
+    const { date, title, status, clienteIds } = req.body as {
       date?: string;
       title?: string;
       status?: string;
+      clienteIds?: number[];
     };
 
     if (!date?.trim()) return res.status(400).json({ message: "Data é obrigatória." });
@@ -266,6 +243,12 @@ export async function createCorujaoSessao(req: Request, res: Response) {
       })
       .returning();
 
+    if (clienteIds && clienteIds.length > 0 && sessao) {
+      await db.insert(schema.corujaoPresencas).values(
+        clienteIds.map((cId) => ({ clienteId: cId, sessaoId: sessao.id, status: "pending" as const }))
+      ).onConflictDoNothing();
+    }
+
     return res.status(201).json({ sessao: serializeSessao(sessao!) });
   } catch (error) {
     console.error("[corujao] createSessao error:", error);
@@ -278,10 +261,11 @@ export async function updateCorujaoSessao(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { date, title, status } = req.body as {
+    const { date, title, status, clienteIds } = req.body as {
       date?: string;
       title?: string | null;
       status?: string;
+      clienteIds?: number[];
     };
 
     const updates: Partial<typeof schema.corujaoSessoes.$inferInsert> = { updatedAt: new Date() };
@@ -297,6 +281,30 @@ export async function updateCorujaoSessao(req: Request, res: Response) {
       .returning();
 
     if (!sessao) return res.status(404).json({ message: "Sessão não encontrada." });
+
+    // Sincronizar clientes: remove quem saiu, adiciona quem entrou (mantém status existente)
+    if (clienteIds !== undefined) {
+      const existing = await db
+        .select({ clienteId: schema.corujaoPresencas.clienteId })
+        .from(schema.corujaoPresencas)
+        .where(eq(schema.corujaoPresencas.sessaoId, id));
+      const existingIds = new Set(existing.map((e) => e.clienteId));
+      const newIds = new Set(clienteIds);
+
+      const toRemove = [...existingIds].filter((cId) => !newIds.has(cId));
+      const toAdd = [...newIds].filter((cId) => !existingIds.has(cId));
+
+      if (toRemove.length > 0) {
+        await db.delete(schema.corujaoPresencas).where(
+          and(eq(schema.corujaoPresencas.sessaoId, id), sql`${schema.corujaoPresencas.clienteId} = ANY(${sql.raw(`ARRAY[${toRemove.join(",")}]`)})`)
+        );
+      }
+      if (toAdd.length > 0) {
+        await db.insert(schema.corujaoPresencas).values(
+          toAdd.map((cId) => ({ clienteId: cId, sessaoId: id, status: "pending" as const }))
+        ).onConflictDoNothing();
+      }
+    }
 
     return res.json({ sessao: serializeSessao(sessao) });
   } catch (error) {
@@ -338,7 +346,6 @@ export async function getSessaoPresencas(req: Request, res: Response) {
       name: string;
       phone: string | null;
       instagram: string | null;
-      presenca_id: number | null;
       status: string;
     }>(sql`
       SELECT
@@ -346,21 +353,19 @@ export async function getSessaoPresencas(req: Request, res: Response) {
         c.name,
         c.phone,
         c.instagram,
-        p.id AS presenca_id,
-        COALESCE(p.status, 'pending') AS status
-      FROM corujao_clientes c
-      LEFT JOIN corujao_presencas p ON p.cliente_id = c.id AND p.sessao_id = ${sessaoId}
-      WHERE c.active = true
+        p.status
+      FROM corujao_presencas p
+      JOIN corujao_clientes c ON c.id = p.cliente_id
+      WHERE p.sessao_id = ${sessaoId}
       ORDER BY c.name ASC
     `);
 
     return res.json({
       presencas: Array.from(rows).map((r) => ({
         clienteId: r.id,
-        name: r.name,
-        phone: r.phone ?? null,
-        instagram: r.instagram ?? null,
-        presencaId: r.presenca_id ?? null,
+        clienteName: r.name,
+        clientePhone: r.phone ?? null,
+        clienteInstagram: r.instagram ?? null,
         status: r.status
       }))
     });
@@ -399,28 +404,42 @@ export async function upsertPresenca(req: Request, res: Response) {
   }
 }
 
+export async function removePresenca(req: Request, res: Response) {
+  try {
+    const sessaoId = Number(req.params.sessaoId);
+    const clienteId = Number(req.params.clienteId);
+    if (isNaN(sessaoId) || isNaN(clienteId)) return res.status(400).json({ message: "ID inválido." });
+
+    const db = getCheckoutDb();
+    await db.delete(schema.corujaoPresencas).where(
+      and(eq(schema.corujaoPresencas.sessaoId, sessaoId), eq(schema.corujaoPresencas.clienteId, clienteId))
+    );
+
+    return res.json({ message: "Cliente removido da sessão." });
+  } catch (error) {
+    console.error("[corujao] removePresenca error:", error);
+    return res.status(500).json({ message: "Erro ao remover presença." });
+  }
+}
+
 // ── Stats gerais ──────────────────────────────────────────────────────────────
 
 export async function getCorujaoStats(_req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
 
-    const [[totalClientes], [totalAtivos], [totalSessoes], statsRows] = await Promise.all([
+    const [[totalClientes], [totalAtivos], [totalSessoes], [jaVieram]] = await Promise.all([
       db.select({ value: count() }).from(schema.corujaoClientes),
       db.select({ value: count() }).from(schema.corujaoClientes).where(eq(schema.corujaoClientes.active, true)),
       db.select({ value: count() }).from(schema.corujaoSessoes),
-      db.execute<{ ja_vieram: number }>(sql`
-        SELECT COUNT(DISTINCT cliente_id)::int AS ja_vieram
-        FROM corujao_presencas
-        WHERE status = 'attended'
-      `)
+      db.select({ value: count() }).from(schema.corujaoClientes).where(eq(schema.corujaoClientes.jaVeio, true))
     ]);
 
     return res.json({
       totalClientes: totalClientes?.value ?? 0,
       totalAtivos: totalAtivos?.value ?? 0,
       totalSessoes: totalSessoes?.value ?? 0,
-      jaVieram: Array.from(statsRows)[0]?.ja_vieram ?? 0
+      jaVieram: jaVieram?.value ?? 0
     });
   } catch (error) {
     console.error("[corujao] getStats error:", error);
@@ -457,8 +476,8 @@ export async function getClienteHistorico(req: Request, res: Response) {
     return res.json({
       historico: Array.from(rows).map((r) => ({
         sessaoId: r.sessao_id,
-        date: r.date,
-        title: r.title ?? null,
+        sessaoDate: r.date,
+        sessaoTitle: r.title ?? null,
         sessaoStatus: r.sessao_status,
         presencaStatus: r.presenca_status
       }))
