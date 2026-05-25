@@ -1,0 +1,31 @@
+import { cookies } from "next/headers";
+
+import { CorujaoSessoesPanel } from "@/components/corujao/corujao-sessoes-panel";
+import { ClientRedirect } from "@/components/navigation/client-redirect";
+import { AppShell } from "@/components/portal/app-shell";
+import { serverApi } from "@/lib/api-server";
+import { getSessionUser } from "@/lib/session";
+import type { CorujaoSessaoSummary } from "@/types/portal";
+
+export const dynamic = "force-dynamic";
+
+export default async function CorujaoSessoesPage() {
+  const user = await getSessionUser();
+
+  if (!user) return <ClientRedirect to="/login" label="login" />;
+  if (user.role !== "admin") return <ClientRedirect to="/home" label="dashboard" />;
+
+  const cookieHeader = (await cookies()).toString();
+
+  const data = await serverApi<{ sessoes: CorujaoSessaoSummary[] }>("/corujao/sessoes", { cookieHeader }).catch(() => ({
+    sessoes: []
+  }));
+
+  return (
+    <AppShell user={user} title="Corujão — Sessões" description="Gerencie as sessões e presenças.">
+      <div className="p-6">
+        <CorujaoSessoesPanel initialSessoes={data.sessoes} />
+      </div>
+    </AppShell>
+  );
+}

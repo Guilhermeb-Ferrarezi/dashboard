@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 export const checkoutProducts = pgTable("checkout_products", {
   id: serial("id").primaryKey(),
@@ -75,6 +75,37 @@ export const checkoutSubscriptions = pgTable("checkout_subscriptions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
+
+// ── Corujão ───────────────────────────────────────────────────────────────────
+
+export const corujaoClientes = pgTable("corujao_clientes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  phone: text("phone"),
+  instagram: text("instagram"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const corujaoSessoes = pgTable("corujao_sessoes", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull(),
+  title: text("title"),
+  status: text("status", { enum: ["planned", "done", "cancelled"] }).notNull().default("planned"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const corujaoPresencas = pgTable("corujao_presencas", {
+  id: serial("id").primaryKey(),
+  clienteId: integer("cliente_id").notNull().references(() => corujaoClientes.id, { onDelete: "cascade" }),
+  sessaoId: integer("sessao_id").notNull().references(() => corujaoSessoes.id, { onDelete: "cascade" }),
+  status: text("status", { enum: ["pending", "confirmed", "attended", "absent"] }).notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+}, (t) => [unique().on(t.clienteId, t.sessaoId)]);
 
 export const checkoutPayments = pgTable("checkout_payments", {
   id: serial("id").primaryKey(),

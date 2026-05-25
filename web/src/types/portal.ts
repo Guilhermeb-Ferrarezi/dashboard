@@ -202,3 +202,55 @@ export interface CheckoutDashboardData {
   pedidosPorDia: { dia: string; total: number }[];
   statusBreakdown: { status: string; total: number }[];
 }
+
+// ── Corujão ───────────────────────────────────────────────────────────────────
+
+export interface CorujaoClienteSummary {
+  id: number;
+  name: string;
+  phone: string | null;
+  instagram: string | null;
+  notes: string | null;
+  active: boolean;
+  visitouAlgumaDia: boolean;
+  ultimaVisita: string | null;
+  totalConfirmacoes: number;
+  createdAt: string;
+}
+
+export type CorujaoSessaoStatus = "planned" | "done" | "cancelled";
+export type CorujaoPresencaStatus = "pending" | "confirmed" | "attended" | "absent";
+
+export interface CorujaoSessaoSummary {
+  id: number;
+  date: string;
+  title: string | null;
+  status: CorujaoSessaoStatus;
+  confirmados: number;
+  presentes: number;
+  pendentes: number;
+  createdAt: string;
+}
+
+export interface CorujaoPresencaSummary {
+  clienteId: number;
+  clienteName: string;
+  clientePhone: string | null;
+  clienteInstagram: string | null;
+  status: CorujaoPresencaStatus;
+}
+
+export interface CorujaoStats {
+  totalClientes: number;
+  clientesAtivos: number;
+  totalSessoes: number;
+  jaVieram: number;
+}
+
+export interface CorujaoClienteHistorico {
+  sessaoId: number;
+  sessaoDate: string;
+  sessaoTitle: string | null;
+  sessaoStatus: CorujaoSessaoStatus;
+  presencaStatus: CorujaoPresencaStatus;
+}
