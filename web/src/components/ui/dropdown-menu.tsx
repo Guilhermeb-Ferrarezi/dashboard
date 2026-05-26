@@ -20,7 +20,17 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
-function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
+// `asChild` é prop do padrão Radix/shadcn. Base UI usa `render={<Element/>}`
+// no lugar. Aceitamos `asChild` no tipo só pra retrocompatibilidade — em
+// runtime ele é descartado e o Trigger renderiza seu próprio <button>, que
+// é o comportamento que o projeto sempre teve (e está OK visualmente).
+// Migrar pra `render` quando houver folga: tira o `button>button` que
+// existe hoje no DOM em muitos sites.
+function DropdownMenuTrigger({
+  asChild,
+  ...props
+}: MenuPrimitive.Trigger.Props & { asChild?: boolean }) {
+  void asChild
   return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
