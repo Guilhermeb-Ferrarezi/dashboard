@@ -616,9 +616,9 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
-  // Pega visitas do contato e decide:
-  //   - 1 visita → confirm() nativo e DELETE direto
-  //   - 2+ visitas → abre Dialog pra o usuário escolher qual
+  // Sempre abre o Dialog — com 1 visita aparece a linha sozinha + botão
+  // de confirmação, com 2+ aparece a lista. Mantém estética consistente
+  // com o resto do painel (sem confirm() nativo).
   async function startCancelarVisita(contato: Contato) {
     setRowBusy(contato.id);
     try {
@@ -631,19 +631,6 @@ export function CorujaoTrabalhoTabela() {
         await reload();
         return;
       }
-      if (visitas.length === 1) {
-        const v = visitas[0]!;
-        const valorFmt = (v.amountCents / 100).toFixed(2).replace(".", ",");
-        const dataFmt = new Date(`${v.dataVisita}T00:00:00`).toLocaleDateString("pt-BR");
-        const confirmed = window.confirm(
-          `Cancelar a visita de R$ ${valorFmt} em ${dataFmt}?\n\nIsso vai liberar 1 vaga` +
-            (v.sessaoId ? " na sessão." : " (visita avulsa).")
-        );
-        if (!confirmed) return;
-        await executarCancel(v.id, v.sessaoId);
-        return;
-      }
-      // 2+: abre Dialog
       setCancelTarget(contato);
       setCancelVisitas(visitas);
       setCancelDialogOpen(true);
@@ -1255,10 +1242,9 @@ export function CorujaoTrabalhoTabela() {
               Cancelar visita
               {cancelTarget ? (
                 <span className="block text-sm font-normal text-muted-foreground mt-1">
-                  {cancelTarget.nome ?? cancelTarget.telefone ?? `Contato #${cancelTarget.id}`} tem
-                  {" "}
-                  {cancelVisitas.length} visita
-                  {cancelVisitas.length === 1 ? "" : "s"} — escolha qual cancelar.
+                  {cancelVisitas.length === 1
+                    ? `${cancelTarget.nome ?? cancelTarget.telefone ?? `Contato #${cancelTarget.id}`} — confirme abaixo.`
+                    : `${cancelTarget.nome ?? cancelTarget.telefone ?? `Contato #${cancelTarget.id}`} tem ${cancelVisitas.length} visitas — escolha qual cancelar.`}
                 </span>
               ) : null}
             </DialogTitle>
