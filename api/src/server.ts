@@ -251,9 +251,13 @@ async function start() {
 
     attachCodexGateway(server);
     startPortalRecentsFlushLoop();
-    runCheckoutMigrations().catch((err) =>
-      console.error("[checkout] migration error:", err)
-    );
+    // runCheckoutMigrations() desativado em 2026-05-26 — todas as 5
+    // operações estão cobertas pelas migrations Drizzle 0003/0004/0008.
+    // Função preservada em db/index.ts (@deprecated) por 1-2 sessões pra
+    // rollback de emergência; remover depois.
+    // runCheckoutMigrations().catch((err) =>
+    //   console.error("[checkout] migration error:", err)
+    // );
 
     function shutdown() {
       console.log("Shutting down…");

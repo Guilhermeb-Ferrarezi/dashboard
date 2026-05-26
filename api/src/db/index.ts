@@ -14,6 +14,12 @@ let _db: Db | null = null;
 let _raw: ReturnType<typeof postgres> | null = null;
 let _migrated = false;
 
+/**
+ * @deprecated 2026-05-26 — todas as 5 operações foram cobertas pelas
+ * migrations Drizzle 0003/0004/0008. Causava a FK duplicada da dívida #3.
+ * Chamada removida em server.ts; função preservada por 1-2 sessões pra
+ * rollback emergencial. Pode ser apagada quando o ciclo estabilizar.
+ */
 export async function runCheckoutMigrations(): Promise<void> {
   if (_migrated) return;
   const url = process.env.POSTGRES_URL;
