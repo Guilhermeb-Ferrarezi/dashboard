@@ -198,8 +198,8 @@ app.use("/api/vct", vctRoutes);
 app.use("/api/codex", codexRoutes);
 app.use("/api/portal", portalRoutes);
 app.use("/api/checkout", checkoutRoutes);
-app.use("/api/corujao", corujaoRoutes);
 app.use("/api/corujao/public", corujaoPublicRoutes);
+app.use("/api/corujao", corujaoRoutes);
 
 app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
 app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
