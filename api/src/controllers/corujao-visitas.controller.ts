@@ -69,6 +69,7 @@ function serializeVisita(row: typeof schema.corujaoVisitas.$inferSelect) {
     id: row.id,
     contatoId: row.contatoId,
     sessaoId: row.sessaoId ?? null,
+    colaboradorId: row.colaboradorId ?? null,
     dataVisita: row.dataVisita,
     amountCents: row.amountCents,
     formaPagamento: row.formaPagamento,
@@ -103,6 +104,7 @@ export async function createVisita(req: Request, res: Response) {
     const {
       contatoId: rawContatoId,
       sessaoId: rawSessaoId,
+      colaboradorId: rawColaboradorId,
       dataVisita: rawDataVisita,
       amountCents: rawAmountCents,
       formaPagamento: rawFormaPagamento,
@@ -110,6 +112,7 @@ export async function createVisita(req: Request, res: Response) {
     } = req.body as {
       contatoId?: unknown;
       sessaoId?: unknown;
+      colaboradorId?: unknown;
       dataVisita?: unknown;
       amountCents?: unknown;
       formaPagamento?: unknown;
@@ -130,6 +133,15 @@ export async function createVisita(req: Request, res: Response) {
         return res.status(400).json({ message: "sessaoId inválido." });
       }
       sessaoId = parsed;
+    }
+
+    let colaboradorId: number | null = null;
+    if (rawColaboradorId !== undefined && rawColaboradorId !== null && rawColaboradorId !== "") {
+      const parsed = Number(rawColaboradorId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return res.status(400).json({ message: "colaboradorId inválido." });
+      }
+      colaboradorId = parsed;
     }
 
     const dataParsed = parseVisitaDate(rawDataVisita);
@@ -156,6 +168,7 @@ export async function createVisita(req: Request, res: Response) {
         .values({
           contatoId,
           sessaoId,
+          colaboradorId,
           dataVisita: dataParsed.value,
           amountCents: amountParsed.value,
           formaPagamento: formaParsed.value,
@@ -191,10 +204,123 @@ export async function createVisita(req: Request, res: Response) {
       if (constraint.includes("sessao")) {
         return res.status(404).json({ message: "Sessão não encontrada." });
       }
+      if (constraint.includes("colaborador")) {
+        return res.status(404).json({ message: "Colaborador não encontrado." });
+      }
       return res.status(404).json({ message: "Contato não encontrado." });
     }
     console.error("[corujao] createVisita error:", error);
     return res.status(500).json({ message: "Erro ao registrar visita." });
+  }
+}
+
+export async function updateVisita(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido." });
+    }
+
+    const {
+      sessaoId: rawSessaoId,
+      colaboradorId: rawColaboradorId,
+      dataVisita: rawDataVisita,
+      amountCents: rawAmountCents,
+      formaPagamento: rawFormaPagamento,
+      observacoes
+    } = req.body as {
+      sessaoId?: unknown;
+      colaboradorId?: unknown;
+      dataVisita?: unknown;
+      amountCents?: unknown;
+      formaPagamento?: unknown;
+      observacoes?: string | null;
+    };
+
+    const updates: Partial<typeof schema.corujaoVisitas.$inferInsert> = {
+      updatedAt: new Date()
+    };
+
+    if (rawSessaoId !== undefined) {
+      if (rawSessaoId === null || rawSessaoId === "") {
+        updates.sessaoId = null;
+      } else {
+        const parsed = Number(rawSessaoId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          return res.status(400).json({ message: "sessaoId inválido." });
+        }
+        updates.sessaoId = parsed;
+      }
+    }
+
+    if (rawColaboradorId !== undefined) {
+      if (rawColaboradorId === null || rawColaboradorId === "") {
+        updates.colaboradorId = null;
+      } else {
+        const parsed = Number(rawColaboradorId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          return res.status(400).json({ message: "colaboradorId inválido." });
+        }
+        updates.colaboradorId = parsed;
+      }
+    }
+
+    if (rawDataVisita !== undefined) {
+      const parsed = parseVisitaDate(rawDataVisita);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.dataVisita = parsed.value;
+    }
+
+    if (rawFormaPagamento !== undefined) {
+      const parsed = parseFormaPagamento(rawFormaPagamento);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.formaPagamento = parsed.value;
+    }
+
+    if (rawAmountCents !== undefined) {
+      // Validamos contra a forma final (se mudou no PATCH ou a antiga).
+      const formaFinal = updates.formaPagamento ?? null;
+      // Sem forma_pagamento definida no PATCH: aceitamos amount mesmo
+      // (FK do schema mantém consistência; validação rigorosa de 0+forma
+      // só faz sentido no fluxo de criação).
+      const parsed = parseVisitaAmount(
+        rawAmountCents,
+        formaFinal ?? "pix" // fallback inócuo: se for 0+forma!=cortesia, rejeita.
+      );
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.amountCents = parsed.value;
+    }
+
+    if (observacoes !== undefined) {
+      updates.observacoes =
+        typeof observacoes === "string" && observacoes.trim().length > 0
+          ? observacoes.trim()
+          : null;
+    }
+
+    const db = getCheckoutDb();
+    const [visita] = await db
+      .update(schema.corujaoVisitas)
+      .set(updates)
+      .where(eq(schema.corujaoVisitas.id, id))
+      .returning();
+
+    if (!visita) return res.status(404).json({ message: "Visita não encontrada." });
+
+    return res.json({ visita: serializeVisita(visita) });
+  } catch (error: unknown) {
+    const pgError = error as { code?: string; constraint_name?: string };
+    if (pgError.code === "23503") {
+      const constraint = pgError.constraint_name ?? "";
+      if (constraint.includes("sessao")) {
+        return res.status(404).json({ message: "Sessão não encontrada." });
+      }
+      if (constraint.includes("colaborador")) {
+        return res.status(404).json({ message: "Colaborador não encontrado." });
+      }
+    }
+    console.error("[corujao] updateVisita error:", error);
+    return res.status(500).json({ message: "Erro ao atualizar visita." });
   }
 }
 

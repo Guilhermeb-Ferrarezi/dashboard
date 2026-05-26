@@ -15,8 +15,14 @@ import {
 import {
   createVisita,
   deleteVisita,
-  listVisitasByContato
+  listVisitasByContato,
+  updateVisita
 } from "../controllers/corujao-visitas.controller";
+import {
+  createColaborador,
+  listColaboradores,
+  updateColaborador
+} from "../controllers/corujao-colaboradores.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
@@ -36,6 +42,11 @@ router.patch("/sessoes/:id", updateSessao);
 
 router.get("/contatos/:id/visitas", listVisitasByContato);
 router.post("/visitas", createVisita);
+router.patch("/visitas/:id", updateVisita);
 router.delete("/visitas/:id", deleteVisita);
+
+router.get("/colaboradores", listColaboradores);
+router.post("/colaboradores", createColaborador);
+router.patch("/colaboradores/:id", updateColaborador);
 
 export default router;
