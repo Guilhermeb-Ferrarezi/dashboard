@@ -99,6 +99,7 @@ type VisitaResumida = {
   id: number;
   contatoId: number;
   sessaoId: number | null;
+  colaboradorId: number | null;
   dataVisita: string;
   amountCents: number;
   formaPagamento: FormaPagamento;
@@ -106,17 +107,30 @@ type VisitaResumida = {
   createdAt: string;
 };
 
+type ColaboradorOption = {
+  id: number;
+  nome: string;
+  ativo: boolean;
+};
+
+const VISITA_COLAB_STORAGE_KEY = "corujao:ultimo-colaborador-visita";
+
 type VisitaForm = {
   sessaoId: string; // "" = sem sessão. Manter como string facilita o <select>.
+  colaboradorId: string; // "" = sem atribuição.
   dataVisita: string;
   valorInput: string; // "45,00" — mantém o que o usuário digitou
   formaPagamento: FormaPagamento;
   observacoes: string;
 };
 
-function emptyVisitaForm(defaultSessaoId: string = ""): VisitaForm {
+function emptyVisitaForm(
+  defaultSessaoId: string = "",
+  defaultColaboradorId: string = ""
+): VisitaForm {
   return {
     sessaoId: defaultSessaoId,
+    colaboradorId: defaultColaboradorId,
     dataVisita: new Date().toISOString().slice(0, 10),
     valorInput: "",
     formaPagamento: "pix",
@@ -337,6 +351,8 @@ export function CorujaoTrabalhoTabela() {
   const [cancelVisitas, setCancelVisitas] = useState<VisitaResumida[]>([]);
   const [cancelBusy, setCancelBusy] = useState<number | null>(null);
 
+  const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
+
   function handleSearch(value: string) {
     setQuery(value);
     setPage(1);
@@ -374,9 +390,10 @@ export function CorujaoTrabalhoTabela() {
   async function reloadProximaSessao() {
     setProximaLoading(true);
     try {
-      const [proxRes, futRes] = await Promise.all([
+      const [proxRes, futRes, colabRes] = await Promise.all([
         clientApi<{ sessao: ProximaSessao | null }>(`/corujao/sessoes/proxima`),
-        clientApi<{ sessoes: SessaoOption[] }>(`/corujao/sessoes?futuras=true`)
+        clientApi<{ sessoes: SessaoOption[] }>(`/corujao/sessoes?futuras=true`),
+        clientApi<{ colaboradores: ColaboradorOption[] }>(`/corujao/colaboradores?ativo=true`)
       ]);
       setProximaSessao(proxRes.sessao);
       // Só sessões abertas/planejadas/lotadas servem pra registrar visita.
@@ -385,10 +402,12 @@ export function CorujaoTrabalhoTabela() {
           ["planejado", "aberto", "lotado"].includes(s.status)
         )
       );
+      setColaboradores(colabRes.colaboradores);
     } catch {
       // silencioso — o card mostra "Nenhuma sessão" e o select fica vazio.
       setProximaSessao(null);
       setSessoesFuturas([]);
+      setColaboradores([]);
     } finally {
       setProximaLoading(false);
     }
@@ -544,7 +563,25 @@ export function CorujaoTrabalhoTabela() {
     setVisitaTarget(contato);
     // Default = próxima sessão futura (se houver), pra acelerar o caso comum.
     const defaultSessao = proximaSessao ? String(proximaSessao.id) : "";
-    setVisitaForm(emptyVisitaForm(defaultSessao));
+
+    // Default colaborador: último escolhido (localStorage) se ainda ativo,
+    // senão primeiro ativo. Acelera batch de registros depois do Corujão.
+    let defaultColab = "";
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(VISITA_COLAB_STORAGE_KEY);
+        if (stored && colaboradores.some((c) => String(c.id) === stored)) {
+          defaultColab = stored;
+        }
+      } catch {
+        // ignora localStorage indisponível (SSR, modo privado, etc.)
+      }
+    }
+    if (!defaultColab && colaboradores.length > 0) {
+      defaultColab = String(colaboradores[0]!.id);
+    }
+
+    setVisitaForm(emptyVisitaForm(defaultSessao, defaultColab));
     setVisitaDialogOpen(true);
   }
 
@@ -580,6 +617,7 @@ export function CorujaoTrabalhoTabela() {
     setVisitaSubmitting(true);
     try {
       const sessaoIdNum = visitaForm.sessaoId ? Number(visitaForm.sessaoId) : null;
+      const colaboradorIdNum = visitaForm.colaboradorId ? Number(visitaForm.colaboradorId) : null;
       const res = await clientApi<{ visita: unknown; contato: Contato }>(
         `/corujao/visitas`,
         {
@@ -587,6 +625,7 @@ export function CorujaoTrabalhoTabela() {
           body: JSON.stringify({
             contatoId: visitaTarget.id,
             sessaoId: sessaoIdNum,
+            colaboradorId: colaboradorIdNum,
             dataVisita: visitaForm.dataVisita,
             amountCents,
             formaPagamento: visitaForm.formaPagamento,
@@ -594,6 +633,18 @@ export function CorujaoTrabalhoTabela() {
           })
         }
       );
+      // Persiste último colaborador escolhido (vazia se "sem atribuição").
+      if (typeof window !== "undefined") {
+        try {
+          if (visitaForm.colaboradorId) {
+            window.localStorage.setItem(VISITA_COLAB_STORAGE_KEY, visitaForm.colaboradorId);
+          } else {
+            window.localStorage.removeItem(VISITA_COLAB_STORAGE_KEY);
+          }
+        } catch {
+          // ignora
+        }
+      }
       // Atualiza só a linha local — ja_participou vem true do backend.
       setContatos((cur) => cur.map((c) => (c.id === res.contato.id ? res.contato : c)));
       // Decrementa vagas localmente quando a visita amarrou na próxima sessão.
@@ -1147,6 +1198,36 @@ export function CorujaoTrabalhoTabela() {
               ) : null}
             </div>
 
+            <div className="space-y-1.5">
+              <Label htmlFor="visita-colaborador">Vendido por</Label>
+              <select
+                id="visita-colaborador"
+                value={visitaForm.colaboradorId}
+                onChange={(e) =>
+                  setVisitaForm((f) => ({ ...f, colaboradorId: e.target.value }))
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {colaboradores.length === 0 ? (
+                  <option value="">— sem atribuição</option>
+                ) : (
+                  <>
+                    {colaboradores.map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.nome}
+                      </option>
+                    ))}
+                    <option value="">— sem atribuição</option>
+                  </>
+                )}
+              </select>
+              {colaboradores.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum colaborador ativo. Cadastre em /corujao/colaboradores.
+                </p>
+              ) : null}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="visita-data">Data da visita</Label>
@@ -1270,6 +1351,12 @@ export function CorujaoTrabalhoTabela() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {v.sessaoId ? `Sessão #${v.sessaoId}` : "Visita avulsa"}
+                      {v.colaboradorId
+                        ? ` · vendido por ${
+                            colaboradores.find((c) => c.id === v.colaboradorId)?.nome ??
+                            `#${v.colaboradorId}`
+                          }`
+                        : " · sem atribuição"}
                       {v.observacoes ? ` · ${v.observacoes}` : ""}
                     </div>
                   </div>

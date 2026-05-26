@@ -238,6 +238,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               kind: "resource",
               keywords: ["sessoes", "corujao", "noite", "vagas", "agenda"],
             }),
+            portalItem({
+              href: "/corujao/colaboradores",
+              label: "Colaboradores",
+              description: "Quem fecha venda do Corujão — base do Método 4",
+              icon: UsersIcon,
+              kind: "resource",
+              keywords: ["colaboradores", "corujao", "vendedor", "metodo 4", "atribuicao"],
+            }),
           ],
         }),
         portalItem({
