@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
+import { MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -201,6 +201,24 @@ export function CorujaoSessoesLista() {
 
   const [deleteTarget, setDeleteTarget] = useState<Sessao | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  type VisitaComContato = { id: number; contatoId: number; formaPagamento: string; amountCents: number; contato: { nome: string | null; telefone: string | null; email: string | null } | null };
+  const [participantesSessao, setParticipantesSessao] = useState<Sessao | null>(null);
+  const [participantes, setParticipantes] = useState<VisitaComContato[]>([]);
+  const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+
+  async function openParticipantes(sessao: Sessao) {
+    setParticipantesSessao(sessao);
+    setLoadingParticipantes(true);
+    try {
+      const res = await clientApi<{ visitas: VisitaComContato[] }>(`/corujao/sessoes/${sessao.id}/visitas`);
+      setParticipantes(res.visitas);
+    } catch {
+      toast.error("Erro ao carregar participantes.");
+    } finally {
+      setLoadingParticipantes(false);
+    }
+  }
 
   async function reload() {
     setLoading(true);
@@ -481,6 +499,10 @@ export function CorujaoSessoesLista() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openParticipantes(sessao)}>
+                            <UsersIcon className="mr-2 h-4 w-4" />
+                            Ver participantes
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEdit(sessao)}>
                             <PencilIcon className="mr-2 h-4 w-4" />
                             Editar
@@ -623,6 +645,48 @@ export function CorujaoSessoesLista() {
               {deleting ? "Apagando…" : "Apagar sessão"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!participantesSessao} onOpenChange={(open) => !open && setParticipantesSessao(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Participantes — {participantesSessao ? formatDataLong(participantesSessao.data) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingParticipantes ? (
+            <div className="flex flex-col gap-2 py-4">
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : participantes.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Nenhum participante nesta sessão.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Pagamento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {participantes.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.contato?.nome ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.contato?.email ?? p.contato?.telefone ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <StatusBadge tone={p.formaPagamento === "gateway" ? "emerald" : p.formaPagamento === "cortesia" ? "muted" : "blue"}>
+                        {p.formaPagamento}
+                      </StatusBadge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </DialogContent>
       </Dialog>
     </div>
