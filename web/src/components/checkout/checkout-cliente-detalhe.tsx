@@ -86,7 +86,7 @@ function getStatusConfig(status: string): { label: string; className: string } {
     case "failed":
       return { label: "Falhou", className: "bg-red-500/15 text-red-400 border-red-500/30" };
     case "refunded":
-      return { label: "Reembolsado", className: "bg-purple-500/15 text-purple-400 border-purple-500/30" };
+      return { label: "Reembolsado", className: "bg-muted/40 text-muted-foreground border-border/60" };
     default:
       return { label: status, className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30" };
   }
@@ -115,7 +115,7 @@ function getSubscriptionStatusConfig(status: string): { label: string; className
 function getBehaviorLabel(cliente: CheckoutClienteSummary): { text: string; tone: string } {
   if (cliente.isVip) return { text: "VIP", tone: "bg-amber-500/15 text-amber-400" };
   if (cliente.orderCount > 1) return { text: "Recompra", tone: "bg-emerald-500/15 text-emerald-400" };
-  return { text: "Novo", tone: "bg-blue-500/15 text-blue-400" };
+  return { text: "Novo", tone: "bg-muted/40 text-muted-foreground" };
 }
 
 interface CheckoutClienteDetalheProps {
