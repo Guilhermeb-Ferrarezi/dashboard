@@ -104,8 +104,8 @@ function KpiCard({
 }) {
   return (
     <div className="rounded-xl border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold mt-2 tabular-nums">{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">{label}</p>
+      <p className="font-heading text-2xl font-semibold tracking-tight mt-2 tabular-nums">{value}</p>
       {hint ? <p className="text-xs text-muted-foreground mt-1">{hint}</p> : null}
     </div>
   );
@@ -185,7 +185,7 @@ export function CorujaoPainel() {
     <div className="flex flex-col gap-[var(--card-gap)]">
       {/* Header com período + chips */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium capitalize">
+        <h2 className="font-heading text-lg font-semibold tracking-tight capitalize">
           {painel?.periodo.label ?? "—"}
         </h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -271,7 +271,7 @@ export function CorujaoPainel() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Colaborador</TableHead>
@@ -321,7 +321,7 @@ export function CorujaoPainel() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>

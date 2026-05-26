@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -333,7 +334,7 @@ export function CorujaoContatosLista() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
@@ -459,18 +460,12 @@ export function CorujaoContatosLista() {
 
             <div className="space-y-1.5">
               <Label htmlFor="contato-origem">Origem</Label>
-              <select
+              <Select
                 id="contato-origem"
                 value={form.origem}
-                onChange={(e) => setForm((f) => ({ ...f, origem: e.target.value as Origem }))}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {ORIGEM_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(value) => setForm((f) => ({ ...f, origem: value as Origem }))}
+                options={ORIGEM_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              />
             </div>
 
             <div className="space-y-1.5">
