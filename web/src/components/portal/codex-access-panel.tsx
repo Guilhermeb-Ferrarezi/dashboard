@@ -265,7 +265,7 @@ function ExpiryBadge({
 
   if (isExpiringSoon) {
     return (
-      <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+      <span className="flex items-center gap-1 text-xs font-medium text-amber-400">
         <TriangleAlertIcon className="size-3.5" />
         Expira {formatDateOnly(expiresAt)}
       </span>
@@ -368,8 +368,8 @@ function TokenRow({
     }
     return (
       <Badge
-        variant="secondary"
-        className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+        variant="outline"
+        className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
       >
         Ativo
       </Badge>
@@ -569,30 +569,36 @@ export function CodexAccessPanel() {
   return (
     <div className="space-y-4">
       {/* ——— Painel de criação ——— */}
-      <div className="rounded-2xl border border-border bg-background p-5 shadow-[0_1px_0_rgba(255,255,255,0.45)]">
+      {/* Card sem rounded-2xl/shadow hardcoded — alinha com restante do
+         projeto (rounded-lg, border-border/60). */}
+      <div className="rounded-lg border border-border/60 bg-background p-4">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold tracking-tight">Acesso por Token</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="font-heading text-sm font-semibold tracking-tight">Acesso por Token</h3>
+          <p className="text-xs text-muted-foreground">
             Crie tokens com escopos e validade controlados.
           </p>
         </div>
 
-        {/* Seletor de modo */}
-        <div className="mt-4 flex flex-wrap gap-2">
+        {/* Seletor de modo Linear-style: ToggleGroup compacto (igual o
+           Modo do tema em Preferências), sem cards verticais com descrição. */}
+        <div className="mt-4 inline-flex rounded-md border border-border/60 bg-muted/40 p-0.5">
           {TOKEN_MODES.map((mode) => {
             const active = activeMode === mode.id;
             return (
-              <Button
+              <button
                 key={mode.id}
                 type="button"
-                variant={active ? "default" : "outline"}
-                size="sm"
                 onClick={() => setActiveMode(mode.id)}
-                className="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                title={mode.description}
+                className={cn(
+                  "h-8 rounded px-3 text-xs font-medium transition-colors",
+                  active
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                <span>{mode.label}</span>
-                <span className="text-[11px] font-normal opacity-80">{mode.description}</span>
-              </Button>
+                {mode.label}
+              </button>
             );
           })}
         </div>
@@ -603,7 +609,7 @@ export function CodexAccessPanel() {
           {/* Nome + botão */}
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
             <label className="grid gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
                 Nome do token
               </span>
               <Input
@@ -614,8 +620,8 @@ export function CodexAccessPanel() {
               />
             </label>
 
-            <Button type="submit" size="lg" disabled={creatingToken}>
-              {creatingToken ? <Spinner size="md" /> : <PlusIcon className="size-4" />}
+            <Button type="submit" size="sm" disabled={creatingToken}>
+              {creatingToken ? <Spinner size="sm" /> : <PlusIcon className="size-4" />}
               {getModeButtonLabel(activeMode)}
             </Button>
           </div>
@@ -637,7 +643,7 @@ export function CodexAccessPanel() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <ShieldIcon className="size-4 text-muted-foreground" />
-              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
                 Permissões
               </span>
             </div>
@@ -692,10 +698,10 @@ export function CodexAccessPanel() {
 
         {/* Token recém-criado */}
         {createdToken ? (
-          <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+          <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/15 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                <p className="text-sm font-semibold text-emerald-400">
                   {getModeTitle(activeMode)} gerado
                 </p>
                 <p className="text-xs text-muted-foreground">
