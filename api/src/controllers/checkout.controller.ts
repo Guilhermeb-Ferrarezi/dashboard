@@ -306,6 +306,22 @@ export async function deleteCliente(req: Request, res: Response) {
     if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
 
     const db = getCheckoutDb();
+
+    const [paidOrder] = await db
+      .select({ id: schema.checkoutOrders.id })
+      .from(schema.checkoutOrders)
+      .where(
+        and(
+          eq(schema.checkoutOrders.userId, userId),
+          eq(schema.checkoutOrders.status, "paid")
+        )
+      )
+      .limit(1);
+
+    if (paidOrder) {
+      return res.status(403).json({ message: "Não é possível remover um cliente com pagamentos confirmados." });
+    }
+
     const [deleted] = await db
       .delete(schema.checkoutCustomers)
       .where(eq(schema.checkoutCustomers.userId, userId))
