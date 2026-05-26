@@ -76,10 +76,10 @@ export function CorujaoProximaSessaoCard({ sessao, loading }: Props) {
     <div className="rounded-xl border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">
             Próximo Corujão
           </p>
-          <h2 className="text-xl font-semibold capitalize">
+          <h2 className="font-heading text-xl font-semibold tracking-tight capitalize">
             {formatDataLong(sessao.data)}
           </h2>
           {sessao.observacoes && (
@@ -98,7 +98,7 @@ export function CorujaoProximaSessaoCard({ sessao, loading }: Props) {
       <div className="mt-5 flex items-end justify-between gap-4">
         <div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-semibold tabular-nums">
+            <span className="font-heading text-3xl font-semibold tracking-tight tabular-nums">
               {sessao.vagasVendidas}
             </span>
             <span className="text-lg text-muted-foreground">/ {sessao.totalVagas}</span>
