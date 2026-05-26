@@ -1,4 +1,7 @@
+import { relations } from "drizzle-orm";
 import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+
+// ── Checkout ──────────────────────────────────────────────────────────────────
 
 export const checkoutProducts = pgTable("checkout_products", {
   id: serial("id").primaryKey(),
@@ -76,40 +79,6 @@ export const checkoutSubscriptions = pgTable("checkout_subscriptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
 
-// ── Corujão ───────────────────────────────────────────────────────────────────
-
-export const corujaoClientes = pgTable("corujao_clientes", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  instagram: text("instagram"),
-  active: boolean("active").notNull().default(true),
-  respondeu: boolean("respondeu").notNull().default(false),
-  jaVeio: boolean("ja_veio").notNull().default(false),
-  ultimaVisita: date("ultima_visita"),
-  confirmouData: date("confirmou_data"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
-
-export const corujaoSessoes = pgTable("corujao_sessoes", {
-  id: serial("id").primaryKey(),
-  date: date("date").notNull(),
-  title: text("title"),
-  status: text("status", { enum: ["planned", "done", "cancelled"] }).notNull().default("planned"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
-
-export const corujaoPresencas = pgTable("corujao_presencas", {
-  id: serial("id").primaryKey(),
-  clienteId: integer("cliente_id").notNull().references(() => corujaoClientes.id, { onDelete: "cascade" }),
-  sessaoId: integer("sessao_id").notNull().references(() => corujaoSessoes.id, { onDelete: "cascade" }),
-  status: text("status", { enum: ["pending", "confirmed", "attended", "absent"] }).notNull().default("pending"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-}, (t) => [unique().on(t.clienteId, t.sessaoId)]);
-
 export const checkoutPayments = pgTable("checkout_payments", {
   id: serial("id").primaryKey(),
   orderId: integer("order_id")
@@ -121,3 +90,180 @@ export const checkoutPayments = pgTable("checkout_payments", {
   rawEvent: jsonb("raw_event"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
+
+// ── Colaboradores (cache local de Users do Mongo para permitir JOIN em SQL) ───
+
+export const colaboradores = pgTable("colaboradores", {
+  id: serial("id").primaryKey(),
+  mongoId: text("mongo_id").notNull().unique(),
+  nome: text("nome").notNull(),
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+// ── Corujão ───────────────────────────────────────────────────────────────────
+
+export const corujaoSessoes = pgTable("corujao_sessoes", {
+  id: serial("id").primaryKey(),
+  data: date("data").notNull(),
+  totalVagas: integer("total_vagas").notNull().default(10),
+  status: text("status", {
+    enum: ["planejado", "aberto", "lotado", "realizado", "cancelado"]
+  }).notNull().default("planejado"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const corujaoContatos = pgTable("corujao_contatos", {
+  id: serial("id").primaryKey(),
+  nome: text("nome"),
+  telefone: text("telefone"),
+  email: text("email"),
+  dataNascimento: date("data_nascimento", { mode: "string" }),
+  origem: text("origem", {
+    enum: ["anuncio", "indicacao", "espontaneo", "outro"]
+  }).notNull().default("espontaneo"),
+  jaParticipou: boolean("ja_participou").notNull().default(false),
+  checkoutUserId: integer("checkout_user_id")
+    .references(() => checkoutCustomers.userId, { onDelete: "set null" }),
+  observacoes: text("observacoes"),
+  ultimoContatoEm: timestamp("ultimo_contato_em", { withTimezone: true }),
+  statusConversa: text("status_conversa", {
+    enum: ["sem_resposta", "aguardando", "confirmou", "recusou"]
+  }),
+  statusPagamento: text("status_pagamento", {
+    enum: ["pendente", "confirmou_pagou", "confirmou_nao_pagou", "paga_na_hora"]
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+}, (t) => [unique().on(t.telefone)]);
+
+export const corujaoVisitas = pgTable("corujao_visitas", {
+  id: serial("id").primaryKey(),
+  contatoId: integer("contato_id")
+    .notNull()
+    .references(() => corujaoContatos.id, { onDelete: "cascade" }),
+  sessaoId: integer("sessao_id")
+    .references(() => corujaoSessoes.id, { onDelete: "set null" }),
+  dataVisita: date("data_visita").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  formaPagamento: text("forma_pagamento", {
+    enum: ["pix", "dinheiro", "cartao", "gateway", "cortesia", "outro"]
+  }).notNull().default("pix"),
+  checkoutOrderId: integer("checkout_order_id")
+    .references(() => checkoutOrders.id, { onDelete: "set null" }),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const corujaoContatoLog = pgTable("corujao_contato_log", {
+  id: serial("id").primaryKey(),
+  contatoId: integer("contato_id")
+    .notNull()
+    .references(() => corujaoContatos.id, { onDelete: "cascade" }),
+  colaboradorId: integer("colaborador_id")
+    .notNull()
+    .references(() => colaboradores.id, { onDelete: "restrict" }),
+  contatadoEm: timestamp("contatado_em", { withTimezone: true }).defaultNow().notNull(),
+  status: text("status", {
+    enum: ["sem_resposta", "resposta_positiva", "pronto_para_pagar", "fechado", "recusou"]
+  }).notNull(),
+  mensagem: text("mensagem"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const corujaoVendas = pgTable("corujao_vendas", {
+  id: serial("id").primaryKey(),
+  contatoId: integer("contato_id")
+    .notNull()
+    .references(() => corujaoContatos.id, { onDelete: "restrict" }),
+  colaboradorId: integer("colaborador_id")
+    .notNull()
+    .references(() => colaboradores.id, { onDelete: "restrict" }),
+  visitaId: integer("visita_id")
+    .references(() => corujaoVisitas.id, { onDelete: "set null" }),
+  sessaoId: integer("sessao_id")
+    .references(() => corujaoSessoes.id, { onDelete: "set null" }),
+  amountCents: integer("amount_cents").notNull(),
+  formaPagamento: text("forma_pagamento", {
+    enum: ["pix", "dinheiro", "cartao", "gateway", "cortesia", "outro"]
+  }).notNull(),
+  vendidoEm: timestamp("vendido_em", { withTimezone: true }).defaultNow().notNull(),
+  gatewayPaymentId: text("gateway_payment_id"),
+  statusPagamento: text("status_pagamento", {
+    enum: ["pago", "pendente", "estornado", "falhou"]
+  }).notNull().default("pago"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+// ── Relations ─────────────────────────────────────────────────────────────────
+
+export const colaboradoresRelations = relations(colaboradores, ({ many }) => ({
+  contatoLog: many(corujaoContatoLog),
+  vendas: many(corujaoVendas)
+}));
+
+export const corujaoSessoesRelations = relations(corujaoSessoes, ({ many }) => ({
+  visitas: many(corujaoVisitas),
+  vendas: many(corujaoVendas)
+}));
+
+export const corujaoContatosRelations = relations(corujaoContatos, ({ one, many }) => ({
+  checkoutCustomer: one(checkoutCustomers, {
+    fields: [corujaoContatos.checkoutUserId],
+    references: [checkoutCustomers.userId]
+  }),
+  visitas: many(corujaoVisitas),
+  contatoLog: many(corujaoContatoLog),
+  vendas: many(corujaoVendas)
+}));
+
+export const corujaoVisitasRelations = relations(corujaoVisitas, ({ one, many }) => ({
+  contato: one(corujaoContatos, {
+    fields: [corujaoVisitas.contatoId],
+    references: [corujaoContatos.id]
+  }),
+  sessao: one(corujaoSessoes, {
+    fields: [corujaoVisitas.sessaoId],
+    references: [corujaoSessoes.id]
+  }),
+  checkoutOrder: one(checkoutOrders, {
+    fields: [corujaoVisitas.checkoutOrderId],
+    references: [checkoutOrders.id]
+  }),
+  vendas: many(corujaoVendas)
+}));
+
+export const corujaoContatoLogRelations = relations(corujaoContatoLog, ({ one }) => ({
+  contato: one(corujaoContatos, {
+    fields: [corujaoContatoLog.contatoId],
+    references: [corujaoContatos.id]
+  }),
+  colaborador: one(colaboradores, {
+    fields: [corujaoContatoLog.colaboradorId],
+    references: [colaboradores.id]
+  })
+}));
+
+export const corujaoVendasRelations = relations(corujaoVendas, ({ one }) => ({
+  contato: one(corujaoContatos, {
+    fields: [corujaoVendas.contatoId],
+    references: [corujaoContatos.id]
+  }),
+  colaborador: one(colaboradores, {
+    fields: [corujaoVendas.colaboradorId],
+    references: [colaboradores.id]
+  }),
+  visita: one(corujaoVisitas, {
+    fields: [corujaoVendas.visitaId],
+    references: [corujaoVisitas.id]
+  }),
+  sessao: one(corujaoSessoes, {
+    fields: [corujaoVendas.sessaoId],
+    references: [corujaoSessoes.id]
+  })
+}));
