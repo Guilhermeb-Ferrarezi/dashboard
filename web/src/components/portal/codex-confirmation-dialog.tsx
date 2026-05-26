@@ -1,6 +1,6 @@
 "use client";
 
-import { WarningCircle } from "@phosphor-icons/react";
+import { AlertCircleIcon } from "@/components/ui/icons";
 
 import {
   Dialog,
@@ -35,7 +35,7 @@ export function CodexConfirmationDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/12 text-amber-300">
-              <WarningCircle className="size-5" />
+              <AlertCircleIcon className="size-5" />
             </div>
             <div>
               <DialogTitle>Confirmar ação do agente</DialogTitle>
