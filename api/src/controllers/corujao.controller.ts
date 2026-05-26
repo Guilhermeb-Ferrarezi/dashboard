@@ -1,45 +1,97 @@
-import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
 
-function serializeCliente(row: typeof schema.corujaoClientes.$inferSelect) {
+const ORIGENS_VALIDAS = ["anuncio", "indicacao", "espontaneo", "outro"] as const;
+type Origem = (typeof ORIGENS_VALIDAS)[number];
+
+const STATUS_CONVERSA_VALIDOS = ["sem_resposta", "aguardando", "confirmou", "recusou"] as const;
+type StatusConversa = (typeof STATUS_CONVERSA_VALIDOS)[number];
+
+const STATUS_PAGAMENTO_VALIDOS = [
+  "pendente",
+  "confirmou_pagou",
+  "confirmou_nao_pagou",
+  "paga_na_hora"
+] as const;
+type StatusPagamento = (typeof STATUS_PAGAMENTO_VALIDOS)[number];
+
+type ParsedBirth =
+  | { ok: true; value: string | null }
+  | { ok: false; error: string };
+
+type ParsedStatus<T> = { ok: true; value: T | null } | { ok: false; error: string };
+
+// Aceita: undefined/null/"" → null. String "YYYY-MM-DD" válida e não-futura → mesma string.
+// Hoje é permitido (margem de fuso); só amanhã+ rejeita.
+export function parseOptionalBirthDate(input: unknown): ParsedBirth {
+  if (input === undefined || input === null || input === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof input !== "string") {
+    return { ok: false, error: "Data de nascimento inválida." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return { ok: false, error: "Data de nascimento inválida." };
+  }
+  const parsed = new Date(`${input}T00:00:00`);
+  if (isNaN(parsed.getTime())) {
+    return { ok: false, error: "Data de nascimento inválida." };
+  }
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (parsed.getTime() > today.getTime()) {
+    return { ok: false, error: "Data de nascimento não pode ser no futuro." };
+  }
+  return { ok: true, value: input };
+}
+
+// Aceita: undefined/null/"" → null. Valor do enum → mesmo valor.
+export function parseStatusConversa(input: unknown): ParsedStatus<StatusConversa> {
+  if (input === undefined || input === null || input === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof input !== "string" || !STATUS_CONVERSA_VALIDOS.includes(input as StatusConversa)) {
+    return { ok: false, error: "Status de conversa inválido." };
+  }
+  return { ok: true, value: input as StatusConversa };
+}
+
+// Aceita: undefined/null/"" → null. Valor do enum → mesmo valor.
+export function parseStatusPagamento(input: unknown): ParsedStatus<StatusPagamento> {
+  if (input === undefined || input === null || input === "") {
+    return { ok: true, value: null };
+  }
+  if (
+    typeof input !== "string" ||
+    !STATUS_PAGAMENTO_VALIDOS.includes(input as StatusPagamento)
+  ) {
+    return { ok: false, error: "Status de pagamento inválido." };
+  }
+  return { ok: true, value: input as StatusPagamento };
+}
+
+function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
   return {
     id: row.id,
-    name: row.name,
-    phone: row.phone ?? null,
-    instagram: row.instagram ?? null,
-    active: row.active,
-    respondeu: row.respondeu,
-    jaVeio: row.jaVeio,
-    ultimaVisita: row.ultimaVisita ?? null,
-    confirmouData: row.confirmouData ?? null,
-    createdAt: row.createdAt.toISOString()
+    nome: row.nome ?? null,
+    telefone: row.telefone ?? null,
+    email: row.email ?? null,
+    dataNascimento: row.dataNascimento ?? null,
+    origem: row.origem,
+    jaParticipou: row.jaParticipou,
+    checkoutUserId: row.checkoutUserId ?? null,
+    observacoes: row.observacoes ?? null,
+    ultimoContatoEm: row.ultimoContatoEm ? row.ultimoContatoEm.toISOString() : null,
+    statusConversa: row.statusConversa ?? null,
+    statusPagamento: row.statusPagamento ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
   };
 }
 
-function serializeSessao(row: typeof schema.corujaoSessoes.$inferSelect & {
-  confirmados?: number;
-  presentes?: number;
-  pendentes?: number;
-  totalClientes?: number;
-}) {
-  return {
-    id: row.id,
-    date: row.date,
-    title: row.title ?? null,
-    status: row.status,
-    confirmados: row.confirmados ?? 0,
-    presentes: row.presentes ?? 0,
-    pendentes: row.pendentes ?? 0,
-    totalClientes: row.totalClientes ?? 0,
-    createdAt: row.createdAt.toISOString()
-  };
-}
-
-// ── Clientes ──────────────────────────────────────────────────────────────────
-
-export async function listCorujaoClientes(req: Request, res: Response) {
+export async function listContatos(req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -47,18 +99,80 @@ export async function listCorujaoClientes(req: Request, res: Response) {
     const offset = (page - 1) * limit;
     const q = String(req.query.q || "").trim();
 
-    const searchFilter = q
-      ? or(
-          ilike(schema.corujaoClientes.name, `%${q}%`),
-          ilike(schema.corujaoClientes.phone, `%${q}%`),
-          ilike(schema.corujaoClientes.instagram, `%${q}%`)
-        )
-      : undefined;
+    let statusConversaFilter: StatusConversa | undefined;
+    if (req.query.statusConversa !== undefined && req.query.statusConversa !== "") {
+      const raw = req.query.statusConversa;
+      if (
+        typeof raw !== "string" ||
+        !STATUS_CONVERSA_VALIDOS.includes(raw as StatusConversa)
+      ) {
+        return res.status(400).json({ message: "Status de conversa inválido." });
+      }
+      statusConversaFilter = raw as StatusConversa;
+    }
 
-    const [[totalRow], clientes] = await Promise.all([
-      db.select({ value: count() }).from(schema.corujaoClientes).where(searchFilter),
-      db.select().from(schema.corujaoClientes).where(searchFilter)
-        .orderBy(desc(schema.corujaoClientes.createdAt))
+    let statusPagamentoFilter: StatusPagamento | undefined;
+    if (req.query.statusPagamento !== undefined && req.query.statusPagamento !== "") {
+      const raw = req.query.statusPagamento;
+      if (
+        typeof raw !== "string" ||
+        !STATUS_PAGAMENTO_VALIDOS.includes(raw as StatusPagamento)
+      ) {
+        return res.status(400).json({ message: "Status de pagamento inválido." });
+      }
+      statusPagamentoFilter = raw as StatusPagamento;
+    }
+
+    let jaParticipouFilter: boolean | undefined;
+    if (req.query.jaParticipou !== undefined && req.query.jaParticipou !== "") {
+      const raw = String(req.query.jaParticipou);
+      if (raw !== "true" && raw !== "false") {
+        return res.status(400).json({ message: "Filtro jaParticipou deve ser true ou false." });
+      }
+      jaParticipouFilter = raw === "true";
+    }
+
+    const sortBy = req.query.sortBy === "recente" ? "recente" : "prioridade";
+
+    const conditions: SQL[] = [];
+    if (q) {
+      conditions.push(
+        or(
+          ilike(schema.corujaoContatos.nome, `%${q}%`),
+          ilike(schema.corujaoContatos.telefone, `%${q}%`),
+          ilike(schema.corujaoContatos.email, `%${q}%`)
+        )!
+      );
+    }
+    if (statusConversaFilter) {
+      conditions.push(eq(schema.corujaoContatos.statusConversa, statusConversaFilter));
+    }
+    if (statusPagamentoFilter) {
+      conditions.push(eq(schema.corujaoContatos.statusPagamento, statusPagamentoFilter));
+    }
+    if (jaParticipouFilter !== undefined) {
+      conditions.push(eq(schema.corujaoContatos.jaParticipou, jaParticipouFilter));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // prioridade (default): quem nunca foi contatado vem primeiro (NULLS FIRST),
+    // depois quem foi contatado há mais tempo. Desempate por created_at desc.
+    const orderByClause =
+      sortBy === "recente"
+        ? [desc(schema.corujaoContatos.createdAt)]
+        : [
+            sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
+            desc(schema.corujaoContatos.createdAt)
+          ];
+
+    const [[totalRow], contatos] = await Promise.all([
+      db.select({ value: count() }).from(schema.corujaoContatos).where(whereClause),
+      db
+        .select()
+        .from(schema.corujaoContatos)
+        .where(whereClause)
+        .orderBy(...orderByClause)
         .limit(limit)
         .offset(offset)
     ]);
@@ -66,426 +180,176 @@ export async function listCorujaoClientes(req: Request, res: Response) {
     const total = totalRow?.value ?? 0;
 
     return res.json({
-      clientes: clientes.map(serializeCliente),
+      contatos: contatos.map(serializeContato),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
     });
   } catch (error) {
-    console.error("[corujao] listClientes error:", error);
-    return res.status(500).json({ message: "Erro ao listar clientes." });
+    console.error("[corujao] listContatos error:", error);
+    return res.status(500).json({ message: "Erro ao listar contatos." });
   }
 }
 
-export async function createCorujaoCliente(req: Request, res: Response) {
+export async function createContato(req: Request, res: Response) {
   try {
-    const { name, phone, instagram, respondeu, jaVeio, ultimaVisita, confirmouData } = req.body as {
-      name?: string;
-      phone?: string;
-      instagram?: string;
-      respondeu?: boolean;
-      jaVeio?: boolean;
-      ultimaVisita?: string | null;
-      confirmouData?: string | null;
+    const { nome, telefone, email, origem, observacoes, dataNascimento } = req.body as {
+      nome?: string | null;
+      telefone?: string;
+      email?: string | null;
+      origem?: string;
+      observacoes?: string | null;
+      dataNascimento?: string | null;
     };
 
-    if (!name?.trim()) return res.status(400).json({ message: "Nome é obrigatório." });
-
-    const db = getCheckoutDb();
-    const [cliente] = await db
-      .insert(schema.corujaoClientes)
-      .values({
-        name: name.trim(),
-        phone: phone?.trim() || null,
-        instagram: instagram?.trim().replace(/^@/, "") || null,
-        respondeu: Boolean(respondeu),
-        jaVeio: Boolean(jaVeio),
-        ultimaVisita: ultimaVisita || null,
-        confirmouData: confirmouData || null
-      })
-      .returning();
-
-    return res.status(201).json({ cliente: serializeCliente(cliente!) });
-  } catch (error) {
-    console.error("[corujao] createCliente error:", error);
-    return res.status(500).json({ message: "Erro ao criar cliente." });
-  }
-}
-
-export async function updateCorujaoCliente(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
-
-    const { name, phone, instagram, active, respondeu, jaVeio, ultimaVisita, confirmouData } = req.body as {
-      name?: string;
-      phone?: string | null;
-      instagram?: string | null;
-      active?: unknown;
-      respondeu?: unknown;
-      jaVeio?: unknown;
-      ultimaVisita?: string | null;
-      confirmouData?: string | null;
-    };
-
-    const updates: Partial<typeof schema.corujaoClientes.$inferInsert> = { updatedAt: new Date() };
-    if (name !== undefined) updates.name = name.trim();
-    if (phone !== undefined) updates.phone = phone?.trim() || null;
-    if (instagram !== undefined) updates.instagram = instagram?.trim().replace(/^@/, "") || null;
-    if (active !== undefined) updates.active = Boolean(active);
-    if (respondeu !== undefined) updates.respondeu = Boolean(respondeu);
-    if (jaVeio !== undefined) updates.jaVeio = Boolean(jaVeio);
-    if (ultimaVisita !== undefined) updates.ultimaVisita = ultimaVisita || null;
-    if (confirmouData !== undefined) updates.confirmouData = confirmouData || null;
-
-    const db = getCheckoutDb();
-    const [cliente] = await db
-      .update(schema.corujaoClientes)
-      .set(updates)
-      .where(eq(schema.corujaoClientes.id, id))
-      .returning();
-
-    if (!cliente) return res.status(404).json({ message: "Cliente não encontrado." });
-
-    return res.json({ cliente: serializeCliente(cliente) });
-  } catch (error) {
-    console.error("[corujao] updateCliente error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar cliente." });
-  }
-}
-
-export async function deleteCorujaoCliente(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
-
-    const db = getCheckoutDb();
-    const [deleted] = await db
-      .delete(schema.corujaoClientes)
-      .where(eq(schema.corujaoClientes.id, id))
-      .returning();
-
-    if (!deleted) return res.status(404).json({ message: "Cliente não encontrado." });
-
-    return res.json({ message: "Cliente removido." });
-  } catch (error) {
-    console.error("[corujao] deleteCliente error:", error);
-    return res.status(500).json({ message: "Erro ao remover cliente." });
-  }
-}
-
-// ── Sessões ───────────────────────────────────────────────────────────────────
-
-export async function listCorujaoSessoes(_req: Request, res: Response) {
-  try {
-    const db = getCheckoutDb();
-    const sessoes = await db
-      .select()
-      .from(schema.corujaoSessoes)
-      .orderBy(desc(schema.corujaoSessoes.date));
-
-    if (sessoes.length === 0) return res.json({ sessoes: [] });
-
-    const ids = sessoes.map((s) => s.id);
-
-    const statsRows = await db.execute<{
-      sessao_id: number;
-      confirmados: number;
-      presentes: number;
-      pendentes: number;
-    }>(sql`
-      SELECT
-        p.sessao_id,
-        COUNT(CASE WHEN p.status = 'confirmed' THEN 1 END)::int AS confirmados,
-        COUNT(CASE WHEN p.status = 'attended' THEN 1 END)::int AS presentes,
-        COUNT(CASE WHEN p.status = 'pending' THEN 1 END)::int AS pendentes
-      FROM corujao_presencas p
-      WHERE p.sessao_id = ANY(${sql.raw(`ARRAY[${ids.join(",")}]`)})
-      GROUP BY p.sessao_id
-    `);
-
-    const [totalClientesRow] = await db
-      .select({ value: count() })
-      .from(schema.corujaoClientes)
-      .where(eq(schema.corujaoClientes.active, true));
-
-    const totalClientes = totalClientesRow?.value ?? 0;
-    const statsMap = new Map(Array.from(statsRows).map((r) => [r.sessao_id, r]));
-
-    return res.json({
-      sessoes: sessoes.map((s) => {
-        const st = statsMap.get(s.id);
-        return serializeSessao({ ...s, confirmados: st?.confirmados ?? 0, presentes: st?.presentes ?? 0, pendentes: st?.pendentes ?? 0, totalClientes });
-      })
-    });
-  } catch (error) {
-    console.error("[corujao] listSessoes error:", error);
-    return res.status(500).json({ message: "Erro ao listar sessões." });
-  }
-}
-
-export async function createCorujaoSessao(req: Request, res: Response) {
-  try {
-    const { date, title, status, clienteIds } = req.body as {
-      date?: string;
-      title?: string;
-      status?: string;
-      clienteIds?: number[];
-    };
-
-    if (!date?.trim()) return res.status(400).json({ message: "Data é obrigatória." });
-
-    const db = getCheckoutDb();
-    const [sessao] = await db
-      .insert(schema.corujaoSessoes)
-      .values({
-        date: date.trim(),
-        title: title?.trim() || null,
-        status: (status as "planned" | "done" | "cancelled") || "planned"
-      })
-      .returning();
-
-    if (clienteIds && clienteIds.length > 0 && sessao) {
-      await db.insert(schema.corujaoPresencas).values(
-        clienteIds.map((cId) => ({ clienteId: cId, sessaoId: sessao.id, status: "pending" as const }))
-      ).onConflictDoNothing();
+    if (!telefone?.trim()) {
+      return res.status(400).json({ message: "Telefone é obrigatório." });
     }
 
-    return res.status(201).json({ sessao: serializeSessao(sessao!) });
-  } catch (error) {
-    console.error("[corujao] createSessao error:", error);
-    return res.status(500).json({ message: "Erro ao criar sessão." });
-  }
-}
-
-export async function updateCorujaoSessao(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
-
-    const { date, title, status, clienteIds } = req.body as {
-      date?: string;
-      title?: string | null;
-      status?: string;
-      clienteIds?: number[];
-    };
-
-    const updates: Partial<typeof schema.corujaoSessoes.$inferInsert> = { updatedAt: new Date() };
-    if (date !== undefined) updates.date = date.trim();
-    if (title !== undefined) updates.title = title?.trim() || null;
-    if (status !== undefined) updates.status = status as "planned" | "done" | "cancelled";
-
-    const db = getCheckoutDb();
-    const [sessao] = await db
-      .update(schema.corujaoSessoes)
-      .set(updates)
-      .where(eq(schema.corujaoSessoes.id, id))
-      .returning();
-
-    if (!sessao) return res.status(404).json({ message: "Sessão não encontrada." });
-
-    // Sincronizar clientes: remove quem saiu, adiciona quem entrou (mantém status existente)
-    if (clienteIds !== undefined) {
-      const existing = await db
-        .select({ clienteId: schema.corujaoPresencas.clienteId })
-        .from(schema.corujaoPresencas)
-        .where(eq(schema.corujaoPresencas.sessaoId, id));
-      const existingIds = new Set(existing.map((e) => e.clienteId));
-      const newIds = new Set(clienteIds);
-
-      const toRemove = [...existingIds].filter((cId) => !newIds.has(cId));
-      const toAdd = [...newIds].filter((cId) => !existingIds.has(cId));
-
-      if (toRemove.length > 0) {
-        await db.delete(schema.corujaoPresencas).where(
-          and(eq(schema.corujaoPresencas.sessaoId, id), sql`${schema.corujaoPresencas.clienteId} = ANY(${sql.raw(`ARRAY[${toRemove.join(",")}]`)})`)
-        );
+    let origemVal: Origem = "espontaneo";
+    if (origem !== undefined && origem !== null && origem !== "") {
+      if (!ORIGENS_VALIDAS.includes(origem as Origem)) {
+        return res.status(400).json({ message: "Origem inválida." });
       }
-      if (toAdd.length > 0) {
-        await db.insert(schema.corujaoPresencas).values(
-          toAdd.map((cId) => ({ clienteId: cId, sessaoId: id, status: "pending" as const }))
-        ).onConflictDoNothing();
-      }
+      origemVal = origem as Origem;
     }
 
-    return res.json({ sessao: serializeSessao(sessao) });
-  } catch (error) {
-    console.error("[corujao] updateSessao error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar sessão." });
-  }
-}
-
-export async function deleteCorujaoSessao(req: Request, res: Response) {
-  try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const birth = parseOptionalBirthDate(dataNascimento);
+    if (!birth.ok) return res.status(400).json({ message: birth.error });
 
     const db = getCheckoutDb();
-    const [deleted] = await db
-      .delete(schema.corujaoSessoes)
-      .where(eq(schema.corujaoSessoes.id, id))
-      .returning();
-
-    if (!deleted) return res.status(404).json({ message: "Sessão não encontrada." });
-
-    return res.json({ message: "Sessão removida." });
-  } catch (error) {
-    console.error("[corujao] deleteSessao error:", error);
-    return res.status(500).json({ message: "Erro ao remover sessão." });
-  }
-}
-
-// ── Presenças ─────────────────────────────────────────────────────────────────
-
-export async function getSessaoPresencas(req: Request, res: Response) {
-  try {
-    const sessaoId = Number(req.params.id);
-    if (isNaN(sessaoId)) return res.status(400).json({ message: "ID inválido." });
-
-    const db = getCheckoutDb();
-    const rows = await db.execute<{
-      id: number;
-      name: string;
-      phone: string | null;
-      instagram: string | null;
-      status: string;
-    }>(sql`
-      SELECT
-        c.id,
-        c.name,
-        c.phone,
-        c.instagram,
-        p.status
-      FROM corujao_presencas p
-      JOIN corujao_clientes c ON c.id = p.cliente_id
-      WHERE p.sessao_id = ${sessaoId}
-      ORDER BY c.name ASC
-    `);
-
-    return res.json({
-      presencas: Array.from(rows).map((r) => ({
-        clienteId: r.id,
-        clienteName: r.name,
-        clientePhone: r.phone ?? null,
-        clienteInstagram: r.instagram ?? null,
-        status: r.status
-      }))
-    });
-  } catch (error) {
-    console.error("[corujao] getSessaoPresencas error:", error);
-    return res.status(500).json({ message: "Erro ao buscar presenças." });
-  }
-}
-
-export async function upsertPresenca(req: Request, res: Response) {
-  try {
-    const sessaoId = Number(req.params.sessaoId);
-    const clienteId = Number(req.params.clienteId);
-    if (isNaN(sessaoId) || isNaN(clienteId)) return res.status(400).json({ message: "IDs inválidos." });
-
-    const { status } = req.body as { status?: string };
-    const validStatuses = ["pending", "confirmed", "attended", "absent"];
-    if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({ message: "Status inválido." });
-    }
-
-    const db = getCheckoutDb();
-    const [presenca] = await db
-      .insert(schema.corujaoPresencas)
-      .values({ clienteId, sessaoId, status: status as "pending" | "confirmed" | "attended" | "absent" })
-      .onConflictDoUpdate({
-        target: [schema.corujaoPresencas.clienteId, schema.corujaoPresencas.sessaoId],
-        set: { status: status as "pending" | "confirmed" | "attended" | "absent", updatedAt: new Date() }
+    const [contato] = await db
+      .insert(schema.corujaoContatos)
+      .values({
+        nome: nome?.trim() || null,
+        telefone: telefone.trim(),
+        email: email?.trim() || null,
+        dataNascimento: birth.value,
+        origem: origemVal,
+        observacoes: observacoes?.trim() || null
       })
       .returning();
 
-    return res.json({ presenca: { id: presenca!.id, clienteId, sessaoId, status: presenca!.status } });
-  } catch (error) {
-    console.error("[corujao] upsertPresenca error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar presença." });
+    return res.status(201).json({ contato: serializeContato(contato!) });
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "23505") {
+      return res
+        .status(409)
+        .json({ message: "Já existe um contato com esse telefone. Busque por ele na lista." });
+    }
+    console.error("[corujao] createContato error:", error);
+    return res.status(500).json({ message: "Erro ao criar contato." });
   }
 }
 
-export async function removePresenca(req: Request, res: Response) {
-  try {
-    const sessaoId = Number(req.params.sessaoId);
-    const clienteId = Number(req.params.clienteId);
-    if (isNaN(sessaoId) || isNaN(clienteId)) return res.status(400).json({ message: "ID inválido." });
-
-    const db = getCheckoutDb();
-    await db.delete(schema.corujaoPresencas).where(
-      and(eq(schema.corujaoPresencas.sessaoId, sessaoId), eq(schema.corujaoPresencas.clienteId, clienteId))
-    );
-
-    return res.json({ message: "Cliente removido da sessão." });
-  } catch (error) {
-    console.error("[corujao] removePresenca error:", error);
-    return res.status(500).json({ message: "Erro ao remover presença." });
-  }
-}
-
-// ── Stats gerais ──────────────────────────────────────────────────────────────
-
-export async function getCorujaoStats(_req: Request, res: Response) {
-  try {
-    const db = getCheckoutDb();
-
-    const [[totalClientes], [totalAtivos], [totalSessoes], [jaVieram]] = await Promise.all([
-      db.select({ value: count() }).from(schema.corujaoClientes),
-      db.select({ value: count() }).from(schema.corujaoClientes).where(eq(schema.corujaoClientes.active, true)),
-      db.select({ value: count() }).from(schema.corujaoSessoes),
-      db.select({ value: count() }).from(schema.corujaoClientes).where(eq(schema.corujaoClientes.jaVeio, true))
-    ]);
-
-    return res.json({
-      totalClientes: totalClientes?.value ?? 0,
-      totalAtivos: totalAtivos?.value ?? 0,
-      totalSessoes: totalSessoes?.value ?? 0,
-      jaVieram: jaVieram?.value ?? 0
-    });
-  } catch (error) {
-    console.error("[corujao] getStats error:", error);
-    return res.status(500).json({ message: "Erro ao buscar stats." });
-  }
-}
-
-// ── Histórico do cliente ──────────────────────────────────────────────────────
-
-export async function getClienteHistorico(req: Request, res: Response) {
+export async function updateContato(req: Request, res: Response) {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const db = getCheckoutDb();
-    const rows = await db.execute<{
-      sessao_id: number;
-      date: string;
-      title: string | null;
-      sessao_status: string;
-      presenca_status: string;
-    }>(sql`
-      SELECT
-        s.id AS sessao_id,
-        s.date,
-        s.title,
-        s.status AS sessao_status,
-        COALESCE(p.status, 'pending') AS presenca_status
-      FROM corujao_sessoes s
-      LEFT JOIN corujao_presencas p ON p.sessao_id = s.id AND p.cliente_id = ${id}
-      ORDER BY s.date DESC
-    `);
+    const {
+      nome,
+      telefone,
+      email,
+      origem,
+      observacoes,
+      dataNascimento,
+      statusConversa,
+      statusPagamento
+    } = req.body as {
+      nome?: string | null;
+      telefone?: string;
+      email?: string | null;
+      origem?: string;
+      observacoes?: string | null;
+      dataNascimento?: string | null;
+      statusConversa?: string | null;
+      statusPagamento?: string | null;
+    };
 
-    return res.json({
-      historico: Array.from(rows).map((r) => ({
-        sessaoId: r.sessao_id,
-        sessaoDate: r.date,
-        sessaoTitle: r.title ?? null,
-        sessaoStatus: r.sessao_status,
-        presencaStatus: r.presenca_status
-      }))
-    });
-  } catch (error) {
-    console.error("[corujao] getClienteHistorico error:", error);
-    return res.status(500).json({ message: "Erro ao buscar histórico." });
+    const updates: Partial<typeof schema.corujaoContatos.$inferInsert> = {
+      updatedAt: new Date()
+    };
+
+    if (nome !== undefined) {
+      updates.nome = nome?.trim() || null;
+    }
+
+    if (telefone !== undefined) {
+      if (!telefone.trim()) return res.status(400).json({ message: "Telefone é obrigatório." });
+      updates.telefone = telefone.trim();
+    }
+
+    if (email !== undefined) {
+      updates.email = email?.trim() || null;
+    }
+
+    if (dataNascimento !== undefined) {
+      const birth = parseOptionalBirthDate(dataNascimento);
+      if (!birth.ok) return res.status(400).json({ message: birth.error });
+      updates.dataNascimento = birth.value;
+    }
+
+    if (origem !== undefined) {
+      if (!ORIGENS_VALIDAS.includes(origem as Origem)) {
+        return res.status(400).json({ message: "Origem inválida." });
+      }
+      updates.origem = origem as Origem;
+    }
+
+    if (observacoes !== undefined) {
+      updates.observacoes = observacoes?.trim() || null;
+    }
+
+    if (statusConversa !== undefined) {
+      const parsed = parseStatusConversa(statusConversa);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.statusConversa = parsed.value;
+    }
+
+    if (statusPagamento !== undefined) {
+      const parsed = parseStatusPagamento(statusPagamento);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.statusPagamento = parsed.value;
+    }
+
+    const db = getCheckoutDb();
+    const [contato] = await db
+      .update(schema.corujaoContatos)
+      .set(updates)
+      .where(eq(schema.corujaoContatos.id, id))
+      .returning();
+
+    if (!contato) return res.status(404).json({ message: "Contato não encontrado." });
+
+    return res.json({ contato: serializeContato(contato) });
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "23505") {
+      return res
+        .status(409)
+        .json({ message: "Já existe um contato com esse telefone. Busque por ele na lista." });
+    }
+    console.error("[corujao] updateContato error:", error);
+    return res.status(500).json({ message: "Erro ao atualizar contato." });
   }
 }
 
-export { and };
+export async function marcarContato(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+
+    const now = new Date();
+    const db = getCheckoutDb();
+    const [contato] = await db
+      .update(schema.corujaoContatos)
+      .set({ ultimoContatoEm: now, updatedAt: now })
+      .where(eq(schema.corujaoContatos.id, id))
+      .returning();
+
+    if (!contato) return res.status(404).json({ message: "Contato não encontrado." });
+
+    return res.json({ contato: serializeContato(contato) });
+  } catch (error) {
+    console.error("[corujao] marcarContato error:", error);
+    return res.status(500).json({ message: "Erro ao marcar contato." });
+  }
+}
