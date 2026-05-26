@@ -480,14 +480,16 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   )
 }
 
+// Linear-style: hover muito sutil (foreground/5), active sem fundo cheio —
+// só indicador inset 2px à esquerda + texto em foreground pleno + font-medium.
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm text-sidebar-foreground/85 ring-sidebar-ring outline-hidden transition-[background-color,color,border-color,box-shadow] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground data-active:shadow-[inset_2px_0_0_var(--sidebar-primary)] [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 motion-reduce:[&>span:last-child]:transition-none",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[background-color,color,border-color,box-shadow] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-foreground/10 active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-foreground/5 data-open:hover:text-sidebar-foreground data-active:font-medium data-active:text-sidebar-foreground data-active:shadow-[inset_2px_0_0_var(--sidebar-primary)] [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 motion-reduce:[&>span:last-child]:transition-none",
   {
     variants: {
       variant: {
-        default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        default: "hover:bg-sidebar-foreground/5 hover:text-sidebar-foreground",
         outline:
-          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-foreground/5 hover:text-sidebar-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
         default: "h-8 text-sm",
@@ -745,7 +747,8 @@ function SidebarMenuSubButton({
     props: mergeProps<"a">(
       {
         className: cn(
-          "relative flex h-7 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-150 group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-active:shadow-[inset_2px_0_0_var(--sidebar-primary)] [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+          // Linear-style sub-item: hover sutil, active só com indicador inset + texto pleno.
+          "relative flex h-7 w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[background-color,color,box-shadow] duration-150 group-data-[collapsible=icon]:hidden hover:bg-sidebar-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-foreground/10 active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:font-medium data-active:text-sidebar-foreground data-active:shadow-[inset_2px_0_0_var(--sidebar-primary)] [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
           className
         ),
       },
