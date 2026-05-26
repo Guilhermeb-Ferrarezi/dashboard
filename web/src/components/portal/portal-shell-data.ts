@@ -230,6 +230,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               kind: "resource",
               keywords: ["contatos", "leads", "corujao", "prospec"],
             }),
+            portalItem({
+              href: "/corujao/sessoes",
+              label: "Sessões",
+              description: "Noites planejadas do Corujão e contagem de vagas",
+              icon: MoonIcon,
+              kind: "resource",
+              keywords: ["sessoes", "corujao", "noite", "vagas", "agenda"],
+            }),
           ],
         }),
         portalItem({

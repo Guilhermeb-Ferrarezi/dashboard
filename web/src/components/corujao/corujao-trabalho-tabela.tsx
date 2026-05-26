@@ -44,6 +44,20 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/lib/api";
 
+import {
+  CorujaoProximaSessaoCard,
+  type ProximaSessao
+} from "./corujao-proxima-sessao-card";
+
+type SessaoOption = {
+  id: number;
+  data: string;
+  totalVagas: number;
+  status: "planejado" | "aberto" | "lotado" | "realizado" | "cancelado";
+  vagasVendidas: number;
+  vagasRestantes: number;
+};
+
 const PAGE_SIZE = 50;
 
 const ORIGEM_OPTIONS = [
@@ -81,19 +95,28 @@ const FORMA_PAGAMENTO_OPTIONS = [
 type FormaPagamento = (typeof FORMA_PAGAMENTO_OPTIONS)[number]["value"];
 
 type VisitaForm = {
+  sessaoId: string; // "" = sem sessão. Manter como string facilita o <select>.
   dataVisita: string;
   valorInput: string; // "45,00" — mantém o que o usuário digitou
   formaPagamento: FormaPagamento;
   observacoes: string;
 };
 
-function emptyVisitaForm(): VisitaForm {
+function emptyVisitaForm(defaultSessaoId: string = ""): VisitaForm {
   return {
+    sessaoId: defaultSessaoId,
     dataVisita: new Date().toISOString().slice(0, 10),
     valorInput: "",
     formaPagamento: "pix",
     observacoes: ""
   };
+}
+
+function formatSessaoOptionLabel(s: SessaoOption): string {
+  // "2026-05-28" → "28/05"; default sem fuso.
+  const d = new Date(`${s.data}T00:00:00`);
+  const dataFmt = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return `${dataFmt} · ${s.vagasVendidas}/${s.totalVagas}`;
 }
 
 // "45,00" → 4500. "45" → 4500. "45,5" → 4550. "" + cortesia tratado fora.
@@ -293,6 +316,10 @@ export function CorujaoTrabalhoTabela() {
   const [visitaForm, setVisitaForm] = useState<VisitaForm>(emptyVisitaForm());
   const [visitaSubmitting, setVisitaSubmitting] = useState(false);
 
+  const [proximaSessao, setProximaSessao] = useState<ProximaSessao | null>(null);
+  const [proximaLoading, setProximaLoading] = useState(true);
+  const [sessoesFuturas, setSessoesFuturas] = useState<SessaoOption[]>([]);
+
   function handleSearch(value: string) {
     setQuery(value);
     setPage(1);
@@ -326,6 +353,33 @@ export function CorujaoTrabalhoTabela() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedQuery, filterConversa, filterPagamento]);
+
+  async function reloadProximaSessao() {
+    setProximaLoading(true);
+    try {
+      const [proxRes, futRes] = await Promise.all([
+        clientApi<{ sessao: ProximaSessao | null }>(`/corujao/sessoes/proxima`),
+        clientApi<{ sessoes: SessaoOption[] }>(`/corujao/sessoes?futuras=true`)
+      ]);
+      setProximaSessao(proxRes.sessao);
+      // Só sessões abertas/planejadas/lotadas servem pra registrar visita.
+      setSessoesFuturas(
+        futRes.sessoes.filter((s) =>
+          ["planejado", "aberto", "lotado"].includes(s.status)
+        )
+      );
+    } catch {
+      // silencioso — o card mostra "Nenhuma sessão" e o select fica vazio.
+      setProximaSessao(null);
+      setSessoesFuturas([]);
+    } finally {
+      setProximaLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    reloadProximaSessao();
+  }, []);
 
   function openCreate() {
     setEditing(null);
@@ -471,7 +525,9 @@ export function CorujaoTrabalhoTabela() {
 
   function openVisitaDialog(contato: Contato) {
     setVisitaTarget(contato);
-    setVisitaForm(emptyVisitaForm());
+    // Default = próxima sessão futura (se houver), pra acelerar o caso comum.
+    const defaultSessao = proximaSessao ? String(proximaSessao.id) : "";
+    setVisitaForm(emptyVisitaForm(defaultSessao));
     setVisitaDialogOpen(true);
   }
 
@@ -506,12 +562,14 @@ export function CorujaoTrabalhoTabela() {
 
     setVisitaSubmitting(true);
     try {
+      const sessaoIdNum = visitaForm.sessaoId ? Number(visitaForm.sessaoId) : null;
       const res = await clientApi<{ visita: unknown; contato: Contato }>(
         `/corujao/visitas`,
         {
           method: "POST",
           body: JSON.stringify({
             contatoId: visitaTarget.id,
+            sessaoId: sessaoIdNum,
             dataVisita: visitaForm.dataVisita,
             amountCents,
             formaPagamento: visitaForm.formaPagamento,
@@ -521,6 +579,15 @@ export function CorujaoTrabalhoTabela() {
       );
       // Atualiza só a linha local — ja_participou vem true do backend.
       setContatos((cur) => cur.map((c) => (c.id === res.contato.id ? res.contato : c)));
+      // Decrementa vagas localmente quando a visita amarrou na próxima sessão.
+      if (sessaoIdNum !== null && proximaSessao && proximaSessao.id === sessaoIdNum) {
+        const vendidas = proximaSessao.vagasVendidas + 1;
+        setProximaSessao({
+          ...proximaSessao,
+          vagasVendidas: vendidas,
+          vagasRestantes: Math.max(0, proximaSessao.totalVagas - vendidas)
+        });
+      }
       toast.success("Visita registrada. Contato marcado como participou.");
       setVisitaDialogOpen(false);
       setVisitaTarget(null);
@@ -538,6 +605,8 @@ export function CorujaoTrabalhoTabela() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CorujaoProximaSessaoCard sessao={proximaSessao} loading={proximaLoading} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Input
@@ -953,6 +1022,36 @@ export function CorujaoTrabalhoTabela() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleVisitaSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="visita-sessao">Sessão do Corujão</Label>
+              <select
+                id="visita-sessao"
+                value={visitaForm.sessaoId}
+                onChange={(e) =>
+                  setVisitaForm((f) => ({ ...f, sessaoId: e.target.value }))
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {sessoesFuturas.length === 0 ? (
+                  <option value="">— sem sessão (avulsa)</option>
+                ) : (
+                  <>
+                    {sessoesFuturas.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {formatSessaoOptionLabel(s)}
+                      </option>
+                    ))}
+                    <option value="">— sem sessão (avulsa)</option>
+                  </>
+                )}
+              </select>
+              {sessoesFuturas.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma sessão futura cadastrada — visita vai ficar como avulsa.
+                </p>
+              ) : null}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="visita-data">Data da visita</Label>
