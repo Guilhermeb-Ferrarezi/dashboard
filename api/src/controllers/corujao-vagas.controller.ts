@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray } from "drizzle-orm";
 import type { Request, Response } from "express";
 import { getCheckoutDb, schema } from "../db/index";
 import { addClient, broadcast, getVagasPayload } from "../lib/vagas-sse";
@@ -37,22 +37,6 @@ export async function descontarVaga(req: Request, res: Response) {
     const db = getCheckoutDb();
     const today = new Date().toISOString().slice(0, 10);
 
-    const [sessao] = await db
-      .select()
-      .from(schema.corujaoSessoes)
-      .where(
-        and(
-          gte(schema.corujaoSessoes.data, today),
-          inArray(schema.corujaoSessoes.status, ["planejado", "aberto"])
-        )
-      )
-      .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id))
-      .limit(1);
-
-    if (!sessao) {
-      return res.status(404).json({ message: "Nenhuma sessão aberta." });
-    }
-
     // Verifica se já existe visita com esse orderId (idempotência)
     const [existing] = await db
       .select({ id: schema.corujaoVisitas.id })
@@ -62,6 +46,44 @@ export async function descontarVaga(req: Request, res: Response) {
 
     if (existing) {
       return res.json({ message: "Vaga já descontada.", visitaId: existing.id });
+    }
+
+    // Busca sessões futuras ordenadas por data
+    const sessoes = await db
+      .select()
+      .from(schema.corujaoSessoes)
+      .where(
+        and(
+          gte(schema.corujaoSessoes.data, today),
+          inArray(schema.corujaoSessoes.status, ["planejado", "aberto", "lotado"])
+        )
+      )
+      .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id));
+
+    if (sessoes.length === 0) {
+      return res.status(404).json({ message: "Nenhuma sessão disponível." });
+    }
+
+    // Conta visitas de cada sessão pra achar a primeira com vaga
+    const vagasMap = new Map<number, number>();
+    if (sessoes.length > 0) {
+      const rows = await db
+        .select({ sessaoId: schema.corujaoVisitas.sessaoId, total: count() })
+        .from(schema.corujaoVisitas)
+        .where(inArray(schema.corujaoVisitas.sessaoId, sessoes.map((s) => s.id)))
+        .groupBy(schema.corujaoVisitas.sessaoId);
+      for (const r of rows) {
+        if (r.sessaoId !== null) vagasMap.set(r.sessaoId, r.total);
+      }
+    }
+
+    const sessao = sessoes.find((s) => {
+      const vendidas = vagasMap.get(s.id) ?? 0;
+      return vendidas < s.totalVagas;
+    });
+
+    if (!sessao) {
+      return res.status(409).json({ message: "Todas as sessões estão lotadas." });
     }
 
     // Busca ou cria contato pelo checkout_user_id
@@ -93,9 +115,18 @@ export async function descontarVaga(req: Request, res: Response) {
       })
       .returning();
 
+    // Se lotou, marca como "lotado"
+    const vendidas = (vagasMap.get(sessao.id) ?? 0) + 1;
+    if (vendidas >= sessao.totalVagas) {
+      await db
+        .update(schema.corujaoSessoes)
+        .set({ status: "lotado" as const, updatedAt: new Date() })
+        .where(eq(schema.corujaoSessoes.id, sessao.id));
+    }
+
     await broadcast();
 
-    return res.json({ message: "Vaga descontada.", visitaId: visita!.id });
+    return res.json({ message: "Vaga descontada.", visitaId: visita!.id, sessaoId: sessao.id });
   } catch (error) {
     console.error("[corujao] descontarVaga error:", error);
     return res.status(500).json({ message: "Erro ao descontar vaga." });
