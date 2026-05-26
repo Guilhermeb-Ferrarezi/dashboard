@@ -6,6 +6,7 @@ import {
   marcarContato,
   updateContato
 } from "../controllers/corujao.controller";
+import { createVisita } from "../controllers/corujao-visitas.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
@@ -17,5 +18,7 @@ router.get("/contatos", listContatos);
 router.post("/contatos", createContato);
 router.patch("/contatos/:id", updateContato);
 router.post("/contatos/:id/marcar-contato", marcarContato);
+
+router.post("/visitas", createVisita);
 
 export default router;
