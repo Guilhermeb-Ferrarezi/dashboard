@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY api/package.json api/bun.lock ./api/
 
-RUN cd /app/api && bun install --frozen-lockfile
+RUN cd /app/api && bun install
 RUN bun install -g @openai/codex
 
 COPY . .
