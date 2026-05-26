@@ -23,6 +23,7 @@ import {
   listColaboradores,
   updateColaborador
 } from "../controllers/corujao-colaboradores.controller";
+import { getPainel } from "../controllers/corujao-painel.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
@@ -48,5 +49,7 @@ router.delete("/visitas/:id", deleteVisita);
 router.get("/colaboradores", listColaboradores);
 router.post("/colaboradores", createColaborador);
 router.patch("/colaboradores/:id", updateColaborador);
+
+router.get("/painel", getPainel);
 
 export default router;
