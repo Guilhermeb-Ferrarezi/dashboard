@@ -102,12 +102,14 @@ export async function createVisita(req: Request, res: Response) {
   try {
     const {
       contatoId: rawContatoId,
+      sessaoId: rawSessaoId,
       dataVisita: rawDataVisita,
       amountCents: rawAmountCents,
       formaPagamento: rawFormaPagamento,
       observacoes
     } = req.body as {
       contatoId?: unknown;
+      sessaoId?: unknown;
       dataVisita?: unknown;
       amountCents?: unknown;
       formaPagamento?: unknown;
@@ -117,6 +119,17 @@ export async function createVisita(req: Request, res: Response) {
     const contatoId = Number(rawContatoId);
     if (!Number.isInteger(contatoId) || contatoId <= 0) {
       return res.status(400).json({ message: "contatoId inválido." });
+    }
+
+    // sessaoId é opcional. Se vier, precisa ser inteiro positivo — a FK
+    // do schema dispara 23503 se a sessão não existir, e o catch já mapeia.
+    let sessaoId: number | null = null;
+    if (rawSessaoId !== undefined && rawSessaoId !== null && rawSessaoId !== "") {
+      const parsed = Number(rawSessaoId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return res.status(400).json({ message: "sessaoId inválido." });
+      }
+      sessaoId = parsed;
     }
 
     const dataParsed = parseVisitaDate(rawDataVisita);
@@ -142,6 +155,7 @@ export async function createVisita(req: Request, res: Response) {
         .insert(schema.corujaoVisitas)
         .values({
           contatoId,
+          sessaoId,
           dataVisita: dataParsed.value,
           amountCents: amountParsed.value,
           formaPagamento: formaParsed.value,
@@ -171,8 +185,12 @@ export async function createVisita(req: Request, res: Response) {
       contato: serializeContato(result.contato)
     });
   } catch (error: unknown) {
-    const pgError = error as { code?: string };
+    const pgError = error as { code?: string; constraint_name?: string };
     if (pgError.code === "23503") {
+      const constraint = pgError.constraint_name ?? "";
+      if (constraint.includes("sessao")) {
+        return res.status(404).json({ message: "Sessão não encontrada." });
+      }
       return res.status(404).json({ message: "Contato não encontrado." });
     }
     console.error("[corujao] createVisita error:", error);
