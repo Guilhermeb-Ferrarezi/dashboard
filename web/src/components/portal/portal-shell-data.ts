@@ -169,9 +169,9 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
       iconKey: "sparkles",
       items: [
         portalItem({
-          href: "/henrique/teste",
-          label: "Teste",
-          description: "Item de teste",
+          href: "/henrique/salgados",
+          label: "Salgados",
+          description: "Salgados do Henrique",
           icon: SparklesIcon,
           kind: "page",
         }),
