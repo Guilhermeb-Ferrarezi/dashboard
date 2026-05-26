@@ -7,7 +7,7 @@ RUN apk add --no-cache curl ripgrep
 
 COPY package.json bun.lock ./
 
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 RUN bun install -g @openai/codex && command -v codex && codex --version
 
 COPY scripts/bootstrap-codex-home.sh /usr/local/bin/bootstrap-codex-home.sh
