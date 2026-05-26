@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronRightIcon,
@@ -396,12 +395,16 @@ export function AppShell({
         <SidebarHeader>
           <div className="flex items-center gap-3 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <div className="flex size-9 shrink-0 items-center justify-center">
-              <Image
+              {/* <img> simples em vez de next/image porque o build vinext
+                 não tem o image optimization loader do Next em prod, e
+                 quebra o asset. Pra logo 36x36 não há ganho de otimização
+                 que justifique a complexidade. */}
+              <img
                 src="/assets/Logo.png"
                 alt="Santos Tech"
                 width={36}
                 height={36}
-                priority
+                className="size-9 object-contain"
               />
             </div>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">

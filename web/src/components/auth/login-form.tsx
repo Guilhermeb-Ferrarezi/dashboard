@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 import { KeyRoundIcon, User2Icon } from "@/components/ui/icons";
@@ -77,24 +76,24 @@ export function LoginForm({ error }: LoginFormProps) {
         aria-hidden
         className="pointer-events-none absolute bottom-0 right-0 -z-10 opacity-[0.04] select-none"
       >
-        <Image
+        <img
           src="/assets/Logo.png"
           alt=""
           width={420}
           height={420}
-          priority={false}
+          className="size-[420px] object-contain"
         />
       </div>
       <Card className="page-fade-in w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
         <CardHeader className="gap-6">
           <div className="flex items-center gap-4">
             <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
-              <Image
+              <img
                 src="/assets/Logo.png"
                 alt="Santos Tech"
                 width={48}
                 height={48}
-                priority
+                className="size-12 object-contain"
               />
             </div>
             <div className="space-y-1">

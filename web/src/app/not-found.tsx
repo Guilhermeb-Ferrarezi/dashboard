@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -12,12 +11,12 @@ export default function NotFound() {
       <Card className="w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
         <CardContent className="flex flex-col items-center gap-5 px-8 py-10 text-center">
           <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
-            <Image
+            <img
               src="/assets/Logo.png"
               alt="Santos Tech"
               width={48}
               height={48}
-              priority
+              className="size-12 object-contain"
             />
           </div>
           <div className="space-y-2">
