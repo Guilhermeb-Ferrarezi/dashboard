@@ -95,7 +95,9 @@ export const checkoutPayments = pgTable("checkout_payments", {
 
 export const colaboradores = pgTable("colaboradores", {
   id: serial("id").primaryKey(),
-  mongoId: text("mongo_id").notNull().unique(),
+  // Nullable agora: colaboradores cadastrados manualmente (sem User no Mongo)
+  // ficam com NULL. Sync com Mongo (dívida #5) ainda vem.
+  mongoId: text("mongo_id").unique(),
   nome: text("nome").notNull(),
   ativo: boolean("ativo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -147,6 +149,8 @@ export const corujaoVisitas = pgTable("corujao_visitas", {
     .references(() => corujaoContatos.id, { onDelete: "cascade" }),
   sessaoId: integer("sessao_id")
     .references(() => corujaoSessoes.id, { onDelete: "set null" }),
+  colaboradorId: integer("colaborador_id")
+    .references(() => colaboradores.id, { onDelete: "set null" }),
   dataVisita: date("data_visita", { mode: "string" }).notNull(),
   amountCents: integer("amount_cents").notNull(),
   formaPagamento: text("forma_pagamento", {
@@ -230,6 +234,10 @@ export const corujaoVisitasRelations = relations(corujaoVisitas, ({ one, many })
   sessao: one(corujaoSessoes, {
     fields: [corujaoVisitas.sessaoId],
     references: [corujaoSessoes.id]
+  }),
+  colaborador: one(colaboradores, {
+    fields: [corujaoVisitas.colaboradorId],
+    references: [colaboradores.id]
   }),
   checkoutOrder: one(checkoutOrders, {
     fields: [corujaoVisitas.checkoutOrderId],

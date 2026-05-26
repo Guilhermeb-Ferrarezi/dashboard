@@ -50,6 +50,13 @@
       "when": 1779782533735,
       "tag": "0006_unknown_quasimodo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779805524793,
+      "tag": "0007_certain_thunderbolts",
+      "breakpoints": true
     }
   ]
 }
