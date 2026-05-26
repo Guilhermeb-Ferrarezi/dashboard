@@ -197,7 +197,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
         />
         <StatCard
           icon={LayoutDashboardIcon}
-          iconTone="bg-blue-500/10 text-blue-400"
+          iconTone="bg-muted/40 text-muted-foreground"
           label="Receita total"
           value={formatBRL(data.totalRevenueCents)}
           hint="pedidos confirmados"
@@ -220,7 +220,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
         />
         <StatCard
           icon={CalendarIcon}
-          iconTone="bg-violet-500/10 text-violet-400"
+          iconTone="bg-muted/40 text-muted-foreground"
           label="Receita esta semana"
           value={formatBRL(receitaSemanaCents)}
         />
@@ -231,7 +231,7 @@ export function CheckoutDashboardPanel({ data }: CheckoutDashboardPanelProps) {
         />
         <StatCard
           icon={UsersIcon}
-          iconTone="bg-purple-500/10 text-purple-400"
+          iconTone="bg-muted/40 text-muted-foreground"
           label="Clientes"
           value={data.totalClientes.toLocaleString("pt-BR")}
           hint="cadastrados no checkout"
