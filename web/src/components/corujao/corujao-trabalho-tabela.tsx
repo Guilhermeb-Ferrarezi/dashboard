@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  CheckIcon,
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -68,6 +69,44 @@ const STATUS_PAGAMENTO_OPTIONS = [
   { value: "paga_na_hora", label: "Paga na hora", tone: "blue" }
 ] as const;
 type StatusPagamento = (typeof STATUS_PAGAMENTO_OPTIONS)[number]["value"];
+
+const FORMA_PAGAMENTO_OPTIONS = [
+  { value: "pix", label: "PIX" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "cartao", label: "Cartão" },
+  { value: "gateway", label: "Gateway (Asaas/Abacate)" },
+  { value: "cortesia", label: "Cortesia" },
+  { value: "outro", label: "Outro" }
+] as const;
+type FormaPagamento = (typeof FORMA_PAGAMENTO_OPTIONS)[number]["value"];
+
+type VisitaForm = {
+  dataVisita: string;
+  valorInput: string; // "45,00" — mantém o que o usuário digitou
+  formaPagamento: FormaPagamento;
+  observacoes: string;
+};
+
+function emptyVisitaForm(): VisitaForm {
+  return {
+    dataVisita: new Date().toISOString().slice(0, 10),
+    valorInput: "",
+    formaPagamento: "pix",
+    observacoes: ""
+  };
+}
+
+// "45,00" → 4500. "45" → 4500. "45,5" → 4550. "" + cortesia tratado fora.
+// Decimais > 2 são truncados pra evitar centavo de menos por arredondamento.
+function parseValorToCents(input: string): number | null {
+  const trimmed = input.trim().replace(/\s/g, "");
+  if (!trimmed) return null;
+  const normalized = trimmed.replace(/\./g, "").replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+  const reais = Number(normalized);
+  if (!Number.isFinite(reais) || reais < 0) return null;
+  return Math.round(reais * 100);
+}
 
 type Contato = {
   id: number;
@@ -249,6 +288,11 @@ export function CorujaoTrabalhoTabela() {
   const [submitting, setSubmitting] = useState(false);
   const [rowBusy, setRowBusy] = useState<number | null>(null);
 
+  const [visitaDialogOpen, setVisitaDialogOpen] = useState(false);
+  const [visitaTarget, setVisitaTarget] = useState<Contato | null>(null);
+  const [visitaForm, setVisitaForm] = useState<VisitaForm>(emptyVisitaForm());
+  const [visitaSubmitting, setVisitaSubmitting] = useState(false);
+
   function handleSearch(value: string) {
     setQuery(value);
     setPage(1);
@@ -422,6 +466,69 @@ export function CorujaoTrabalhoTabela() {
       );
     } finally {
       setRowBusy(null);
+    }
+  }
+
+  function openVisitaDialog(contato: Contato) {
+    setVisitaTarget(contato);
+    setVisitaForm(emptyVisitaForm());
+    setVisitaDialogOpen(true);
+  }
+
+  function closeVisitaDialog() {
+    if (visitaSubmitting) return;
+    setVisitaDialogOpen(false);
+    setVisitaTarget(null);
+    setVisitaForm(emptyVisitaForm());
+  }
+
+  async function handleVisitaSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (visitaSubmitting || !visitaTarget) return;
+
+    // Cortesia aceita campo vazio (= 0). Outras formas exigem valor.
+    let amountCents: number;
+    if (visitaForm.formaPagamento === "cortesia" && visitaForm.valorInput.trim() === "") {
+      amountCents = 0;
+    } else {
+      const parsed = parseValorToCents(visitaForm.valorInput);
+      if (parsed === null) {
+        toast.error("Valor inválido. Use formato 45,00 (ou deixe em branco quando for cortesia).");
+        return;
+      }
+      amountCents = parsed;
+    }
+
+    if (amountCents === 0 && visitaForm.formaPagamento !== "cortesia") {
+      toast.error("Valor 0 só é permitido quando a forma de pagamento é Cortesia.");
+      return;
+    }
+
+    setVisitaSubmitting(true);
+    try {
+      const res = await clientApi<{ visita: unknown; contato: Contato }>(
+        `/corujao/visitas`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            contatoId: visitaTarget.id,
+            dataVisita: visitaForm.dataVisita,
+            amountCents,
+            formaPagamento: visitaForm.formaPagamento,
+            observacoes: visitaForm.observacoes.trim() || null
+          })
+        }
+      );
+      // Atualiza só a linha local — ja_participou vem true do backend.
+      setContatos((cur) => cur.map((c) => (c.id === res.contato.id ? res.contato : c)));
+      toast.success("Visita registrada. Contato marcado como participou.");
+      setVisitaDialogOpen(false);
+      setVisitaTarget(null);
+      setVisitaForm(emptyVisitaForm());
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao registrar visita."));
+    } finally {
+      setVisitaSubmitting(false);
     }
   }
 
@@ -671,6 +778,10 @@ export function CorujaoTrabalhoTabela() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openVisitaDialog(contato)}>
+                                  <CheckIcon className="mr-2 h-4 w-4" />
+                                  Registrar visita
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openEdit(contato)}>
                                   <PencilIcon className="mr-2 h-4 w-4" />
                                   Editar
@@ -820,6 +931,107 @@ export function CorujaoTrabalhoTabela() {
               </Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Salvando…" : editing ? "Salvar" : "Cadastrar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={visitaDialogOpen}
+        onOpenChange={(open) => (open ? setVisitaDialogOpen(true) : closeVisitaDialog())}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Registrar visita
+              {visitaTarget ? (
+                <span className="block text-sm font-normal text-muted-foreground mt-1">
+                  {visitaTarget.nome ?? visitaTarget.telefone ?? `Contato #${visitaTarget.id}`}
+                </span>
+              ) : null}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleVisitaSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="visita-data">Data da visita</Label>
+                <Input
+                  id="visita-data"
+                  type="date"
+                  value={visitaForm.dataVisita}
+                  onChange={(e) =>
+                    setVisitaForm((f) => ({ ...f, dataVisita: e.target.value }))
+                  }
+                  max={new Date().toISOString().slice(0, 10)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="visita-valor">
+                  Valor R$
+                  {visitaForm.formaPagamento === "cortesia" ? (
+                    <span className="ml-1 text-xs text-muted-foreground">(opcional)</span>
+                  ) : null}
+                </Label>
+                <Input
+                  id="visita-valor"
+                  inputMode="decimal"
+                  placeholder="45,00"
+                  value={visitaForm.valorInput}
+                  onChange={(e) =>
+                    setVisitaForm((f) => ({ ...f, valorInput: e.target.value }))
+                  }
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="visita-forma">Forma de pagamento</Label>
+              <select
+                id="visita-forma"
+                value={visitaForm.formaPagamento}
+                onChange={(e) =>
+                  setVisitaForm((f) => ({
+                    ...f,
+                    formaPagamento: e.target.value as FormaPagamento
+                  }))
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {FORMA_PAGAMENTO_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="visita-obs">Observações</Label>
+              <Textarea
+                id="visita-obs"
+                value={visitaForm.observacoes}
+                onChange={(e) =>
+                  setVisitaForm((f) => ({ ...f, observacoes: e.target.value }))
+                }
+                placeholder="Veio acompanhado, comentário, etc."
+                rows={3}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeVisitaDialog}
+                disabled={visitaSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={visitaSubmitting}>
+                {visitaSubmitting ? "Registrando…" : "Registrar visita"}
               </Button>
             </DialogFooter>
           </form>
