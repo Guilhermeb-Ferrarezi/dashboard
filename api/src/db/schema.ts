@@ -55,6 +55,12 @@ export const checkoutOrders = pgTable("checkout_orders", {
   status: text("status", { enum: ["pending", "paid", "failed", "expired", "refunded"] })
     .notNull()
     .default("pending"),
+  // Coluna já existia no banco mas estava fora do schema (dívida #1
+  // do REVISAO_FINAL). Adicionada com os 2 valores reais em produção
+  // (pix/card) — qualquer escrita futura passa a respeitar o enum.
+  paymentMethod: text("payment_method", { enum: ["pix", "card"] })
+    .notNull()
+    .default("pix"),
   abacateBillingId: text("abacate_billing_id"),
   checkoutUrl: text("checkout_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
