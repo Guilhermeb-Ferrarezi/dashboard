@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -125,6 +125,70 @@ function ListSkeleton() {
   );
 }
 
+function EditableVagas({
+  sessaoId,
+  vagasVendidas,
+  totalVagas,
+  lotada,
+  disabled,
+  onSaveTotalVagas
+}: {
+  sessaoId: number;
+  vagasVendidas: number;
+  totalVagas: number;
+  lotada: boolean;
+  disabled: boolean;
+  onSaveTotalVagas: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(totalVagas));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    if (disabled) return;
+    setValue(String(totalVagas));
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function save() {
+    setEditing(false);
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num >= 0 && num !== totalVagas) {
+      onSaveTotalVagas(num);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="flex items-center gap-0.5">
+        <span className={lotada ? "text-amber-400" : ""}>{vagasVendidas}</span>
+        <span className="text-muted-foreground">/</span>
+        <input
+          ref={inputRef}
+          type="number"
+          min={0}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+          className="w-10 bg-transparent border-b border-primary text-center text-sm font-medium outline-none tabular-nums"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`cursor-pointer hover:underline ${lotada ? "text-amber-400" : ""}`}
+      onClick={startEdit}
+      title="Clique para editar"
+    >
+      {vagasVendidas} / {totalVagas}
+    </span>
+  );
+}
+
 export function CorujaoSessoesLista() {
   const [sessoes, setSessoes] = useState<Sessao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,6 +289,22 @@ export function CorujaoSessoesLista() {
       toast.error(extractErrorMessage(error, "Erro ao salvar sessão."));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function updateTotalVagas(sessaoId: number, novoTotal: number) {
+    if (!Number.isInteger(novoTotal) || novoTotal < 0) return;
+    setRowBusy(sessaoId);
+    try {
+      const res = await clientApi<{ sessao: Sessao }>(`/corujao/sessoes/${sessaoId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ totalVagas: novoTotal })
+      });
+      setSessoes((cur) => cur.map((s) => (s.id === sessaoId ? res.sessao : s)));
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao atualizar vagas."));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -363,9 +443,14 @@ export function CorujaoSessoesLista() {
                         >
                           <MinusIcon className="h-3 w-3" />
                         </Button>
-                        <span className={lotada ? "text-amber-400" : ""}>
-                          {sessao.vagasVendidas} / {sessao.totalVagas}
-                        </span>
+                        <EditableVagas
+                          sessaoId={sessao.id}
+                          vagasVendidas={sessao.vagasVendidas}
+                          totalVagas={sessao.totalVagas}
+                          lotada={lotada}
+                          disabled={busy}
+                          onSaveTotalVagas={(v) => updateTotalVagas(sessao.id, v)}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
