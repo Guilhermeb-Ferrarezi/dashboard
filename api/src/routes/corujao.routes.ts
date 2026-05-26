@@ -12,7 +12,11 @@ import {
   listSessoes,
   updateSessao
 } from "../controllers/corujao-sessoes.controller";
-import { createVisita } from "../controllers/corujao-visitas.controller";
+import {
+  createVisita,
+  deleteVisita,
+  listVisitasByContato
+} from "../controllers/corujao-visitas.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
@@ -30,6 +34,8 @@ router.get("/sessoes/proxima", getProximaSessao);
 router.post("/sessoes", createSessao);
 router.patch("/sessoes/:id", updateSessao);
 
+router.get("/contatos/:id/visitas", listVisitasByContato);
 router.post("/visitas", createVisita);
+router.delete("/visitas/:id", deleteVisita);
 
 export default router;

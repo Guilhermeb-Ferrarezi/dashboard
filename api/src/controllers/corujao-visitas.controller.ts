@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
@@ -195,5 +195,91 @@ export async function createVisita(req: Request, res: Response) {
     }
     console.error("[corujao] createVisita error:", error);
     return res.status(500).json({ message: "Erro ao registrar visita." });
+  }
+}
+
+export async function listVisitasByContato(req: Request, res: Response) {
+  try {
+    const contatoId = Number(req.params.id);
+    if (!Number.isInteger(contatoId) || contatoId <= 0) {
+      return res.status(400).json({ message: "contatoId inválido." });
+    }
+
+    const db = getCheckoutDb();
+    const rows = await db
+      .select()
+      .from(schema.corujaoVisitas)
+      .where(eq(schema.corujaoVisitas.contatoId, contatoId))
+      .orderBy(desc(schema.corujaoVisitas.dataVisita), desc(schema.corujaoVisitas.id));
+
+    return res.json({ visitas: rows.map(serializeVisita) });
+  } catch (error) {
+    console.error("[corujao] listVisitasByContato error:", error);
+    return res.status(500).json({ message: "Erro ao listar visitas." });
+  }
+}
+
+export async function deleteVisita(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido." });
+    }
+
+    const db = getCheckoutDb();
+
+    // Transação: pega contatoId/sessaoId, deleta, recalc ja_participou.
+    // Se a visita era a única do contato, ja_participou volta a false.
+    const result = await db.transaction(async (tx) => {
+      const [visita] = await tx
+        .select()
+        .from(schema.corujaoVisitas)
+        .where(eq(schema.corujaoVisitas.id, id))
+        .limit(1);
+
+      if (!visita) {
+        return { ok: false as const, message: "Visita não encontrada.", status: 404 as const };
+      }
+
+      await tx.delete(schema.corujaoVisitas).where(eq(schema.corujaoVisitas.id, id));
+
+      const [remaining] = await tx
+        .select({ value: count() })
+        .from(schema.corujaoVisitas)
+        .where(eq(schema.corujaoVisitas.contatoId, visita.contatoId));
+
+      const newJaParticipou = (remaining?.value ?? 0) > 0;
+
+      const [contato] = await tx
+        .update(schema.corujaoContatos)
+        .set({ jaParticipou: newJaParticipou, updatedAt: new Date() })
+        .where(eq(schema.corujaoContatos.id, visita.contatoId))
+        .returning();
+
+      return {
+        ok: true as const,
+        contato,
+        sessaoId: visita.sessaoId ?? null,
+        visitaDeletadaId: id
+      };
+    });
+
+    if (!result.ok) {
+      return res.status(result.status).json({ message: result.message });
+    }
+
+    if (!result.contato) {
+      // Contato sumiu entre o SELECT da visita e o UPDATE — caso degenerado.
+      return res.json({ contato: null, sessaoId: result.sessaoId, visitaDeletadaId: result.visitaDeletadaId });
+    }
+
+    return res.json({
+      contato: serializeContato(result.contato),
+      sessaoId: result.sessaoId,
+      visitaDeletadaId: result.visitaDeletadaId
+    });
+  } catch (error) {
+    console.error("[corujao] deleteVisita error:", error);
+    return res.status(500).json({ message: "Erro ao cancelar visita." });
   }
 }
