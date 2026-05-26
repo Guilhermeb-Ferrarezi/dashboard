@@ -26,6 +26,7 @@ import {
   updateColaborador
 } from "../controllers/corujao-colaboradores.controller";
 import { getPainel } from "../controllers/corujao-painel.controller";
+import { ajustarVagas } from "../controllers/corujao-vagas.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
@@ -55,5 +56,7 @@ router.post("/colaboradores", createColaborador);
 router.patch("/colaboradores/:id", updateColaborador);
 
 router.get("/painel", getPainel);
+
+router.post("/vagas/ajustar", ajustarVagas);
 
 export default router;

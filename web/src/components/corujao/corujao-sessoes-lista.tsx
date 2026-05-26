@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
+import { MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -228,6 +228,23 @@ export function CorujaoSessoesLista() {
     }
   }
 
+  async function ajustarVagas(sessaoId: number, delta: number) {
+    setRowBusy(sessaoId);
+    try {
+      const res = await clientApi<{ totalVagas: number }>("/corujao/vagas/ajustar", {
+        method: "POST",
+        body: JSON.stringify({ sessaoId, delta })
+      });
+      setSessoes((cur) =>
+        cur.map((s) => s.id === sessaoId ? { ...s, totalVagas: res.totalVagas, vagasRestantes: Math.max(0, res.totalVagas - s.vagasVendidas) } : s)
+      );
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao ajustar vagas."));
+    } finally {
+      setRowBusy(null);
+    }
+  }
+
   async function updateStatus(id: number, status: StatusSessao) {
     setRowBusy(id);
     try {
@@ -336,14 +353,34 @@ export function CorujaoSessoesLista() {
                       </DropdownMenu>
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      <span className={lotada ? "text-amber-400" : ""}>
-                        {sessao.vagasVendidas} / {sessao.totalVagas}
-                      </span>
-                      {lotada && (
-                        <StatusBadge tone="amber" className="ml-2">
-                          Lotado
-                        </StatusBadge>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          disabled={busy || sessao.totalVagas <= sessao.vagasVendidas}
+                          onClick={() => ajustarVagas(sessao.id, -1)}
+                        >
+                          <MinusIcon className="h-3 w-3" />
+                        </Button>
+                        <span className={lotada ? "text-amber-400" : ""}>
+                          {sessao.vagasVendidas} / {sessao.totalVagas}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          disabled={busy}
+                          onClick={() => ajustarVagas(sessao.id, 1)}
+                        >
+                          <PlusIcon className="h-3 w-3" />
+                        </Button>
+                        {lotada && (
+                          <StatusBadge tone="amber" className="ml-1">
+                            Lotado
+                          </StatusBadge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell
                       className="max-w-[260px] truncate text-sm text-muted-foreground"

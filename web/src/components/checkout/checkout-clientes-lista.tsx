@@ -2,13 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UsersIcon } from "@/components/ui/icons";
+import { Trash2Icon, UsersIcon } from "@/components/ui/icons";
 import {
   Table,
   TableBody,
@@ -73,6 +82,24 @@ export function CheckoutClientesLista() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CheckoutClienteSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await clientApi(`/checkout/clientes/${deleteTarget.userId}`, { method: "DELETE" });
+      setClientes((prev) => prev.filter((c) => c.userId !== deleteTarget.userId));
+      setPagination((prev) => ({ ...prev, total: prev.total - 1 }));
+      toast.success("Cliente removido.");
+    } catch {
+      toast.error("Erro ao remover cliente.");
+    } finally {
+      setDeleteTarget(null);
+      setDeleting(false);
+    }
+  }
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -127,6 +154,7 @@ export function CheckoutClientesLista() {
                 <TableHead>Login</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Data de criação</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,6 +184,19 @@ export function CheckoutClientesLista() {
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(cliente.createdAt)}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(cliente);
+                          }}
+                        >
+                          <Trash2Icon className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
             </TableBody>
@@ -166,6 +207,24 @@ export function CheckoutClientesLista() {
       {pagination.pages > 1 && (
         <Pagination page={page} pageCount={pagination.pages} onPageChange={setPage} />
       )}
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover cliente</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tem certeza que deseja remover <strong>{deleteTarget?.userName ?? deleteTarget?.userLogin}</strong>?
+            Todos os pedidos e dados associados serão excluídos permanentemente.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Removendo…" : "Remover"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
