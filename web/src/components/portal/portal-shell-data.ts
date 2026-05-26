@@ -262,7 +262,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           description: "Gestao de pagamentos, clientes e produtos",
           icon: ShoppingCartIcon,
           kind: "page",
-          keywords: ["checkout", "pagamento", "clientes", "produtos", "abacate", "pix"],
+          keywords: ["checkout", "pagamento", "clientes", "produtos", "dotfy", "pix"],
           children: [
             portalItem({
               href: "/checkout",
@@ -278,7 +278,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               description: "Clientes cadastrados no checkout",
               icon: UsersIcon,
               kind: "resource",
-              keywords: ["clientes", "usuarios", "checkout", "abacate"],
+              keywords: ["clientes", "usuarios", "checkout", "dotfy"],
             }),
             portalItem({
               href: "/checkout/produtos",

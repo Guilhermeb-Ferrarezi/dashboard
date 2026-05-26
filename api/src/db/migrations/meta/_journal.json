@@ -71,6 +71,13 @@
       "when": 1779808500000,
       "tag": "0009_drop_payments_dup_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779868800000,
+      "tag": "0010_dotfy_migration",
+      "breakpoints": true
     }
   ]
 }

@@ -217,7 +217,7 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
               <div className="flex items-center justify-between px-5 py-4">
                 <div>
                   <p className="text-base font-semibold">Cobrança — {formatBRL(detailPedido.amountCents)}</p>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {detailPedido.abacateBillingId ?? detailPedido.id}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">ID: {detailPedido.chargeId ?? detailPedido.id}</p>
                 </div>
                 <Badge variant="outline" className={getStatusConfig(detailPedido.status).className}>
                   {getStatusConfig(detailPedido.status).label}
@@ -317,8 +317,8 @@ export function CheckoutClienteDetalhe({ cliente }: CheckoutClienteDetalheProps)
         <h2 className="text-2xl font-bold">{cliente.userName ?? cliente.userLogin}</h2>
         <div className="flex items-center gap-1.5 text-sm">
           <span className="text-muted-foreground">ID:</span>
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{cliente.abacateCustomerId}</code>
-          <CopyButton value={cliente.abacateCustomerId} label="Copiar ID" />
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{cliente.providerCustomerId}</code>
+          <CopyButton value={cliente.providerCustomerId} label="Copiar ID" />
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           {cliente.userEmail && (
