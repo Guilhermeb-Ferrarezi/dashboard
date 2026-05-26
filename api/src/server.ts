@@ -18,6 +18,7 @@ import portalRoutes from "./routes/portal.routes";
 import checkoutRoutes from "./routes/checkout.routes";
 import corujaoRoutes from "./routes/corujao.routes";
 import corujaoPublicRoutes from "./routes/corujao-public.routes";
+import emailRoutes from "./routes/email.routes";
 import { runCheckoutMigrations } from "./db/index";
 import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
 import {
@@ -200,6 +201,7 @@ app.use("/api/portal", portalRoutes);
 app.use("/api/checkout", checkoutRoutes);
 app.use("/api/corujao/public", corujaoPublicRoutes);
 app.use("/api/corujao", corujaoRoutes);
+app.use("/api/email", emailRoutes);
 
 app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
 app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);

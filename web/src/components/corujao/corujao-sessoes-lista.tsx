@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "@/components/ui/icons";
+import { MailIcon, MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -206,6 +206,42 @@ export function CorujaoSessoesLista() {
   const [participantesSessao, setParticipantesSessao] = useState<Sessao | null>(null);
   const [participantes, setParticipantes] = useState<VisitaComContato[]>([]);
   const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+
+  const [emailMode, setEmailMode] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  async function handleSendEmail() {
+    const emails = participantes
+      .map((p) => p.contato?.email)
+      .filter((e): e is string => !!e && e.includes("@"));
+
+    if (emails.length === 0) {
+      toast.error("Nenhum participante tem email cadastrado.");
+      return;
+    }
+    if (!emailSubject.trim() || !emailBody.trim()) {
+      toast.error("Preencha assunto e mensagem.");
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      await clientApi("/email/send", {
+        method: "POST",
+        body: JSON.stringify({ to: emails, subject: emailSubject.trim(), body: emailBody.trim() })
+      });
+      toast.success(`Email enviado para ${emails.length} participante${emails.length > 1 ? "s" : ""}.`);
+      setEmailMode(false);
+      setEmailSubject("");
+      setEmailBody("");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Erro ao enviar email."));
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   async function openParticipantes(sessao: Sessao) {
     setParticipantesSessao(sessao);
@@ -649,7 +685,7 @@ export function CorujaoSessoesLista() {
       </Dialog>
 
       <Dialog open={!!participantesSessao} onOpenChange={(open) => !open && setParticipantesSessao(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               Participantes — {participantesSessao ? formatDataLong(participantesSessao.data) : ""}
@@ -686,6 +722,43 @@ export function CorujaoSessoesLista() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {!loadingParticipantes && participantes.length > 0 && !emailMode && (
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setEmailMode(true)}>
+                <MailIcon className="mr-2 h-3.5 w-3.5" />
+                Enviar email para participantes
+              </Button>
+            </DialogFooter>
+          )}
+
+          {emailMode && (
+            <div className="flex flex-col gap-3 border-t border-border/40 pt-4">
+              <p className="text-xs text-muted-foreground">
+                Será enviado para {participantes.filter((p) => p.contato?.email?.includes("@")).length} participante(s) com email.
+              </p>
+              <Input
+                placeholder="Assunto do email"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+              <Textarea
+                placeholder="Mensagem..."
+                rows={4}
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEmailMode(false)} disabled={sendingEmail}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSendEmail} disabled={sendingEmail}>
+                  <MailIcon className="mr-2 h-3.5 w-3.5" />
+                  {sendingEmail ? "Enviando…" : "Enviar"}
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
