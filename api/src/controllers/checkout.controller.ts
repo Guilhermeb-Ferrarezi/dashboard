@@ -2,6 +2,7 @@ import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm"
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
+import { createDotfyProduct } from "../lib/dotfy-products";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
   return {
@@ -573,7 +574,21 @@ export async function createProduto(req: Request, res: Response) {
       })
       .returning();
 
-    return res.status(201).json({ produto: serializeProduct(produto!) });
+    const dotfyResult = await createDotfyProduct({
+      title: name.trim(),
+      description: desc,
+      priceCents: cents,
+      imageUrl: imageUrl?.trim() || undefined
+    });
+
+    if (!dotfyResult.ok) {
+      console.warn("[checkout] dotfy product sync failed:", dotfyResult.error);
+    }
+
+    return res.status(201).json({
+      produto: serializeProduct(produto!),
+      dotfy: dotfyResult.ok ? dotfyResult.data : null
+    });
   } catch (error) {
     console.error("[checkout] createProduto error:", error);
     return res.status(500).json({ message: "Erro ao criar produto." });
