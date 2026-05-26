@@ -39,7 +39,7 @@ function serializeOrder(row: typeof schema.checkoutOrders.$inferSelect) {
     description: row.description,
     amountCents: row.amountCents,
     status: row.status,
-    abacateBillingId: row.abacateBillingId ?? null,
+    chargeId: row.chargeId ?? null,
     checkoutUrl: row.checkoutUrl ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
@@ -80,7 +80,7 @@ function serializeClienteEnriquecido(
     userName: customer.name ?? null,
     userTaxId: customer.taxId ?? null,
     userPhone: customer.cellphone ?? null,
-    abacateCustomerId: customer.abacateCustomerId,
+    providerCustomerId: customer.providerCustomerId,
     createdAt: customer.createdAt.toISOString(),
     orderCount,
     totalSpentCents,
@@ -423,7 +423,7 @@ h1{font-size:20px;border-bottom:2px solid #22c55e;padding-bottom:8px}
 <div class="row"><span class="label">Data</span><span class="value">${order.createdAt.toLocaleDateString("pt-BR")}</span></div>
 <div class="row"><span class="label">Cliente</span><span class="value">${customer?.userLogin ?? "—"}</span></div>
 <div class="row"><span class="label">E-mail</span><span class="value">${customer?.userEmail ?? "—"}</span></div>
-${order.abacateBillingId ? `<div class="row"><span class="label">Billing ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.abacateBillingId}</span></div>` : ""}
+${order.chargeId ? `<div class="row"><span class="label">Charge ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.chargeId}</span></div>` : ""}
 <p style="margin-top:24px;font-size:12px;color:#999;text-align:center">Santos Tech · Comprovante gerado em ${new Date().toLocaleString("pt-BR")}</p>
 </body></html>`;
 
