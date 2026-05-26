@@ -8,6 +8,7 @@ import {
 } from "../controllers/corujao.controller";
 import {
   createSessao,
+  deleteSessao,
   getProximaSessao,
   listSessoes,
   updateSessao
@@ -40,6 +41,7 @@ router.get("/sessoes", listSessoes);
 router.get("/sessoes/proxima", getProximaSessao);
 router.post("/sessoes", createSessao);
 router.patch("/sessoes/:id", updateSessao);
+router.delete("/sessoes/:id", deleteSessao);
 
 router.get("/contatos/:id/visitas", listVisitasByContato);
 router.post("/visitas", createVisita);
