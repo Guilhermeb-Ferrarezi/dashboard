@@ -203,54 +203,6 @@ export interface CheckoutDashboardData {
   statusBreakdown: { status: string; total: number }[];
 }
 
-// ── Corujão ───────────────────────────────────────────────────────────────────
-
-export interface CorujaoClienteSummary {
-  id: number;
-  name: string;
-  phone: string | null;
-  instagram: string | null;
-  active: boolean;
-  respondeu: boolean;
-  jaVeio: boolean;
-  ultimaVisita: string | null;
-  confirmouData: string | null;
-  createdAt: string;
-}
-
-export type CorujaoSessaoStatus = "planned" | "done" | "cancelled";
-export type CorujaoPresencaStatus = "pending" | "confirmed" | "attended" | "absent";
-
-export interface CorujaoSessaoSummary {
-  id: number;
-  date: string;
-  title: string | null;
-  status: CorujaoSessaoStatus;
-  confirmados: number;
-  presentes: number;
-  pendentes: number;
-  createdAt: string;
-}
-
-export interface CorujaoPresencaSummary {
-  clienteId: number;
-  clienteName: string;
-  clientePhone: string | null;
-  clienteInstagram: string | null;
-  status: CorujaoPresencaStatus;
-}
-
-export interface CorujaoStats {
-  totalClientes: number;
-  clientesAtivos: number;
-  totalSessoes: number;
-  jaVieram: number;
-}
-
-export interface CorujaoClienteHistorico {
-  sessaoId: number;
-  sessaoDate: string;
-  sessaoTitle: string | null;
-  sessaoStatus: CorujaoSessaoStatus;
-  presencaStatus: CorujaoPresencaStatus;
-}
+// Tipos legados do Corujão antigo (corujao_clientes/presencas) removidos junto
+// com a migration 0004. Tipos novos do Corujão estão inline nos componentes
+// `corujao-contatos-lista.tsx` e `corujao-trabalho-tabela.tsx` por enquanto.
