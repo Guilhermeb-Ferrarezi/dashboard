@@ -2,7 +2,7 @@ import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm"
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
-import { createDotfyProduct, deleteDotfyProduct } from "../lib/dotfy-products";
+import { createDotfyProduct, deleteDotfyProduct, updateDotfyProduct } from "../lib/dotfy-products";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
   return {
@@ -578,6 +578,7 @@ export async function createProduto(req: Request, res: Response) {
       title: name.trim(),
       description: desc,
       priceCents: cents,
+      discountPercent: discPct,
       imageUrl: imageUrl?.trim() || undefined
     });
 
@@ -655,6 +656,29 @@ export async function updateProduto(req: Request, res: Response) {
 
     if (!produto) return res.status(404).json({ message: "Produto não encontrado." });
 
+    if (name !== undefined || amountCents !== undefined || discountPercent !== undefined || imageUrl !== undefined) {
+      try {
+        const dotfyResult = await updateDotfyProduct(produto.dotfyProductId, {
+          title: produto.name,
+          description: produto.description,
+          priceCents: produto.amountCents,
+          discountPercent: produto.discountPercent,
+          imageUrl: produto.imageUrl || undefined
+        });
+
+        if (dotfyResult.ok) {
+          await db
+            .update(schema.checkoutProducts)
+            .set({ dotfyProductId: dotfyResult.productId, dotfySlug: dotfyResult.slug })
+            .where(eq(schema.checkoutProducts.id, id));
+        } else {
+          console.warn("[checkout] dotfy product update failed:", dotfyResult.error);
+        }
+      } catch (err) {
+        console.warn("[checkout] dotfy product update error:", err);
+      }
+    }
+
     return res.json({ produto: serializeProduct(produto) });
   } catch (error) {
     console.error("[checkout] updateProduto error:", error);
@@ -675,11 +699,15 @@ export async function deleteProduto(req: Request, res: Response) {
 
     if (!deleted) return res.status(404).json({ message: "Produto não encontrado." });
 
-    if (deleted.dotfyProductId) {
-      const dotfyResult = await deleteDotfyProduct(deleted.dotfyProductId);
-      if (!dotfyResult.ok) {
-        console.warn("[checkout] dotfy product delete failed:", dotfyResult.error);
+    try {
+      if (deleted.dotfyProductId) {
+        const dotfyResult = await deleteDotfyProduct(deleted.dotfyProductId);
+        if (!dotfyResult.ok) {
+          console.warn("[checkout] dotfy product delete failed:", dotfyResult.error);
+        }
       }
+    } catch (err) {
+      console.warn("[checkout] dotfy product delete error:", err);
     }
 
     return res.json({ message: "Produto removido." });
