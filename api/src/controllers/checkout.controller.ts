@@ -2,6 +2,7 @@ import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm"
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
+import { createDotfyProduct, deleteDotfyProduct, updateDotfyProduct } from "../lib/dotfy-products";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
   return {
@@ -39,7 +40,7 @@ function serializeOrder(row: typeof schema.checkoutOrders.$inferSelect) {
     description: row.description,
     amountCents: row.amountCents,
     status: row.status,
-    abacateBillingId: row.abacateBillingId ?? null,
+    chargeId: row.chargeId ?? null,
     checkoutUrl: row.checkoutUrl ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
@@ -80,7 +81,7 @@ function serializeClienteEnriquecido(
     userName: customer.name ?? null,
     userTaxId: customer.taxId ?? null,
     userPhone: customer.cellphone ?? null,
-    abacateCustomerId: customer.abacateCustomerId,
+    providerCustomerId: customer.providerCustomerId,
     createdAt: customer.createdAt.toISOString(),
     orderCount,
     totalSpentCents,
@@ -423,7 +424,7 @@ h1{font-size:20px;border-bottom:2px solid #22c55e;padding-bottom:8px}
 <div class="row"><span class="label">Data</span><span class="value">${order.createdAt.toLocaleDateString("pt-BR")}</span></div>
 <div class="row"><span class="label">Cliente</span><span class="value">${customer?.userLogin ?? "—"}</span></div>
 <div class="row"><span class="label">E-mail</span><span class="value">${customer?.userEmail ?? "—"}</span></div>
-${order.abacateBillingId ? `<div class="row"><span class="label">Billing ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.abacateBillingId}</span></div>` : ""}
+${order.chargeId ? `<div class="row"><span class="label">Charge ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.chargeId}</span></div>` : ""}
 <p style="margin-top:24px;font-size:12px;color:#999;text-align:center">Santos Tech · Comprovante gerado em ${new Date().toLocaleString("pt-BR")}</p>
 </body></html>`;
 
@@ -573,6 +574,23 @@ export async function createProduto(req: Request, res: Response) {
       })
       .returning();
 
+    const dotfyResult = await createDotfyProduct({
+      title: name.trim(),
+      description: desc,
+      priceCents: cents,
+      discountPercent: discPct,
+      imageUrl: imageUrl?.trim() || undefined
+    });
+
+    if (dotfyResult.ok) {
+      await db
+        .update(schema.checkoutProducts)
+        .set({ dotfyProductId: dotfyResult.productId, dotfySlug: dotfyResult.slug })
+        .where(eq(schema.checkoutProducts.id, produto!.id));
+    } else {
+      console.warn("[checkout] dotfy product sync failed:", dotfyResult.error);
+    }
+
     return res.status(201).json({ produto: serializeProduct(produto!) });
   } catch (error) {
     console.error("[checkout] createProduto error:", error);
@@ -638,6 +656,29 @@ export async function updateProduto(req: Request, res: Response) {
 
     if (!produto) return res.status(404).json({ message: "Produto não encontrado." });
 
+    if (name !== undefined || amountCents !== undefined || discountPercent !== undefined || imageUrl !== undefined) {
+      try {
+        const dotfyResult = await updateDotfyProduct(produto.dotfyProductId, {
+          title: produto.name,
+          description: produto.description,
+          priceCents: produto.amountCents,
+          discountPercent: produto.discountPercent,
+          imageUrl: produto.imageUrl || undefined
+        });
+
+        if (dotfyResult.ok) {
+          await db
+            .update(schema.checkoutProducts)
+            .set({ dotfyProductId: dotfyResult.productId, dotfySlug: dotfyResult.slug })
+            .where(eq(schema.checkoutProducts.id, id));
+        } else {
+          console.warn("[checkout] dotfy product update failed:", dotfyResult.error);
+        }
+      } catch (err) {
+        console.warn("[checkout] dotfy product update error:", err);
+      }
+    }
+
     return res.json({ produto: serializeProduct(produto) });
   } catch (error) {
     console.error("[checkout] updateProduto error:", error);
@@ -657,6 +698,17 @@ export async function deleteProduto(req: Request, res: Response) {
       .returning();
 
     if (!deleted) return res.status(404).json({ message: "Produto não encontrado." });
+
+    try {
+      if (deleted.dotfyProductId) {
+        const dotfyResult = await deleteDotfyProduct(deleted.dotfyProductId);
+        if (!dotfyResult.ok) {
+          console.warn("[checkout] dotfy product delete failed:", dotfyResult.error);
+        }
+      }
+    } catch (err) {
+      console.warn("[checkout] dotfy product delete error:", err);
+    }
 
     return res.json({ message: "Produto removido." });
   } catch (error) {

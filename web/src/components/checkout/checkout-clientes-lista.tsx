@@ -147,7 +147,7 @@ export function CheckoutClientesLista() {
                       onClick={() => router.push(`/checkout/clientes/${cliente.userId}`)}
                     >
                       <TableCell className="font-mono text-xs text-muted-foreground">
-                        {truncateId(cliente.abacateCustomerId)}
+                        {truncateId(cliente.providerCustomerId)}
                       </TableCell>
                       <TableCell className="font-medium">{cliente.userLogin}</TableCell>
                       <TableCell className="text-muted-foreground">

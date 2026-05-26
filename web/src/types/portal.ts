@@ -135,7 +135,7 @@ export interface CheckoutClienteSummary {
   userName: string | null;
   userTaxId: string | null;
   userPhone: string | null;
-  abacateCustomerId: string;
+  providerCustomerId: string;
   createdAt: string;
   orderCount: number;
   totalSpentCents: number;
@@ -152,7 +152,7 @@ export interface CheckoutClientePedido {
   description: string;
   amountCents: number;
   status: CheckoutOrderStatus;
-  abacateBillingId: string | null;
+  chargeId: string | null;
   checkoutUrl: string | null;
   createdAt: string;
   updatedAt: string;

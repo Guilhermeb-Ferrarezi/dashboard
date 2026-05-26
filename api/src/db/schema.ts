@@ -13,6 +13,8 @@ export const checkoutProducts = pgTable("checkout_products", {
   active: boolean("active").notNull().default(true),
   imageKey: text("image_key"),
   imageUrl: text("image_url"),
+  dotfyProductId: text("dotfy_product_id"),
+  dotfySlug: text("dotfy_slug"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
@@ -32,7 +34,7 @@ export const checkoutCoupons = pgTable("checkout_coupons", {
 export const checkoutCustomers = pgTable("checkout_customers", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),
-  abacateCustomerId: text("abacate_customer_id").notNull(),
+  providerCustomerId: text("provider_customer_id").notNull(),
   userLogin: text("user_login"),
   userEmail: text("user_email"),
   name: text("name"),
@@ -55,13 +57,10 @@ export const checkoutOrders = pgTable("checkout_orders", {
   status: text("status", { enum: ["pending", "paid", "failed", "expired", "refunded"] })
     .notNull()
     .default("pending"),
-  // Coluna já existia no banco mas estava fora do schema (dívida #1
-  // do REVISAO_FINAL). Adicionada com os 2 valores reais em produção
-  // (pix/card) — qualquer escrita futura passa a respeitar o enum.
   paymentMethod: text("payment_method", { enum: ["pix", "card"] })
     .notNull()
     .default("pix"),
-  abacateBillingId: text("abacate_billing_id"),
+  chargeId: text("charge_id"),
   checkoutUrl: text("checkout_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
@@ -90,7 +89,7 @@ export const checkoutPayments = pgTable("checkout_payments", {
   orderId: integer("order_id")
     .notNull()
     .references(() => checkoutOrders.id, { onDelete: "cascade" }),
-  abacateEventId: text("abacate_event_id"),
+  chargeEventId: text("charge_event_id"),
   status: text("status").notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   rawEvent: jsonb("raw_event"),
