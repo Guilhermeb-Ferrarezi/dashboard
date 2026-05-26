@@ -22,6 +22,7 @@ export type DotfyProductInput = {
   title: string;
   description?: string;
   priceCents: number;
+  discountPercent?: number | null;
   slug?: string;
   imageUrl?: string;
   isActive?: boolean;
@@ -31,12 +32,18 @@ export type DotfyProductResult =
   | { ok: true; productId: string; slug: string }
   | { ok: false; error: string };
 
+function finalPrice(priceCents: number, discountPercent?: number | null): number {
+  if (!discountPercent) return priceCents / 100;
+  return Math.round(priceCents * (1 - discountPercent / 100)) / 100;
+}
+
 export async function createDotfyProduct(input: DotfyProductInput): Promise<DotfyProductResult> {
   if (!DOTFY_API_KEY) {
     return { ok: false, error: "DOTFY_API_KEY not configured" };
   }
 
   const slug = input.slug || toSlug(input.title);
+  const price = finalPrice(input.priceCents, input.discountPercent);
 
   const response = await fetch(`${DOTFY_API_URL}/api/products`, {
     method: "POST",
@@ -44,7 +51,7 @@ export async function createDotfyProduct(input: DotfyProductInput): Promise<Dotf
     body: JSON.stringify({
       title: input.title,
       description: input.description || input.title,
-      price: input.priceCents / 100,
+      price,
       slug,
       isActive: input.isActive ?? true,
       ...(input.imageUrl ? { imageUrl: input.imageUrl } : {})
@@ -84,20 +91,15 @@ export async function deleteDotfyProduct(productId: string): Promise<{ ok: boole
 
   if (response.ok) return { ok: true };
 
-  // Fallback: desativar via PATCH se DELETE não existir
-  if (response.status === 404 || response.status === 405) {
-    const patchRes = await fetch(`${DOTFY_API_URL}/api/products/${productId}`, {
-      method: "PATCH",
-      headers: headers(),
-      body: JSON.stringify({ isActive: false })
-    });
-
-    console.log("[dotfy] deactivate product response", patchRes.status);
-
-    if (patchRes.ok) return { ok: true };
-
-    return { ok: false, error: `deactivate failed: HTTP ${patchRes.status}` };
-  }
-
   return { ok: false, error: `HTTP ${response.status}` };
+}
+
+export async function updateDotfyProduct(
+  oldProductId: string | null,
+  input: DotfyProductInput
+): Promise<DotfyProductResult> {
+  if (oldProductId) {
+    await deleteDotfyProduct(oldProductId);
+  }
+  return createDotfyProduct(input);
 }
