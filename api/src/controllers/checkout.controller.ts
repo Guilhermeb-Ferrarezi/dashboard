@@ -2,7 +2,7 @@ import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm"
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
-import { createDotfyProduct } from "../lib/dotfy-products";
+import { createDotfyProduct, deleteDotfyProduct } from "../lib/dotfy-products";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
   return {
@@ -581,14 +581,16 @@ export async function createProduto(req: Request, res: Response) {
       imageUrl: imageUrl?.trim() || undefined
     });
 
-    if (!dotfyResult.ok) {
+    if (dotfyResult.ok) {
+      await db
+        .update(schema.checkoutProducts)
+        .set({ dotfyProductId: dotfyResult.productId, dotfySlug: dotfyResult.slug })
+        .where(eq(schema.checkoutProducts.id, produto!.id));
+    } else {
       console.warn("[checkout] dotfy product sync failed:", dotfyResult.error);
     }
 
-    return res.status(201).json({
-      produto: serializeProduct(produto!),
-      dotfy: dotfyResult.ok ? dotfyResult.data : null
-    });
+    return res.status(201).json({ produto: serializeProduct(produto!) });
   } catch (error) {
     console.error("[checkout] createProduto error:", error);
     return res.status(500).json({ message: "Erro ao criar produto." });
@@ -672,6 +674,13 @@ export async function deleteProduto(req: Request, res: Response) {
       .returning();
 
     if (!deleted) return res.status(404).json({ message: "Produto não encontrado." });
+
+    if (deleted.dotfyProductId) {
+      const dotfyResult = await deleteDotfyProduct(deleted.dotfyProductId);
+      if (!dotfyResult.ok) {
+        console.warn("[checkout] dotfy product delete failed:", dotfyResult.error);
+      }
+    }
 
     return res.json({ message: "Produto removido." });
   } catch (error) {

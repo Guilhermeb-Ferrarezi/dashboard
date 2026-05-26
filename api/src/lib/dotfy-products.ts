@@ -28,7 +28,7 @@ export type DotfyProductInput = {
 };
 
 export type DotfyProductResult =
-  | { ok: true; data: Record<string, unknown> }
+  | { ok: true; productId: string; slug: string }
   | { ok: false; error: string };
 
 export async function createDotfyProduct(input: DotfyProductInput): Promise<DotfyProductResult> {
@@ -51,7 +51,11 @@ export async function createDotfyProduct(input: DotfyProductInput): Promise<Dotf
     })
   });
 
-  const json = (await response.json()) as { success?: boolean; data?: Record<string, unknown>; error?: string };
+  const json = (await response.json()) as {
+    success?: boolean;
+    data?: { id?: string; slug?: string; [k: string]: unknown };
+    error?: string;
+  };
 
   console.log("[dotfy] create product response", response.status, json.error ?? "ok");
 
@@ -59,5 +63,41 @@ export async function createDotfyProduct(input: DotfyProductInput): Promise<Dotf
     return { ok: false, error: json.error ?? `HTTP ${response.status}` };
   }
 
-  return { ok: true, data: json.data };
+  return {
+    ok: true,
+    productId: json.data.id ?? "",
+    slug: json.data.slug ?? slug
+  };
+}
+
+export async function deleteDotfyProduct(productId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!DOTFY_API_KEY || !productId) {
+    return { ok: false, error: "missing key or productId" };
+  }
+
+  const response = await fetch(`${DOTFY_API_URL}/api/products/${productId}`, {
+    method: "DELETE",
+    headers: headers()
+  });
+
+  console.log("[dotfy] delete product response", response.status);
+
+  if (response.ok) return { ok: true };
+
+  // Fallback: desativar via PATCH se DELETE não existir
+  if (response.status === 404 || response.status === 405) {
+    const patchRes = await fetch(`${DOTFY_API_URL}/api/products/${productId}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ isActive: false })
+    });
+
+    console.log("[dotfy] deactivate product response", patchRes.status);
+
+    if (patchRes.ok) return { ok: true };
+
+    return { ok: false, error: `deactivate failed: HTTP ${patchRes.status}` };
+  }
+
+  return { ok: false, error: `HTTP ${response.status}` };
 }
