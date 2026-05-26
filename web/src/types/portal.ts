@@ -111,6 +111,7 @@ export interface CheckoutProductSummary {
   amountCents: number;
   discountPercent: number | null;
   active: boolean;
+  isCorujao: boolean;
   imageKey: string | null;
   imageUrl: string | null;
   createdAt: string;

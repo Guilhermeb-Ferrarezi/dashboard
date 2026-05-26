@@ -15,6 +15,7 @@ function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
     active: row.active,
     imageKey: row.imageKey ?? null,
     imageUrl: row.imageUrl ?? null,
+    isCorujao: row.isCorujao,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -603,7 +604,7 @@ export async function updateProduto(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl } = req.body as {
+    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
@@ -612,6 +613,7 @@ export async function updateProduto(req: Request, res: Response) {
       features?: unknown;
       imageKey?: string | null;
       imageUrl?: string | null;
+      isCorujao?: unknown;
     };
 
     const db = getCheckoutDb();
@@ -645,6 +647,7 @@ export async function updateProduto(req: Request, res: Response) {
       }
     }
     if (active !== undefined) updates.active = Boolean(active);
+    if (isCorujao !== undefined) updates.isCorujao = Boolean(isCorujao);
     if (imageKey !== undefined) updates.imageKey = imageKey?.trim() || null;
     if (imageUrl !== undefined) updates.imageUrl = imageUrl?.trim() || null;
 

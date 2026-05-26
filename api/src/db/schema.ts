@@ -13,6 +13,7 @@ export const checkoutProducts = pgTable("checkout_products", {
   active: boolean("active").notNull().default(true),
   imageKey: text("image_key"),
   imageUrl: text("image_url"),
+  isCorujao: boolean("is_corujao").notNull().default(false),
   dotfyProductId: text("dotfy_product_id"),
   dotfySlug: text("dotfy_slug"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
