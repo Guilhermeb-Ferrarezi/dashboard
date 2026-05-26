@@ -26,6 +26,7 @@ import {
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  Trash2Icon,
   UsersIcon,
   XIcon
 } from "@/components/ui/icons";
@@ -93,6 +94,17 @@ const FORMA_PAGAMENTO_OPTIONS = [
   { value: "outro", label: "Outro" }
 ] as const;
 type FormaPagamento = (typeof FORMA_PAGAMENTO_OPTIONS)[number]["value"];
+
+type VisitaResumida = {
+  id: number;
+  contatoId: number;
+  sessaoId: number | null;
+  dataVisita: string;
+  amountCents: number;
+  formaPagamento: FormaPagamento;
+  observacoes: string | null;
+  createdAt: string;
+};
 
 type VisitaForm = {
   sessaoId: string; // "" = sem sessão. Manter como string facilita o <select>.
@@ -319,6 +331,11 @@ export function CorujaoTrabalhoTabela() {
   const [proximaSessao, setProximaSessao] = useState<ProximaSessao | null>(null);
   const [proximaLoading, setProximaLoading] = useState(true);
   const [sessoesFuturas, setSessoesFuturas] = useState<SessaoOption[]>([]);
+
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Contato | null>(null);
+  const [cancelVisitas, setCancelVisitas] = useState<VisitaResumida[]>([]);
+  const [cancelBusy, setCancelBusy] = useState<number | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -599,6 +616,88 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
+  // Pega visitas do contato e decide:
+  //   - 1 visita → confirm() nativo e DELETE direto
+  //   - 2+ visitas → abre Dialog pra o usuário escolher qual
+  async function startCancelarVisita(contato: Contato) {
+    setRowBusy(contato.id);
+    try {
+      const { visitas } = await clientApi<{ visitas: VisitaResumida[] }>(
+        `/corujao/contatos/${contato.id}/visitas`
+      );
+      if (visitas.length === 0) {
+        // Estado inconsistente: jaParticipou=true mas sem visitas. Limpa.
+        toast.info("Não há visitas registradas — atualizando contato.");
+        await reload();
+        return;
+      }
+      if (visitas.length === 1) {
+        const v = visitas[0]!;
+        const valorFmt = (v.amountCents / 100).toFixed(2).replace(".", ",");
+        const dataFmt = new Date(`${v.dataVisita}T00:00:00`).toLocaleDateString("pt-BR");
+        const confirmed = window.confirm(
+          `Cancelar a visita de R$ ${valorFmt} em ${dataFmt}?\n\nIsso vai liberar 1 vaga` +
+            (v.sessaoId ? " na sessão." : " (visita avulsa).")
+        );
+        if (!confirmed) return;
+        await executarCancel(v.id, v.sessaoId);
+        return;
+      }
+      // 2+: abre Dialog
+      setCancelTarget(contato);
+      setCancelVisitas(visitas);
+      setCancelDialogOpen(true);
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao buscar visitas do contato."));
+    } finally {
+      setRowBusy(null);
+    }
+  }
+
+  async function executarCancel(visitaId: number, sessaoId: number | null) {
+    setCancelBusy(visitaId);
+    try {
+      const res = await clientApi<{ contato: Contato | null; sessaoId: number | null }>(
+        `/corujao/visitas/${visitaId}`,
+        { method: "DELETE" }
+      );
+      if (res.contato) {
+        setContatos((cur) => cur.map((c) => (c.id === res.contato!.id ? res.contato! : c)));
+      }
+      // Decrementa o card só se a visita removida era da próxima sessão.
+      if (sessaoId !== null && proximaSessao && proximaSessao.id === sessaoId) {
+        const vendidas = Math.max(0, proximaSessao.vagasVendidas - 1);
+        setProximaSessao({
+          ...proximaSessao,
+          vagasVendidas: vendidas,
+          vagasRestantes: Math.max(0, proximaSessao.totalVagas - vendidas)
+        });
+      }
+      toast.success("Visita cancelada. Vaga liberada.");
+      // Atualiza o Dialog (se estava aberto) removendo a visita cancelada
+      // ou fechando se foi a última.
+      setCancelVisitas((cur) => {
+        const next = cur.filter((v) => v.id !== visitaId);
+        if (next.length === 0) {
+          setCancelDialogOpen(false);
+          setCancelTarget(null);
+        }
+        return next;
+      });
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao cancelar visita."));
+    } finally {
+      setCancelBusy(null);
+    }
+  }
+
+  function closeCancelDialog() {
+    if (cancelBusy !== null) return;
+    setCancelDialogOpen(false);
+    setCancelTarget(null);
+    setCancelVisitas([]);
+  }
+
   if (loading && contatos.length === 0) return <ListSkeleton />;
 
   const showingFiltered = !!(query || filterConversa || filterPagamento);
@@ -851,6 +950,15 @@ export function CorujaoTrabalhoTabela() {
                                   <CheckIcon className="mr-2 h-4 w-4" />
                                   Registrar visita
                                 </DropdownMenuItem>
+                                {contato.jaParticipou && (
+                                  <DropdownMenuItem
+                                    onClick={() => startCancelarVisita(contato)}
+                                    className="text-red-400 focus:text-red-400"
+                                  >
+                                    <Trash2Icon className="mr-2 h-4 w-4" />
+                                    Cancelar visita
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => openEdit(contato)}>
                                   <PencilIcon className="mr-2 h-4 w-4" />
                                   Editar
@@ -1134,6 +1242,76 @@ export function CorujaoTrabalhoTabela() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={cancelDialogOpen}
+        onOpenChange={(open) => (open ? setCancelDialogOpen(true) : closeCancelDialog())}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Cancelar visita
+              {cancelTarget ? (
+                <span className="block text-sm font-normal text-muted-foreground mt-1">
+                  {cancelTarget.nome ?? cancelTarget.telefone ?? `Contato #${cancelTarget.id}`} tem
+                  {" "}
+                  {cancelVisitas.length} visita
+                  {cancelVisitas.length === 1 ? "" : "s"} — escolha qual cancelar.
+                </span>
+              ) : null}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {cancelVisitas.map((v) => {
+              const valorFmt = (v.amountCents / 100).toFixed(2).replace(".", ",");
+              const dataFmt = new Date(`${v.dataVisita}T00:00:00`).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric"
+              });
+              const busy = cancelBusy === v.id;
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-4 py-3"
+                >
+                  <div className="text-sm">
+                    <div className="font-medium tabular-nums">
+                      {dataFmt} · R$ {valorFmt} · {v.formaPagamento}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {v.sessaoId ? `Sessão #${v.sessaoId}` : "Visita avulsa"}
+                      {v.observacoes ? ` · ${v.observacoes}` : ""}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:text-red-400 hover:bg-red-500/10"
+                    disabled={busy}
+                    onClick={() => executarCancel(v.id, v.sessaoId)}
+                  >
+                    <Trash2Icon className="mr-1.5 h-4 w-4" />
+                    {busy ? "Cancelando…" : "Cancelar esta"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeCancelDialog}
+              disabled={cancelBusy !== null}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
