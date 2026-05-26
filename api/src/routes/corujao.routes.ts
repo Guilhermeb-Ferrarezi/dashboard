@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   createContato,
+  deleteContato,
   listContatos,
   marcarContato,
   updateContato
@@ -36,6 +37,7 @@ router.get("/contatos", listContatos);
 router.post("/contatos", createContato);
 router.patch("/contatos/:id", updateContato);
 router.post("/contatos/:id/marcar-contato", marcarContato);
+router.delete("/contatos/:id", deleteContato);
 
 router.get("/sessoes", listSessoes);
 router.get("/sessoes/proxima", getProximaSessao);

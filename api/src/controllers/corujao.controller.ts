@@ -353,3 +353,54 @@ export async function marcarContato(req: Request, res: Response) {
     return res.status(500).json({ message: "Erro ao marcar contato." });
   }
 }
+
+export async function deleteContato(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido." });
+    }
+
+    const db = getCheckoutDb();
+
+    // Conta visitas e soma receita ANTES do DELETE (informativo pra UI).
+    // ON DELETE CASCADE do schema vai dropar visitas + contato_log junto.
+    // Cortesia (amount_cents=0) entra no count mas não na receita.
+    const [stats] = await db
+      .select({
+        visitasCount: sql<number>`COUNT(*)::int`,
+        receitaCents: sql<number>`COALESCE(SUM(CASE WHEN ${schema.corujaoVisitas.formaPagamento} <> 'cortesia' THEN ${schema.corujaoVisitas.amountCents} ELSE 0 END), 0)::int`
+      })
+      .from(schema.corujaoVisitas)
+      .where(eq(schema.corujaoVisitas.contatoId, id));
+
+    const visitasRemovidas = stats?.visitasCount ?? 0;
+    const receitaRemovidaCents = stats?.receitaCents ?? 0;
+
+    const result = await db
+      .delete(schema.corujaoContatos)
+      .where(eq(schema.corujaoContatos.id, id))
+      .returning({ id: schema.corujaoContatos.id });
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Contato não encontrado." });
+    }
+
+    return res.json({
+      deletedId: id,
+      visitasRemovidas,
+      receitaRemovidaCents
+    });
+  } catch (error: unknown) {
+    // corujao_vendas.contato_id é ON DELETE RESTRICT (tabela vazia hoje,
+    // mas previne perda silenciosa de venda quando entrar em uso).
+    const pgError = error as { code?: string };
+    if (pgError.code === "23503") {
+      return res.status(409).json({
+        message: "Contato tem vendas registradas — apague as vendas antes."
+      });
+    }
+    console.error("[corujao] deleteContato error:", error);
+    return res.status(500).json({ message: "Erro ao apagar contato." });
+  }
+}

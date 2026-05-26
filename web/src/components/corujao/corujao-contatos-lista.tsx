@@ -24,6 +24,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  Trash2Icon,
   UsersIcon
 } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/lib/api";
+
+import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
 
 const PAGE_SIZE = 50;
 
@@ -185,6 +188,7 @@ export function CorujaoContatosLista() {
   const [editing, setEditing] = useState<Contato | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -393,6 +397,13 @@ export function CorujaoContatosLista() {
                               <PencilIcon className="mr-2 h-4 w-4" />
                               Editar
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(contato)}
+                              className="text-red-400 focus:text-red-400"
+                            >
+                              <Trash2Icon className="mr-2 h-4 w-4" />
+                              Excluir contato
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -490,6 +501,16 @@ export function CorujaoContatosLista() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <CorujaoDeleteContatoDialog
+        contato={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={(id) => {
+          setContatos((cur) => cur.filter((c) => c.id !== id));
+          setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

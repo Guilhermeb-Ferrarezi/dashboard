@@ -50,6 +50,7 @@ import {
   CorujaoProximaSessaoCard,
   type ProximaSessao
 } from "./corujao-proxima-sessao-card";
+import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
 
 type SessaoOption = {
   id: number;
@@ -337,6 +338,8 @@ export function CorujaoTrabalhoTabela() {
   const [cancelBusy, setCancelBusy] = useState<number | null>(null);
 
   const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
+
+  const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -974,6 +977,13 @@ export function CorujaoTrabalhoTabela() {
                                   <PencilIcon className="mr-2 h-4 w-4" />
                                   Editar
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeleteTarget(contato)}
+                                  className="text-red-400 focus:text-red-400"
+                                >
+                                  <Trash2Icon className="mr-2 h-4 w-4" />
+                                  Excluir contato
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -1324,6 +1334,16 @@ export function CorujaoTrabalhoTabela() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CorujaoDeleteContatoDialog
+        contato={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={(id) => {
+          setContatos((cur) => cur.filter((c) => c.id !== id));
+          setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
