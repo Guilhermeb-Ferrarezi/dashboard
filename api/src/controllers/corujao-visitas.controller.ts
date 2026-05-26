@@ -2,6 +2,7 @@ import { count, desc, eq } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
+import { broadcast } from "../lib/vagas-sse";
 
 const FORMAS_PAGAMENTO_VALIDAS = [
   "pix",
@@ -192,6 +193,8 @@ export async function createVisita(req: Request, res: Response) {
       // branch é defesa em profundidade caso a transação seja alterada.
       return res.status(404).json({ message: "Contato não encontrado." });
     }
+
+    broadcast().catch(() => {});
 
     return res.status(201).json({
       visita: serializeVisita(result.visita!),
@@ -398,6 +401,8 @@ export async function deleteVisita(req: Request, res: Response) {
       // Contato sumiu entre o SELECT da visita e o UPDATE — caso degenerado.
       return res.json({ contato: null, sessaoId: result.sessaoId, visitaDeletadaId: result.visitaDeletadaId });
     }
+
+    broadcast().catch(() => {});
 
     return res.json({
       contato: serializeContato(result.contato),
