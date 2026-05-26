@@ -21,7 +21,13 @@ function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
-function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
+// Mesma compatibilidade do DropdownMenuTrigger: aceita `asChild` no tipo
+// mas ignora em runtime — Base UI usa `render`. Ver dropdown-menu.tsx.
+function TooltipTrigger({
+  asChild,
+  ...props
+}: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
+  void asChild
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 

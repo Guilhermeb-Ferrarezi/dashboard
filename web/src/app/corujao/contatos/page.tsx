@@ -1,11 +1,11 @@
-import { CorujaoSessoesLista } from "@/components/corujao/corujao-sessoes-lista";
+import { CorujaoContatosLista } from "@/components/corujao/corujao-contatos-lista";
 import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { AppShell } from "@/components/portal/app-shell";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function CorujaoSessoesPage() {
+export default async function CorujaoContatosPage() {
   const user = await getSessionUser();
 
   if (!user) return <ClientRedirect to="/login" label="login" />;
@@ -15,10 +15,10 @@ export default async function CorujaoSessoesPage() {
     <AppShell
       user={user}
       breadcrumb={[{ label: "Corujão", href: "/corujao" }]}
-      title="Sessões"
-      description="Planeje as noites do Corujão e acompanhe vagas vendidas."
+      title="Contatos"
+      description="Base de pessoas pra prospectar e registrar visitas."
     >
-      <CorujaoSessoesLista />
+      <CorujaoContatosLista />
     </AppShell>
   );
 }

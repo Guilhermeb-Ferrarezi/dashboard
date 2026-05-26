@@ -29,6 +29,48 @@
       "when": 1779732300617,
       "tag": "0003_overjoyed_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779771551622,
+      "tag": "0004_silly_gorgon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779780418380,
+      "tag": "0005_wealthy_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779782533735,
+      "tag": "0006_unknown_quasimodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779805524793,
+      "tag": "0007_certain_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779808021477,
+      "tag": "0008_premium_lake",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779808500000,
+      "tag": "0009_drop_payments_dup_fk",
+      "breakpoints": true
     }
   ]
 }

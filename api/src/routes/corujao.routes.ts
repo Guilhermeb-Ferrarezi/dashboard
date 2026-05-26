@@ -1,40 +1,55 @@
 import { Router } from "express";
+
 import {
-  listCorujaoClientes,
-  createCorujaoCliente,
-  updateCorujaoCliente,
-  deleteCorujaoCliente,
-  listCorujaoSessoes,
-  createCorujaoSessao,
-  updateCorujaoSessao,
-  deleteCorujaoSessao,
-  getSessaoPresencas,
-  upsertPresenca,
-  removePresenca,
-  getCorujaoStats,
-  getClienteHistorico
+  createContato,
+  listContatos,
+  marcarContato,
+  updateContato
 } from "../controllers/corujao.controller";
+import {
+  createSessao,
+  getProximaSessao,
+  listSessoes,
+  updateSessao
+} from "../controllers/corujao-sessoes.controller";
+import {
+  createVisita,
+  deleteVisita,
+  listVisitasByContato,
+  updateVisita
+} from "../controllers/corujao-visitas.controller";
+import {
+  createColaborador,
+  listColaboradores,
+  updateColaborador
+} from "../controllers/corujao-colaboradores.controller";
+import { getPainel } from "../controllers/corujao-painel.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
 const router = Router();
+
 router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 
-router.get("/stats", getCorujaoStats);
+router.get("/contatos", listContatos);
+router.post("/contatos", createContato);
+router.patch("/contatos/:id", updateContato);
+router.post("/contatos/:id/marcar-contato", marcarContato);
 
-router.get("/clientes", listCorujaoClientes);
-router.post("/clientes", createCorujaoCliente);
-router.put("/clientes/:id", updateCorujaoCliente);
-router.delete("/clientes/:id", deleteCorujaoCliente);
-router.get("/clientes/:id/historico", getClienteHistorico);
+router.get("/sessoes", listSessoes);
+router.get("/sessoes/proxima", getProximaSessao);
+router.post("/sessoes", createSessao);
+router.patch("/sessoes/:id", updateSessao);
 
-router.get("/sessoes", listCorujaoSessoes);
-router.post("/sessoes", createCorujaoSessao);
-router.put("/sessoes/:id", updateCorujaoSessao);
-router.delete("/sessoes/:id", deleteCorujaoSessao);
+router.get("/contatos/:id/visitas", listVisitasByContato);
+router.post("/visitas", createVisita);
+router.patch("/visitas/:id", updateVisita);
+router.delete("/visitas/:id", deleteVisita);
 
-router.get("/sessoes/:id/presencas", getSessaoPresencas);
-router.patch("/sessoes/:sessaoId/presencas/:clienteId", upsertPresenca);
-router.delete("/sessoes/:sessaoId/presencas/:clienteId", removePresenca);
+router.get("/colaboradores", listColaboradores);
+router.post("/colaboradores", createColaborador);
+router.patch("/colaboradores/:id", updateColaborador);
+
+router.get("/painel", getPainel);
 
 export default router;
