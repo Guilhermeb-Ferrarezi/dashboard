@@ -86,7 +86,7 @@ export function UserMenu({
             className="w-72 border border-border/70 p-0 shadow-xl"
           >
             <div className="relative overflow-hidden rounded-lg bg-popover">
-              <div className="h-16 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_36%,transparent),color-mix(in_oklch,var(--sidebar)_88%,black))]" />
+              <div className="h-12 bg-muted/30" />
               <div className="px-4 pb-3">
                 <Avatar className="-mt-8 size-14 border-4 border-popover">
                   <AvatarFallback className="bg-primary text-lg font-semibold text-primary-foreground">

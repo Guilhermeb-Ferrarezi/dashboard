@@ -339,7 +339,7 @@ function renderDiffLine(line: string, index: number) {
 
   if (line.startsWith("@@")) {
     return (
-      <span key={`${index}:${line}`} className={cn(baseClass, "text-sky-300", "bg-sky-500/8")}>
+      <span key={`${index}:${line}`} className={cn(baseClass, "text-muted-foreground", "bg-muted/30")}>
         {line}
       </span>
     );
@@ -1105,7 +1105,7 @@ export function CodexDrawer({
             {timeline.map((entry) => {
               if (entry.kind === "user") {
                 return (
-                  <div key={entry.id} className="ml-auto max-w-[88%] rounded-[16px] bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_90%,white),color-mix(in_oklch,var(--primary)_72%,black))] px-3 py-2 text-sm text-primary-foreground shadow-[0_4px_14px_rgba(98,110,255,0.18)]">
+                  <div key={entry.id} className="ml-auto max-w-[88%] rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground">
                     <CodexMarkdown tone="inverse" className="text-sm leading-7">
                       {entry.text}
                     </CodexMarkdown>
@@ -1177,18 +1177,18 @@ export function CodexDrawer({
                 const expanded = expandedCommandIds.has(entry.id);
 
                 return (
-                  <div key={entry.id} className="rounded-xl border border-sky-500/15 bg-sky-500/5 px-3 py-2">
+                  <div key={entry.id} className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <button
                         type="button"
-                        className="flex min-w-0 items-center gap-2 text-left text-xs font-medium uppercase tracking-[0.16em] text-sky-300 transition hover:text-sky-200"
+                        className="flex min-w-0 items-center gap-2 text-left text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground transition hover:text-foreground"
                         onClick={() => toggleCommandDetails(entry.id)}
                         aria-expanded={expanded}
                       >
                         <ChevronDownIcon className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
                         <span className="truncate">Consulta técnica</span>
                       </button>
-                      <Badge className="border border-sky-500/20 bg-sky-500/10 text-sky-300">
+                      <Badge className="border border-border/60 bg-muted/50 text-muted-foreground">
                         {entry.status}
                       </Badge>
                     </div>
