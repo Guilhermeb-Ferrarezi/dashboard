@@ -8,6 +8,7 @@ import {
   ArrowSquareOut,
   ArrowUp,
   ArrowsDownUp,
+  ArrowsOutSimple,
   BellRinging,
   BookOpenText,
   CalendarBlank,
@@ -59,6 +60,7 @@ import {
   Sidebar,
   SidebarSimple,
   SignOut,
+  SlidersHorizontal,
   Sparkle,
   Spinner,
   SquaresFour,
@@ -76,6 +78,7 @@ import {
   UserMinus,
   Users,
   UsersThree,
+  WarningCircle,
   WarningOctagon,
   X,
   XCircle,
@@ -118,6 +121,7 @@ export const Loader2Icon = Spinner;
 export const LoaderCircleIcon = Spinner;
 export const LogOutIcon = SignOut;
 export const LogsIcon = Rows;
+export const MaximizeIcon = ArrowsOutSimple;
 export const EyeIcon = Eye;
 export const MailIcon = EnvelopeSimple;
 export const MinusIcon = Minus;
@@ -144,6 +148,7 @@ export const SearchCheckIcon = ListMagnifyingGlass;
 export const SearchIcon = MagnifyingGlass;
 export const SettingsIcon = Gear;
 export const ShieldCheckIcon = ShieldCheck;
+export const SlidersHorizontalIcon = SlidersHorizontal;
 export const ShieldIcon = Shield;
 export const SparklesIcon = Sparkle;
 export const SquareIcon = Square;
@@ -155,6 +160,7 @@ export const PackageIcon = Package;
 export const ShoppingCartIcon = ShoppingCart;
 export const Trash2Icon = Trash;
 export const TriangleAlertIcon = WarningOctagon;
+export const AlertCircleIcon = WarningCircle;
 export const UploadIcon = Upload;
 export const BotIcon = Robot;
 export const User2Icon = User;
