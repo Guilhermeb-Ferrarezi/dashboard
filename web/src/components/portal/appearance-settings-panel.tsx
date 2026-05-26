@@ -1,22 +1,18 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckIcon,
-  CircleDotIcon,
   MonitorIcon,
   MoonIcon,
-  PaletteIcon,
-  PanelTopIcon,
-  Rows3Icon,
-  SquareIcon,
+  MoonStarsIcon,
   SunIcon,
 } from "@/components/ui/icons";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Card,
@@ -29,17 +25,14 @@ import { cn } from "@/lib/utils";
 import { clientApi } from "@/lib/api";
 import {
   applyThemePreferencesToDocument,
-  DEFAULT_THEME_PREFERENCES,
   THEME_ACCENT_OPTIONS,
   THEME_DENSITY_OPTIONS,
   THEME_MODE_OPTIONS,
   THEME_RADIUS_OPTIONS,
   getEffectiveColorScheme,
   type ThemeAccent,
-  type ThemeDensity,
   type ThemeMode,
   type ThemePreferences,
-  type ThemeRadius,
 } from "@/lib/theme-preferences";
 
 interface AppearanceSettingsPanelProps {
@@ -51,90 +44,41 @@ const modeIcons: Record<ThemeMode, React.ComponentType<{ className?: string }>> 
   system: MonitorIcon,
   light: SunIcon,
   dark: MoonIcon,
-  onix: SquareIcon,
+  // Onix = preto OLED. MoonStars carrega "noite mais profunda" sem
+  // colidir com Moon (que já é dark).
+  onix: MoonStarsIcon,
 };
 
-const radiusPreview: Record<ThemeRadius, string> = {
-  sm: "rounded-sm",
-  md: "rounded-md",
-  lg: "rounded-xl",
+// Swatch hardcoded por accent (oklch). 'custom' usa cor escolhida pelo user.
+const ACCENT_SWATCH: Record<Exclude<ThemeAccent, "custom">, string> = {
+  ember: "bg-[oklch(0.69_0.17_28)]",
+  sky: "bg-[oklch(0.74_0.13_250)]",
+  emerald: "bg-[oklch(0.73_0.12_155)]",
+  violet: "bg-[oklch(0.74_0.14_300)]",
 };
-
-const densityPreview: Record<ThemeDensity, string> = {
-  compact: "gap-1",
-  comfortable: "gap-1.5",
-  spacious: "gap-2.5",
-};
-
-function PreferenceSection({
-  title,
-  description,
-  icon: Icon,
-  children,
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-lg border border-border bg-background p-4">
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <h3 className="font-heading text-sm font-semibold tracking-tight">{title}</h3>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
 
 const DENSITY_KEY = "portal:density";
 
-function DensityPreferenceToggle() {
-  const [compact, setCompact] = useState(false);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(DENSITY_KEY);
-    if (stored === "compact") {
-      setCompact(true);
-      document.documentElement.dataset.density = "compact";
-    }
-  }, []);
-
-  function toggle(next: boolean) {
-    setCompact(next);
-    if (next) {
-      document.documentElement.dataset.density = "compact";
-      window.localStorage.setItem(DENSITY_KEY, "compact");
-    } else {
-      delete document.documentElement.dataset.density;
-      window.localStorage.removeItem(DENSITY_KEY);
-    }
-  }
-
+// Linear-style: row enxuto label esquerda, controle direita.
+function Row({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-lg border border-border bg-background p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="font-heading text-sm font-semibold tracking-tight">
-            Modo compacto
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            Reduz paddings e gaps em todo o portal. Útil em telas menores.
-          </p>
-        </div>
-        <Switch
-          checked={compact}
-          onCheckedChange={toggle}
-          label="Alternar modo compacto"
-        />
+    <div className="grid gap-3 px-4 py-3.5 md:grid-cols-[180px_1fr] md:items-center md:gap-6">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {description ? (
+          <p className="text-xs text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-    </section>
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -145,22 +89,57 @@ export function AppearanceSettingsPanel({
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
   const [draft, setDraft] = useState<ThemePreferences>(preferences);
-  const [pending, setPending] = useState(false);
+  const [compactDensity, setCompactDensity] = useState(false);
+  const lastSavedRef = useRef<string>(JSON.stringify(preferences));
 
+  // Sync quando o servidor mudar `preferences` (refresh externo).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(preferences);
+    lastSavedRef.current = JSON.stringify(preferences);
   }, [preferences]);
 
+  // Densidade local (compact) — separada da `draft.density` (servidor).
+  useEffect(() => {
+    const stored = window.localStorage.getItem(DENSITY_KEY);
+    if (stored === "compact") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCompactDensity(true);
+      document.documentElement.dataset.density = "compact";
+    }
+  }, []);
+
+  // Aplica preview ao vivo enquanto o user mexe.
   useEffect(() => {
     const effectiveTheme = getEffectiveColorScheme(draft.mode, resolvedTheme);
-
-    applyThemePreferencesToDocument(
-      document.documentElement,
-      draft,
-      effectiveTheme,
-    );
+    applyThemePreferencesToDocument(document.documentElement, draft, effectiveTheme);
     document.documentElement.style.colorScheme = effectiveTheme;
   }, [draft, resolvedTheme]);
+
+  // Autosalvar debounced 600ms — sem botão "Salvar" sticky. Só dispara
+  // quando o draft muda em relação ao último estado persistido.
+  useEffect(() => {
+    const serialized = JSON.stringify(draft);
+    if (serialized === lastSavedRef.current) return;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await clientApi<{ preferences: ThemePreferences }>(
+          "/user/preferences",
+          { method: "PUT", body: JSON.stringify({ preferences: draft }) },
+        );
+        lastSavedRef.current = JSON.stringify(response.preferences);
+        setTheme(response.preferences.mode);
+        startTransition(() => router.refresh());
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Não foi possível salvar.",
+        );
+      }
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [draft, router, setTheme]);
 
   function updatePreference<K extends keyof ThemePreferences>(
     key: K,
@@ -169,31 +148,14 @@ export function AppearanceSettingsPanel({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSave() {
-    setPending(true);
-
-    try {
-      const response = await clientApi<{
-        preferences: ThemePreferences;
-      }>("/user/preferences", {
-        method: "PUT",
-        body: JSON.stringify({ preferences: draft }),
-      });
-
-      setDraft(response.preferences);
-      setTheme(response.preferences.mode);
-      startTransition(() => {
-        router.refresh();
-      });
-      toast.success("Preferencias salvas na sua conta.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel salvar as preferencias.",
-      );
-    } finally {
-      setPending(false);
+  function toggleCompactDensity(next: boolean) {
+    setCompactDensity(next);
+    if (next) {
+      document.documentElement.dataset.density = "compact";
+      window.localStorage.setItem(DENSITY_KEY, "compact");
+    } else {
+      delete document.documentElement.dataset.density;
+      window.localStorage.removeItem(DENSITY_KEY);
     }
   }
 
@@ -201,264 +163,156 @@ export function AppearanceSettingsPanel({
     <>
       {framed ? (
         <CardHeader>
-          <CardTitle>Aparencia</CardTitle>
+          <CardTitle>Aparência</CardTitle>
           <CardDescription>
-            Tema, cores e densidade ficam salvos na sua conta e acompanham o
-            login em qualquer dispositivo.
+            Mudanças são salvas automaticamente na sua conta.
           </CardDescription>
         </CardHeader>
       ) : null}
-      <CardContent className={cn("space-y-4", !framed && "px-0")}>
+      <CardContent className={cn("space-y-6", !framed && "px-0")}>
         {!framed ? (
-          <div>
-            <CardTitle>Aparencia</CardTitle>
-            <CardDescription>
-              Tema, cores, cantos e densidade do portal.
-            </CardDescription>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Mudanças são salvas automaticamente na sua conta.
+          </p>
         ) : null}
-        <PreferenceSection
-          title="Modo do tema"
-          description="Controle como a interface acompanha luz, escuro ou o aparelho."
-          icon={PanelTopIcon}
-        >
-          <div className="grid overflow-hidden rounded-lg border border-border bg-muted/40 p-1 sm:grid-cols-2 xl:grid-cols-4">
-            {THEME_MODE_OPTIONS.map((option) => {
-              const Icon = modeIcons[option.value];
-              const active = draft.mode === option.value;
 
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => updatePreference("mode", option.value)}
-                  className={cn(
-                    "flex min-h-16 items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
-                    active
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">
-                      {option.label}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {option.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </PreferenceSection>
+        {/* Form-table denso: cada preferência em uma linha. */}
+        <div className="divide-y divide-border/60 rounded-md border border-border/60">
+          {/* Modo do tema — 4 chips horizontais */}
+          <Row label="Modo do tema" description="Como a interface acompanha luz/escuro.">
+            <div className="inline-flex rounded-md border border-border/60 bg-muted/40 p-0.5">
+              {THEME_MODE_OPTIONS.map((option) => {
+                const Icon = modeIcons[option.value];
+                const active = draft.mode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => updatePreference("mode", option.value)}
+                    title={option.description}
+                    className={cn(
+                      "flex h-8 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors",
+                      active
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
 
-        <PreferenceSection
-          title="Cor de destaque"
-          description="Escolha a cor dos botoes, foco, sidebar e destaques."
-          icon={PaletteIcon}
-        >
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-            {THEME_ACCENT_OPTIONS.map((option) => {
-              const active = draft.accent === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => updatePreference("accent", option.value)}
-                      className={cn(
-                        "flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                        active
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-muted/30 hover:border-primary/45 hover:bg-muted/60",
-                      )}
+          {/* Accent — bolinhas alinhadas */}
+          <Row label="Cor de destaque" description="Botões, foco e elementos ativos.">
+            <div className="flex flex-wrap items-center gap-2">
+              {THEME_ACCENT_OPTIONS.map((option) => {
+                const active = draft.accent === option.value;
+                const isCustom = option.value === "custom";
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => updatePreference("accent", option.value)}
+                    title={option.label}
+                    className={cn(
+                      "relative flex size-8 items-center justify-center rounded-full ring-2 transition",
+                      active ? "ring-foreground" : "ring-transparent hover:ring-foreground/30",
+                    )}
                   >
                     <span
                       className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-full ring-1 ring-black/10",
-                        option.value !== "custom" &&
-                          ({
-                            ember: "bg-[oklch(0.69_0.17_28)]",
-                            sky: "bg-[oklch(0.74_0.13_250)]",
-                            emerald: "bg-[oklch(0.73_0.12_155)]",
-                            violet: "bg-[oklch(0.74_0.14_300)]",
-                          } as Record<Exclude<ThemeAccent, "custom">, string>)[option.value],
+                        "size-7 rounded-full",
+                        !isCustom &&
+                          ACCENT_SWATCH[option.value as Exclude<ThemeAccent, "custom">],
                       )}
-                    style={
-                      option.value === "custom"
-                        ? { backgroundColor: draft.customAccentColor }
-                        : undefined
-                    }
-                  >
+                      style={
+                        isCustom
+                          ? {
+                              backgroundColor: draft.customAccentColor,
+                              backgroundImage:
+                                "conic-gradient(from 0deg, #ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ef4444)",
+                            }
+                          : undefined
+                      }
+                    />
                     {active ? (
-                      <CheckIcon className="size-4 text-white drop-shadow" />
+                      <CheckIcon className="absolute size-3.5 text-white drop-shadow" />
                     ) : null}
-                  </span>
-                    <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {option.label}
-                    </span>
-                    <span className="block text-xs leading-snug text-muted-foreground">
-                      {option.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Row>
+
+          {/* Custom color picker — visível só quando custom está ativo */}
           {draft.accent === "custom" ? (
-            <div className="mt-3 rounded-lg border border-border bg-muted/35 p-3">
-              <label className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-                <span
-                  className="size-11 rounded-lg border border-border shadow-inner"
-                  style={{ backgroundColor: draft.customAccentColor }}
-                />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">
-                    Cor personalizada
-                  </span>
-                  <span className="block font-mono text-xs uppercase text-muted-foreground">
-                    {draft.customAccentColor}
-                  </span>
-                </span>
+            <Row label="Cor personalizada" description="Hex aplicado em tempo real.">
+              <label className="flex items-center gap-3">
                 <input
                   type="color"
                   value={draft.customAccentColor}
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
-                      accent: "custom",
                       customAccentColor: event.target.value,
                     }))
                   }
-                  className="h-10 w-full cursor-pointer rounded-md border border-border bg-transparent p-1 sm:w-16"
+                  className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent p-1"
                   aria-label="Selecionar cor personalizada"
                 />
+                <span className="font-mono text-xs uppercase text-muted-foreground">
+                  {draft.customAccentColor}
+                </span>
               </label>
-            </div>
+            </Row>
           ) : null}
-        </PreferenceSection>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <PreferenceSection
-            title="Raio dos cantos"
-            description="Defina se os elementos ficam mais retos ou suaves."
-            icon={CircleDotIcon}
+          {/* Raio dos cantos */}
+          <Row label="Raio dos cantos" description="Curvatura dos elementos.">
+            <Select
+              value={draft.radius}
+              onValueChange={(value) =>
+                updatePreference("radius", value as ThemePreferences["radius"])
+              }
+              options={THEME_RADIUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              className="max-w-xs"
+            />
+          </Row>
+
+          {/* Densidade */}
+          <Row label="Densidade visual" description="Respiro entre blocos do layout.">
+            <Select
+              value={draft.density}
+              onValueChange={(value) =>
+                updatePreference("density", value as ThemePreferences["density"])
+              }
+              options={THEME_DENSITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              className="max-w-xs"
+            />
+          </Row>
+
+          {/* Modo compacto local (localStorage, separado do server) */}
+          <Row
+            label="Modo compacto"
+            description="Reduz paddings/gaps. Salvo apenas neste navegador."
           >
-            <div className="space-y-2">
-              {THEME_RADIUS_OPTIONS.map((option) => {
-                const active = draft.radius === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => updatePreference("radius", option.value)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                      active
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-muted/30 hover:border-primary/45 hover:bg-muted/60",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "size-9 shrink-0 border-2 border-primary/70 bg-primary/10",
-                        radiusPreview[option.value],
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">
-                        {option.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {option.description}
-                      </span>
-                    </span>
-                    {active ? <CheckIcon className="size-4 text-primary" /> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </PreferenceSection>
-
-          <PreferenceSection
-            title="Densidade visual"
-            description="Ajuste o respiro entre blocos do layout."
-            icon={Rows3Icon}
-          >
-            <div className="space-y-2">
-              {THEME_DENSITY_OPTIONS.map((option) => {
-                const active = draft.density === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => updatePreference("density", option.value)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                      active
-                        ? "border-primary bg-primary/10"
-                        : "border-border bg-muted/30 hover:border-primary/45 hover:bg-muted/60",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex size-9 shrink-0 flex-col justify-center rounded-md border border-border bg-background p-1.5",
-                        densityPreview[option.value],
-                      )}
-                    >
-                      <span className="h-1 rounded-full bg-primary/75" />
-                      <span className="h-1 rounded-full bg-primary/45" />
-                      <span className="h-1 rounded-full bg-primary/25" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">
-                        {option.label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {option.description}
-                      </span>
-                    </span>
-                    {active ? <CheckIcon className="size-4 text-primary" /> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </PreferenceSection>
-        </div>
-
-        <DensityPreferenceToggle />
-
-        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-popover/95 pt-4 backdrop-blur">
-          <Button onClick={handleSave} disabled={pending} loading={pending}>
-            Salvar aparência
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setDraft(DEFAULT_THEME_PREFERENCES);
-              setTheme(DEFAULT_THEME_PREFERENCES.mode);
-            }}
-          >
-            Restaurar padrao
-          </Button>
+            <Switch
+              checked={compactDensity}
+              onCheckedChange={toggleCompactDensity}
+              label="Alternar modo compacto"
+            />
+          </Row>
         </div>
       </CardContent>
     </>
   );
 
   if (!framed) {
-    return <div className="space-y-4">{content}</div>;
+    return <div>{content}</div>;
   }
 
-  return (
-    <Card className="border-border/60 bg-card/90">
-      {content}
-    </Card>
-  );
+  return <Card className="border-border/60 bg-card/90">{content}</Card>;
 }

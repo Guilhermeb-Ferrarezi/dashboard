@@ -211,7 +211,7 @@ export function CorujaoColaboradoresLista() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>

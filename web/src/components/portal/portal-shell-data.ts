@@ -13,6 +13,7 @@ import {
   ShoppingCartIcon,
   SparklesIcon,
   ShieldIcon,
+  TagsIcon,
   UserRoundIcon,
   UsersIcon,
 } from "@/components/ui/icons";
@@ -83,136 +84,19 @@ function portalItem(
 
 export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[] {
   return [
+    // Negócio — produtos que geram receita / operação diária.
+    // Vem primeiro porque é onde o Henrique passa a maior parte do tempo.
     {
-      label: "Operacao",
-      iconKey: "logs",
+      label: "Negocio",
+      iconKey: "cart",
       items: [
         portalItem({
-          href: logsHref,
-          label: "Logs",
-          description: "Observabilidade e historico de eventos",
-          icon: LogsIcon,
-          kind: "resource",
-          keywords: ["logs", "observabilidade", "eventos"],
-        }),
-      ],
-    },
-    {
-      label: "Jogos",
-      iconKey: "vct",
-      items: [
-        portalItem({
-          href: "/vct",
-          label: "VCT",
-          description: "Area principal do VCT",
-          icon: CrosshairIcon,
-          kind: "page",
-          keywords: ["valorant", "vct", "competitivo"],
-          children: [
-            portalItem({
-              href: "/vct/inscricoes",
-              label: "Inscricoes",
-              description: "Lista de inscricoes do VCT",
-              icon: SparklesIcon,
-              kind: "resource",
-              keywords: ["inscricoes", "players", "registros"],
-            }),
-            portalItem({
-              href: "/vct/formacoes",
-              label: "Formacoes",
-              description: "Times e formacoes do VCT",
-              icon: BadgeCheckIcon,
-              kind: "resource",
-              keywords: ["times", "formacoes", "squads"],
-            }),
-          ],
-        }),
-        portalItem({
-          href: "/counter-strike",
-          label: "Counter-strike",
-          description: "Area principal do Counter-strike",
-          icon: ShieldIcon,
-          kind: "page",
-          keywords: ["cs", "counter strike"],
-          children: [
-            portalItem({
-              href: "/counter-strike/inscricoes",
-              label: "Inscricoes",
-              description: "Lista de inscricoes do Counter-strike",
-              icon: SparklesIcon,
-              kind: "resource",
-              keywords: ["inscricoes", "players", "registros"],
-            }),
-          ],
-        }),
-        portalItem({
-          href: "/league-of-legends",
-          label: "League of Legends",
-          description: "Area principal do LoL",
-          icon: SparklesIcon,
-          kind: "page",
-          keywords: ["lol", "league", "legends"],
-          children: [
-            portalItem({
-              href: "/league-of-legends/inscricoes",
-              label: "Inscricoes",
-              description: "Lista de inscricoes do LoL",
-              icon: SparklesIcon,
-              kind: "resource",
-              keywords: ["inscricoes", "players", "registros"],
-            }),
-          ],
-        }),
-      ],
-    },
-    {
-      label: "Henrique",
-      iconKey: "sparkles",
-      items: [
-        portalItem({
-          href: "/henrique/salgados",
-          label: "Salgados",
-          description: "Salgados do Henrique",
-          icon: SparklesIcon,
-          kind: "page",
-        }),
-      ],
-    },
-    {
-      label: "Administracao",
-      iconKey: "admin",
-      items: [
-        portalItem({
-          href: "/admin/users",
-          label: "Usuarios",
-          description: "Base de usuarios e perfis de acesso",
-          icon: ShieldIcon,
-          kind: "resource",
-          keywords: ["usuarios", "admin", "acesso", "perfis"],
-        }),
-        portalItem({
-          href: "/admin/r2",
-          label: "R2",
-          description: "Envio de imagens para o bucket",
-          icon: ImageIcon,
-          kind: "resource",
-          keywords: ["r2", "imagens", "upload", "bucket", "assets"],
-        }),
-        portalItem({
-          href: "/admin/publicador",
-          label: "Publicador",
-          description: "Envio de ZIPs estaticos para o volume de sites",
-          icon: LayoutGridIcon,
-          kind: "resource",
-          keywords: ["publicador", "zip", "site", "rotas", "volume"],
-        }),
-        portalItem({
-          href: "/corujao",
+          href: "/corujao/painel",
           label: "Corujão",
-          description: "Tela de trabalho e contatos do Corujão",
+          description: "Operação do Corujão — Método 4",
           icon: MoonIcon,
           kind: "page",
-          keywords: ["corujao", "contatos", "leads", "prospec", "trabalho"],
+          keywords: ["corujao", "contatos", "leads", "prospec", "trabalho", "metodo 4"],
           children: [
             portalItem({
               href: "/corujao/painel",
@@ -269,7 +153,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               label: "Dashboard",
               description: "Visao geral do checkout",
               icon: LayoutDashboardIcon,
-              kind: "page",
+              kind: "resource",
               keywords: ["dashboard", "checkout", "visao geral", "resumo"],
             }),
             portalItem({
@@ -288,7 +172,124 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               kind: "resource",
               keywords: ["produtos", "catalogo", "planos", "checkout"],
             }),
+            portalItem({
+              href: "/checkout/cupons",
+              label: "Cupons",
+              description: "Cupons de desconto do checkout",
+              icon: TagsIcon,
+              kind: "resource",
+              keywords: ["cupons", "desconto", "promocao", "checkout"],
+            }),
           ],
+        }),
+      ],
+    },
+    // Jogos — produtos sazonais (torneios/eventos). Uso esporádico.
+    {
+      label: "Jogos",
+      iconKey: "vct",
+      items: [
+        portalItem({
+          href: "/vct",
+          label: "Valorant",
+          description: "Inscrições e formações do Valorant",
+          icon: CrosshairIcon,
+          kind: "page",
+          keywords: ["valorant", "vct", "competitivo"],
+          children: [
+            portalItem({
+              href: "/vct/inscricoes",
+              label: "Inscricoes",
+              description: "Lista de inscricoes do Valorant",
+              icon: SparklesIcon,
+              kind: "resource",
+              keywords: ["inscricoes", "players", "registros"],
+            }),
+            portalItem({
+              href: "/vct/formacoes",
+              label: "Formacoes",
+              description: "Times e formacoes do Valorant",
+              icon: BadgeCheckIcon,
+              kind: "resource",
+              keywords: ["times", "formacoes", "squads"],
+            }),
+          ],
+        }),
+        portalItem({
+          href: "/counter-strike",
+          label: "Counter-strike",
+          description: "Inscrições do Counter-strike",
+          icon: ShieldIcon,
+          kind: "page",
+          keywords: ["cs", "counter strike"],
+          children: [
+            portalItem({
+              href: "/counter-strike/inscricoes",
+              label: "Inscricoes",
+              description: "Lista de inscricoes do Counter-strike",
+              icon: SparklesIcon,
+              kind: "resource",
+              keywords: ["inscricoes", "players", "registros"],
+            }),
+          ],
+        }),
+        portalItem({
+          href: "/league-of-legends",
+          label: "League of Legends",
+          description: "Inscrições do LoL",
+          icon: SparklesIcon,
+          kind: "page",
+          keywords: ["lol", "league", "legends"],
+          children: [
+            portalItem({
+              href: "/league-of-legends/inscricoes",
+              label: "Inscricoes",
+              description: "Lista de inscricoes do LoL",
+              icon: SparklesIcon,
+              kind: "resource",
+              keywords: ["inscricoes", "players", "registros"],
+            }),
+          ],
+        }),
+      ],
+    },
+    // Plataforma — infraestrutura/configuração do portal. Uso raro.
+    // Logs vive aqui (não merece grupo próprio com 1 item).
+    {
+      label: "Plataforma",
+      iconKey: "admin",
+      items: [
+        portalItem({
+          href: "/admin/users",
+          label: "Usuarios",
+          description: "Base de usuarios e perfis de acesso",
+          icon: ShieldIcon,
+          kind: "resource",
+          keywords: ["usuarios", "admin", "acesso", "perfis"],
+        }),
+        portalItem({
+          href: "/admin/publicador",
+          label: "Publicador",
+          description: "Envio de ZIPs estaticos para o volume de sites",
+          icon: LayoutGridIcon,
+          kind: "resource",
+          keywords: ["publicador", "zip", "site", "rotas", "volume"],
+        }),
+        portalItem({
+          href: "/admin/r2",
+          label: "R2",
+          description: "Envio de imagens para o bucket",
+          icon: ImageIcon,
+          kind: "resource",
+          keywords: ["r2", "imagens", "upload", "bucket", "assets"],
+        }),
+        portalItem({
+          href: logsHref,
+          label: "Logs",
+          description: "Observabilidade e historico de eventos",
+          icon: LogsIcon,
+          kind: "resource",
+          keywords: ["logs", "observabilidade", "eventos"],
         }),
       ],
     },

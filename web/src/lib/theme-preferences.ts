@@ -12,7 +12,7 @@ export interface ThemePreferences {
 }
 
 export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
-  mode: "system",
+  mode: "onix",
   accent: "ember",
   customAccentColor: "#f97316",
   radius: "md",

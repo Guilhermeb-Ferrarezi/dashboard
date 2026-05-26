@@ -18,9 +18,10 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon } from "@/components/ui/icons";
+import { MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge, type StatusBadgeTone } from "@/components/ui/status-badge";
 import {
@@ -134,6 +135,9 @@ export function CorujaoSessoesLista() {
   const [form, setForm] = useState<FormValues>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
 
+  const [deleteTarget, setDeleteTarget] = useState<Sessao | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   async function reload() {
     setLoading(true);
     try {
@@ -240,6 +244,28 @@ export function CorujaoSessoesLista() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await clientApi<{ deletedId: number; visitasOrfanizadas: number }>(
+        `/corujao/sessoes/${deleteTarget.id}`,
+        { method: "DELETE" }
+      );
+      setSessoes((cur) => cur.filter((s) => s.id !== deleteTarget.id));
+      const msg =
+        res.visitasOrfanizadas > 0
+          ? `Sessão apagada. ${res.visitasOrfanizadas} visita${res.visitasOrfanizadas === 1 ? "" : "s"} desvinculada${res.visitasOrfanizadas === 1 ? "" : "s"}.`
+          : "Sessão apagada.";
+      toast.success(msg);
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao apagar sessão."));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loading && sessoes.length === 0) return <ListSkeleton />;
 
   return (
@@ -265,7 +291,7 @@ export function CorujaoSessoesLista() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
@@ -337,6 +363,13 @@ export function CorujaoSessoesLista() {
                             <PencilIcon className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeleteTarget(sessao)}
+                            className="text-red-400 focus:text-red-400"
+                          >
+                            <Trash2Icon className="mr-2 h-4 w-4" />
+                            Excluir sessão
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -381,20 +414,17 @@ export function CorujaoSessoesLista() {
 
             <div className="space-y-1.5">
               <Label htmlFor="sessao-status">Status</Label>
-              <select
-                id="sessao-status"
+              <Select
                 value={form.status}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, status: e.target.value as StatusSessao }))
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, status: value as StatusSessao }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                options={STATUS_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+                placeholder="Selecionar status…"
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -417,6 +447,60 @@ export function CorujaoSessoesLista() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apagar sessão?</DialogTitle>
+          </DialogHeader>
+          {deleteTarget ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                Sessão de{" "}
+                <span className="font-medium capitalize text-foreground">
+                  {formatDataLong(deleteTarget.data)}
+                </span>
+                . Esta ação é irreversível.
+              </p>
+              {deleteTarget.vagasVendidas > 0 ? (
+                <p className="rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-amber-400">
+                  Atenção: <strong>{deleteTarget.vagasVendidas}</strong>{" "}
+                  visita{deleteTarget.vagasVendidas === 1 ? "" : "s"} amarrada
+                  {deleteTarget.vagasVendidas === 1 ? "" : "s"} a esta sessão.
+                  {" "}Ao apagar, ela
+                  {deleteTarget.vagasVendidas === 1 ? "" : "s"} {deleteTarget.vagasVendidas === 1 ? "vira" : "viram"}
+                  {" "}avulsa{deleteTarget.vagasVendidas === 1 ? "" : "s"} (mantêm valor e
+                  atribuição, mas desaparecem do agrupamento por sessão nos relatórios).
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              <Trash2Icon className="size-4" />
+              {deleting ? "Apagando…" : "Apagar sessão"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

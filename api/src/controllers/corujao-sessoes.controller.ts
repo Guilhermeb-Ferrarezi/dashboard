@@ -296,6 +296,40 @@ export async function updateSessao(req: Request, res: Response) {
   }
 }
 
+export async function deleteSessao(req: Request, res: Response) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido." });
+    }
+
+    const db = getCheckoutDb();
+
+    // Conta visitas amarradas ANTES do DELETE (apenas informativo —
+    // serve pra UI mostrar quantas visitas viraram avulsas no toast).
+    // A FK do schema (ON DELETE SET NULL) cuida da desvinculação.
+    const [vagasRow] = await db
+      .select({ value: count() })
+      .from(schema.corujaoVisitas)
+      .where(eq(schema.corujaoVisitas.sessaoId, id));
+    const visitasOrfanizadas = vagasRow?.value ?? 0;
+
+    const result = await db
+      .delete(schema.corujaoSessoes)
+      .where(eq(schema.corujaoSessoes.id, id))
+      .returning({ id: schema.corujaoSessoes.id });
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Sessão não encontrada." });
+    }
+
+    return res.json({ deletedId: id, visitasOrfanizadas });
+  } catch (error) {
+    console.error("[corujao] deleteSessao error:", error);
+    return res.status(500).json({ message: "Erro ao apagar sessão." });
+  }
+}
+
 // Usado pelo controller de visitas pra validar sessaoId antes do INSERT.
 // Se for retornado null, o caller decide o que fazer (geralmente 404).
 export async function findSessaoById(id: number): Promise<SessaoRow | null> {

@@ -4,7 +4,17 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+// `variant="linear"` ativa um estilo dev-tool (Linear/Vercel): sem border-b
+// permanente entre linhas, hover sutil, header column tiny uppercase.
+// `default` mantém aparência shadcn original — zero impacto em tabelas
+// que não optaram explicitamente pelo linear.
+type TableVariant = "default" | "linear"
+
+function Table({
+  className,
+  variant = "default",
+  ...props
+}: React.ComponentProps<"table"> & { variant?: TableVariant }) {
   return (
     <div
       data-slot="table-container"
@@ -12,6 +22,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
+        data-variant={variant}
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
@@ -61,6 +72,8 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
       data-slot="table-row"
       className={cn(
         "border-b border-border/50 transition-colors duration-150 hover:bg-muted/40 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+        // Variant linear (selector consulta data-variant=linear no ancestral <table>)
+        "[[data-variant=linear]_&]:border-b-0 [[data-variant=linear]_&]:hover:bg-foreground/[0.03]",
         className
       )}
       {...props}
@@ -74,6 +87,8 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       data-slot="table-head"
       className={cn(
         "h-10 px-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        // Variant linear: header coluna tiny com tracking aberto Linear-style.
+        "[[data-variant=linear]_&]:h-9 [[data-variant=linear]_&]:text-[10px] [[data-variant=linear]_&]:tracking-[0.14em] [[data-variant=linear]_&]:text-muted-foreground/70",
         className
       )}
       {...props}
@@ -87,6 +102,8 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        // Variant linear: padding vertical apertado pra alta densidade.
+        "[[data-variant=linear]_&]:py-2.5",
         className
       )}
       {...props}

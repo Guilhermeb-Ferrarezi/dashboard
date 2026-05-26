@@ -170,15 +170,15 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
   }
 
   const statusStyle: Record<string, string> = {
-    live: "border-emerald-500/25 bg-emerald-500/10 text-emerald-400",
-    pilot: "border-amber-500/25 bg-amber-500/10 text-amber-400",
-    beta: "border-sky-500/25 bg-sky-500/10 text-sky-400",
+    live: "border-emerald-500/30 bg-emerald-500/15 text-emerald-400",
+    pilot: "border-amber-500/30 bg-amber-500/15 text-amber-400",
+    beta: "border-border/60 bg-muted/40 text-muted-foreground",
   };
 
   const statusDot: Record<string, string> = {
     live: "bg-emerald-400",
     pilot: "bg-amber-400",
-    beta: "bg-sky-400",
+    beta: "bg-muted-foreground/60",
   };
 
   return (
@@ -361,8 +361,8 @@ export function ProjectLauncher({ user, projects }: ProjectLauncherProps) {
           {/* Recent */}
           <div className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur-sm">
             <div className="mb-4 flex items-center gap-2.5">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10">
-                <ZapIcon className="size-3.5 text-sky-400" />
+              <div className="flex size-7 items-center justify-center rounded-lg bg-muted/40">
+                <ZapIcon className="size-3.5 text-muted-foreground" />
               </div>
               <h3 className="text-sm font-semibold">Recentes</h3>
             </div>

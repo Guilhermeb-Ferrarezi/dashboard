@@ -43,6 +43,7 @@ import {
   MagnifyingGlass,
   Monitor,
   Moon,
+  MoonStars,
   Note,
   Palette,
   PencilSimple,
@@ -127,6 +128,7 @@ export const MailIcon = EnvelopeSimple;
 export const MinusIcon = Minus;
 export const MonitorIcon = Monitor;
 export const MoonIcon = Moon;
+export const MoonStarsIcon = MoonStars;
 export const MoreHorizontalIcon = DotsThree;
 export const OctagonXIcon = XCircle;
 export const PaletteIcon = Palette;

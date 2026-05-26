@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -736,36 +737,30 @@ export function CorujaoTrabalhoTabela() {
             onChange={(e) => handleSearch(e.target.value)}
             className="h-9 w-72 text-sm"
           />
-          <select
+          <Select
             value={filterConversa}
-            onChange={(e) => {
-              setFilterConversa(e.target.value as StatusConversa | "");
+            onValueChange={(value) => {
+              setFilterConversa(value as StatusConversa | "");
               setPage(1);
             }}
-            className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="">Todos os status (conversa)</option>
-            {STATUS_CONVERSA_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
+            options={[
+              { value: "", label: "Todos os status (conversa)" },
+              ...STATUS_CONVERSA_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+            ]}
+            className="w-56"
+          />
+          <Select
             value={filterPagamento}
-            onChange={(e) => {
-              setFilterPagamento(e.target.value as StatusPagamento | "");
+            onValueChange={(value) => {
+              setFilterPagamento(value as StatusPagamento | "");
               setPage(1);
             }}
-            className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="">Todos os status (pagamento)</option>
-            {STATUS_PAGAMENTO_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Todos os status (pagamento)" },
+              ...STATUS_PAGAMENTO_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+            ]}
+            className="w-56"
+          />
           {showingFiltered && (
             <Button
               variant="ghost"
@@ -803,7 +798,7 @@ export function CorujaoTrabalhoTabela() {
             className="m-4"
           />
         ) : (
-          <Table>
+          <Table variant="linear">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
@@ -1049,62 +1044,44 @@ export function CorujaoTrabalhoTabela() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="contato-origem">Origem</Label>
-                <select
+                <Select
                   id="contato-origem"
                   value={form.origem}
-                  onChange={(e) => setForm((f) => ({ ...f, origem: e.target.value as Origem }))}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {ORIGEM_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(value) =>
+                    setForm((f) => ({ ...f, origem: value as Origem }))
+                  }
+                  options={ORIGEM_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="contato-status-conversa">Status conversa</Label>
-                <select
+                <Select
                   id="contato-status-conversa"
                   value={form.statusConversa}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      statusConversa: e.target.value as StatusConversa | ""
-                    }))
+                  onValueChange={(value) =>
+                    setForm((f) => ({ ...f, statusConversa: value as StatusConversa | "" }))
                   }
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">— (nenhum)</option>
-                  {STATUS_CONVERSA_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: "— (nenhum)" },
+                    ...STATUS_CONVERSA_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+                  ]}
+                />
               </div>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="contato-status-pagamento">Status pagamento</Label>
-              <select
+              <Select
                 id="contato-status-pagamento"
                 value={form.statusPagamento}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    statusPagamento: e.target.value as StatusPagamento | ""
-                  }))
+                onValueChange={(value) =>
+                  setForm((f) => ({ ...f, statusPagamento: value as StatusPagamento | "" }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">— (nenhum)</option>
-                {STATUS_PAGAMENTO_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— (nenhum)" },
+                  ...STATUS_PAGAMENTO_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+                ]}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -1148,27 +1125,24 @@ export function CorujaoTrabalhoTabela() {
           <form onSubmit={handleVisitaSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="visita-sessao">Sessão do Corujão</Label>
-              <select
+              <Select
                 id="visita-sessao"
                 value={visitaForm.sessaoId}
-                onChange={(e) =>
-                  setVisitaForm((f) => ({ ...f, sessaoId: e.target.value }))
+                onValueChange={(value) =>
+                  setVisitaForm((f) => ({ ...f, sessaoId: value }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {sessoesFuturas.length === 0 ? (
-                  <option value="">— sem sessão (avulsa)</option>
-                ) : (
-                  <>
-                    {sessoesFuturas.map((s) => (
-                      <option key={s.id} value={String(s.id)}>
-                        {formatSessaoOptionLabel(s)}
-                      </option>
-                    ))}
-                    <option value="">— sem sessão (avulsa)</option>
-                  </>
-                )}
-              </select>
+                options={
+                  sessoesFuturas.length === 0
+                    ? [{ value: "", label: "— sem sessão (avulsa)" }]
+                    : [
+                        ...sessoesFuturas.map((s) => ({
+                          value: String(s.id),
+                          label: formatSessaoOptionLabel(s),
+                        })),
+                        { value: "", label: "— sem sessão (avulsa)" },
+                      ]
+                }
+              />
               {sessoesFuturas.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   Nenhuma sessão futura cadastrada — visita vai ficar como avulsa.
@@ -1178,27 +1152,21 @@ export function CorujaoTrabalhoTabela() {
 
             <div className="space-y-1.5">
               <Label htmlFor="visita-colaborador">Vendido por</Label>
-              <select
+              <Select
                 id="visita-colaborador"
                 value={visitaForm.colaboradorId}
-                onChange={(e) =>
-                  setVisitaForm((f) => ({ ...f, colaboradorId: e.target.value }))
+                onValueChange={(value) =>
+                  setVisitaForm((f) => ({ ...f, colaboradorId: value }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {colaboradores.length === 0 ? (
-                  <option value="">— sem atribuição</option>
-                ) : (
-                  <>
-                    {colaboradores.map((c) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.nome}
-                      </option>
-                    ))}
-                    <option value="">— sem atribuição</option>
-                  </>
-                )}
-              </select>
+                options={
+                  colaboradores.length === 0
+                    ? [{ value: "", label: "— sem atribuição" }]
+                    : [
+                        ...colaboradores.map((c) => ({ value: String(c.id), label: c.nome })),
+                        { value: "", label: "— sem atribuição" },
+                      ]
+                }
+              />
               {colaboradores.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   Nenhum colaborador ativo. Cadastre em /corujao/colaboradores.
@@ -1242,23 +1210,14 @@ export function CorujaoTrabalhoTabela() {
 
             <div className="space-y-1.5">
               <Label htmlFor="visita-forma">Forma de pagamento</Label>
-              <select
+              <Select
                 id="visita-forma"
                 value={visitaForm.formaPagamento}
-                onChange={(e) =>
-                  setVisitaForm((f) => ({
-                    ...f,
-                    formaPagamento: e.target.value as FormaPagamento
-                  }))
+                onValueChange={(value) =>
+                  setVisitaForm((f) => ({ ...f, formaPagamento: value as FormaPagamento }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {FORMA_PAGAMENTO_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                options={FORMA_PAGAMENTO_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              />
             </div>
 
             <div className="space-y-1.5">

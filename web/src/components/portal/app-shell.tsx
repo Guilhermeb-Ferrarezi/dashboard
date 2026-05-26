@@ -317,7 +317,7 @@ export function AppShell({
           <SidebarMenuButton
             render={<button type="button" />}
             isActive={active}
-            className="relative w-full h-9 !py-0 !pl-2 !pr-8 !flex items-center gap-2"
+            className="relative w-full h-8 !py-0 !pl-2 !pr-8 !flex items-center gap-2"
             aria-expanded={isOpen}
             aria-controls={`${item.href.slice(1)}-submenu`}
             onClick={() => {
@@ -338,7 +338,7 @@ export function AppShell({
           <SidebarMenuButton
             render={<Link href={item.href} />}
             isActive={active}
-            className="relative w-full h-9 !py-0 !pl-8 !pr-2 !flex items-center gap-2"
+            className="relative w-full h-8 !py-0 !pl-2 !pr-2 !flex items-center gap-2"
           >
             <span className="min-w-0 truncate text-sm leading-5">{item.label}</span>
           </SidebarMenuButton>
@@ -440,11 +440,12 @@ export function AppShell({
           />
 
           {visibleSidebarGroups.map((group) => (
-            <SidebarGroup key={group.label}>
-              <Button
+            <SidebarGroup key={group.label} className="mt-2 first:mt-0">
+              {/* Header Linear-style: label uppercase tiny + chevron discreto.
+                 Ícone de grupo removido — Linear/Vercel não usam, fica mais limpo. */}
+              <button
                 type="button"
-                variant="ghost"
-                className="mb-1 flex h-9 w-full items-center justify-between gap-2 rounded-md px-2 text-sidebar-foreground/70 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground aria-expanded:bg-sidebar-foreground/10 aria-expanded:text-sidebar-foreground"
+                className="group/group-header mb-0.5 flex h-6 w-full items-center justify-between gap-2 rounded-sm px-2 text-sidebar-foreground/55 transition-colors hover:text-sidebar-foreground/80"
                 onClick={() =>
                   setOpenGroups((current) => ({
                     ...current,
@@ -458,21 +459,17 @@ export function AppShell({
                 }
                 aria-expanded={openGroups[group.label] ?? routeOpenGroups[group.label] ?? false}
               >
-                <SidebarGroupLabel className="flex min-w-0 flex-1 items-center gap-2 px-0">
-                  {(() => {
-                    const GroupIcon = portalIconMap[group.iconKey];
-                    return <GroupIcon className="size-4" />;
-                  })()}
+                <SidebarGroupLabel className="flex min-w-0 flex-1 items-center px-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-current">
                   <span className="truncate">{group.label}</span>
                 </SidebarGroupLabel>
                 <ChevronRightIcon
                   className={cn(
-                    "size-4 shrink-0 transition-transform",
+                    "size-3 shrink-0 opacity-0 transition-[opacity,transform] group-hover/group-header:opacity-100",
                     (openGroups[group.label] ?? routeOpenGroups[group.label] ?? false) &&
-                      "rotate-90",
+                      "rotate-90 opacity-100",
                   )}
                 />
-              </Button>
+              </button>
               <SidebarGroupContent>
                 <SidebarMenuSub
                   open={openGroups[group.label] ?? routeOpenGroups[group.label] ?? false}
@@ -507,13 +504,15 @@ export function AppShell({
         <div className="relative flex h-full">
           <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
             <SystemBanner />
+            {/* Header Linear-style: fino (~44px), tipografia compacta,
+               actions ghost com hover sutil. */}
             <header className="shrink-0 z-20 bg-sidebar">
-              <div className="flex w-full items-center gap-4 px-6 py-4">
+              <div className="flex w-full items-center gap-3 px-4 py-2">
                 <SidebarTrigger />
-                <nav className="flex min-w-0 flex-1 items-center gap-2 text-base text-muted-foreground">
+                <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
                   {breadcrumb ? (
                     breadcrumb.map((item, i) => (
-                      <span key={i} className="flex items-center gap-2">
+                      <span key={i} className="flex items-center gap-1.5">
                         <Link href={item.href} className="hover:text-foreground transition-colors">
                           {item.label}
                         </Link>
@@ -522,7 +521,7 @@ export function AppShell({
                     ))
                   ) : eyebrow ? (
                     eyebrow.split("›").map((segment, i, arr) => (
-                      <span key={i} className="flex items-center gap-2">
+                      <span key={i} className="flex items-center gap-1.5">
                         <span>{segment.trim()}</span>
                         {i < arr.length - 1 || title ? (
                           <span className="text-muted-foreground/40">/</span>
@@ -530,20 +529,21 @@ export function AppShell({
                       </span>
                     ))
                   ) : null}
-                  <span className="truncate font-semibold text-foreground">{title}</span>
+                  <span className="truncate font-medium text-foreground">{title}</span>
                 </nav>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <ApiHealthIndicator className="hidden md:inline-flex" />
                   <ThemeCycleButton />
                   {user.role === "admin" ? (
                     <Button
                       type="button"
-                      variant={codexOpen ? "default" : "outline"}
-                      className="gap-2"
+                      variant={codexOpen ? "secondary" : "ghost"}
+                      size="sm"
+                      className="gap-1.5"
                       onClick={() => setCodexOpen((current) => !current)}
                     >
                       <PanelRightOpenIcon className="size-4" />
-                      {codexOpen ? "Fechar IA" : "Abrir IA"}
+                      <span className="hidden sm:inline">{codexOpen ? "Fechar IA" : "Abrir IA"}</span>
                     </Button>
                   ) : null}
                 </div>
