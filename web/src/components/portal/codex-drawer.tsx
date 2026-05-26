@@ -8,20 +8,20 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import {
-  ArrowsOutSimple,
-  ArrowUp,
-  ArrowCounterClockwise,
-  ArrowSquareOut,
-  CaretDown,
-  MagnifyingGlass,
-  Play,
-  Plus,
-  SlidersHorizontal,
-  Shield,
-  Spinner,
-  Square,
-  X,
-} from "@phosphor-icons/react";
+  ArrowUpIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
+  Loader2Icon,
+  MaximizeIcon,
+  PlayIcon,
+  PlusIcon,
+  RefreshCcwIcon,
+  SearchIcon,
+  ShieldIcon,
+  SlidersHorizontalIcon,
+  SquareIcon,
+  XIcon,
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -884,7 +884,7 @@ export function CodexDrawer({
         <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-              <Shield className="size-5" />
+              <ShieldIcon className="size-5" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-destructive">
@@ -901,11 +901,11 @@ export function CodexDrawer({
 
           <div className="mt-5 flex flex-wrap gap-2">
             <Button type="button" className="gap-2" onClick={onRequestOpenSettings}>
-              <Shield className="size-4" />
+              <ShieldIcon className="size-4" />
               Abrir configuracoes
             </Button>
             <Button type="button" variant="outline" className="gap-2" onClick={() => void refreshAccount()}>
-              <ArrowCounterClockwise className="size-4" />
+              <RefreshCcwIcon className="size-4" />
               Atualizar estado
             </Button>
           </div>
@@ -937,7 +937,7 @@ export function CodexDrawer({
                 className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-card/80"
               >
                 <span className="truncate">{currentThread?.title || "New conversation"}</span>
-                <CaretDown className="size-3.5 shrink-0" />
+                <ChevronDownIcon className="size-3.5 shrink-0" />
               </button>
 
               {historyOpen ? (
@@ -950,14 +950,14 @@ export function CodexDrawer({
                   )}
                 >
                   <div className="relative">
-                    <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       value={historySearch}
                       onChange={(event) => setHistorySearch(event.target.value)}
                       placeholder="Search..."
                       className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-10 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/50"
                     />
-                    <MagnifyingGlass className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <SearchIcon className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   </div>
 
                   <div className="px-1 pb-1 pt-3">
@@ -1007,15 +1007,15 @@ export function CodexDrawer({
 
             <div className="flex shrink-0 items-center gap-0.5">
               <Button type="button" variant="ghost" size="icon-sm" onClick={resetChat}>
-                <Plus className="size-4" />
+                <PlusIcon className="size-4" />
                 <span className="sr-only">Novo chat</span>
               </Button>
               <Button type="button" variant="ghost" size="icon-sm" onClick={toggleFullscreen}>
-                <ArrowsOutSimple className="size-4" />
+                <MaximizeIcon className="size-4" />
                 <span className="sr-only">Tela cheia</span>
               </Button>
               <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
-                <X className="size-4" />
+                <XIcon className="size-4" />
                 <span className="sr-only">Fechar chat</span>
               </Button>
             </div>
@@ -1043,7 +1043,7 @@ export function CodexDrawer({
               className="gap-2"
               onClick={() => window.open(deviceLogin.verificationUrl, "_blank", "noopener,noreferrer")}
             >
-              <ArrowSquareOut className="size-3.5" />
+              <ExternalLinkIcon className="size-3.5" />
               Abrir verificacao
             </Button>
             <code className="rounded-md bg-card px-2 py-1 text-xs text-foreground">
@@ -1061,7 +1061,7 @@ export function CodexDrawer({
             {!canChat ? (
               <div className="py-1 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2 text-foreground">
-                  <Shield className="size-4 text-primary" />
+                  <ShieldIcon className="size-4 text-primary" />
                   {allowDeviceLogin
                     ? "Conecte a conta compartilhada para liberar o agente."
                     : "O agente nao usa login compartilhado neste modo."}
@@ -1074,12 +1074,12 @@ export function CodexDrawer({
                 <div className="mt-3 flex flex-wrap gap-2">
                   {allowDeviceLogin ? (
                     <Button type="button" size="sm" className="gap-2" onClick={startDeviceLogin}>
-                      <Play className="size-3.5" />
+                      <PlayIcon className="size-3.5" />
                       Conectar ChatGPT
                     </Button>
                   ) : null}
                   <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => void refreshThreads()}>
-                    <ArrowCounterClockwise className="size-3.5" />
+                    <RefreshCcwIcon className="size-3.5" />
                     Atualizar
                   </Button>
                 </div>
@@ -1088,7 +1088,7 @@ export function CodexDrawer({
 
             {canChat && loadingThread ? (
               <div className="flex items-center gap-2 px-0.5 py-1 text-sm text-muted-foreground">
-                <Spinner className="size-4 animate-spin" />
+                <Loader2Icon className="size-4 animate-spin" />
                 Carregando conversa...
               </div>
             ) : null}
@@ -1131,7 +1131,7 @@ export function CodexDrawer({
                   <div key={entry.id} className="rounded-xl border border-border/60 bg-card/40 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        <CaretDown className={cn("size-3 shrink-0 transition-transform", hidden && "-rotate-90")} />
+                        <ChevronDownIcon className={cn("size-3 shrink-0 transition-transform", hidden && "-rotate-90")} />
                         <span>thinking</span>
                       </div>
                       <button
@@ -1168,7 +1168,7 @@ export function CodexDrawer({
 
                   return (
                     <div key={entry.id} className="flex items-center gap-2 px-0.5 py-1 text-sm text-muted-foreground">
-                      <Spinner className="size-4 animate-spin" />
+                      <Loader2Icon className="size-4 animate-spin" />
                       <span>{summarizeCodexCommand(entry.command)}</span>
                     </div>
                   );
@@ -1185,7 +1185,7 @@ export function CodexDrawer({
                         onClick={() => toggleCommandDetails(entry.id)}
                         aria-expanded={expanded}
                       >
-                        <CaretDown className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
+                        <ChevronDownIcon className={cn("size-3 shrink-0 transition-transform", !expanded && "-rotate-90")} />
                         <span className="truncate">Consulta técnica</span>
                       </button>
                       <Badge className="border border-sky-500/20 bg-sky-500/10 text-sky-300">
@@ -1293,7 +1293,7 @@ export function CodexDrawer({
                       className="rounded-full text-muted-foreground"
                       onClick={interruptTurn}
                     >
-                      <Square className="size-3.5" />
+                      <SquareIcon className="size-3.5" />
                       <span className="sr-only">Interromper</span>
                     </Button>
                   ) : (
@@ -1303,7 +1303,7 @@ export function CodexDrawer({
                       size="icon-sm"
                       className="rounded-full text-muted-foreground"
                     >
-                      <SlidersHorizontal className="size-3.5" />
+                      <SlidersHorizontalIcon className="size-3.5" />
                       <span className="sr-only">Ajustes</span>
                     </Button>
                   )}
@@ -1315,7 +1315,7 @@ export function CodexDrawer({
                     onClick={() => sendPrompt()}
                     disabled={!canChat || sending}
                   >
-                    {sending ? <Spinner className="size-3.5 animate-spin" /> : <ArrowUp className="size-3.5" />}
+                    {sending ? <Loader2Icon className="size-3.5 animate-spin" /> : <ArrowUpIcon className="size-3.5" />}
                     <span className="sr-only">Enviar</span>
                   </Button>
                 </div>

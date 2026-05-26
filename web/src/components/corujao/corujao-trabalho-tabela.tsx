@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusBadgeTone } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -277,25 +277,9 @@ function normalizePhoneForWhatsApp(phone: string): string | null {
   return `55${digits}`;
 }
 
-function toneClass(tone: string): string {
-  switch (tone) {
-    case "amber":
-      return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    case "emerald":
-      return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    case "red":
-      return "bg-red-500/15 text-red-400 border-red-500/30";
-    case "blue":
-      return "bg-blue-500/15 text-blue-400 border-blue-500/30";
-    case "muted":
-    default:
-      return "bg-muted text-muted-foreground border-border/40";
-  }
-}
-
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <Skeleton className="h-9 w-full max-w-3xl" />
       <div className="rounded-lg border border-border/60 overflow-hidden">
         <div className="flex gap-6 border-b border-border/40 px-4 py-3">
@@ -741,7 +725,7 @@ export function CorujaoTrabalhoTabela() {
   const showingFiltered = !!(query || filterConversa || filterPagamento);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <CorujaoProximaSessaoCard sessao={proximaSessao} loading={proximaLoading} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -867,12 +851,9 @@ export function CorujaoTrabalhoTabela() {
                                 className="h-7 -mx-2 px-2 font-normal"
                                 disabled={busy}
                               >
-                                <Badge
-                                  variant="outline"
-                                  className={`font-normal ${toneClass(conversaOpt?.tone ?? "muted")}`}
-                                >
+                                <StatusBadge tone={(conversaOpt?.tone ?? "muted") as StatusBadgeTone}>
                                   {conversaOpt?.label ?? "—"}
-                                </Badge>
+                                </StatusBadge>
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start">
@@ -916,12 +897,9 @@ export function CorujaoTrabalhoTabela() {
                                 className="h-7 -mx-2 px-2 font-normal"
                                 disabled={busy}
                               >
-                                <Badge
-                                  variant="outline"
-                                  className={`font-normal ${toneClass(pagamentoOpt?.tone ?? "muted")}`}
-                                >
+                                <StatusBadge tone={(pagamentoOpt?.tone ?? "muted") as StatusBadgeTone}>
                                   {pagamentoOpt?.label ?? "—"}
-                                </Badge>
+                                </StatusBadge>
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start">

@@ -552,14 +552,21 @@ export function AppShell({
 
             <div
               className={cn(
-                "flex w-full flex-1 min-h-0 overflow-hidden p-[24px]",
+                // Padding do gutter externo respeita o switch de densidade
+                // (--app-page-padding-* definidos em globals.css).
+                "flex w-full flex-1 min-h-0 overflow-hidden",
+                "px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]",
               )}
             >
               <main
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col rounded-[24px] bg-card border border-border/30 p-[24px] shadow-sm overflow-y-auto",
+                  // Main é um card visual — raio entra na escala de --radius
+                  // (rounded-3xl ≈ 22px, antes era hardcoded em 24px) e
+                  // padding usa --card-padding-* pra também responder à densidade.
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col rounded-3xl bg-card border border-border/30 shadow-sm overflow-y-auto",
+                  "px-[var(--card-padding-x)] py-[var(--card-padding-y)]",
                   lockViewport && "overflow-hidden",
                 )}
               >
