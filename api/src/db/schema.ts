@@ -106,7 +106,7 @@ export const colaboradores = pgTable("colaboradores", {
 
 export const corujaoSessoes = pgTable("corujao_sessoes", {
   id: serial("id").primaryKey(),
-  data: date("data").notNull(),
+  data: date("data", { mode: "string" }).notNull(),
   totalVagas: integer("total_vagas").notNull().default(10),
   status: text("status", {
     enum: ["planejado", "aberto", "lotado", "realizado", "cancelado"]
