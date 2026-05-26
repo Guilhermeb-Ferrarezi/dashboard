@@ -42,7 +42,7 @@ export async function getVagasPayload(): Promise<VagasPayload> {
   const db = getCheckoutDb();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [sessao] = await db
+  const sessoes = await db
     .select()
     .from(schema.corujaoSessoes)
     .where(
@@ -51,19 +51,29 @@ export async function getVagasPayload(): Promise<VagasPayload> {
         inArray(schema.corujaoSessoes.status, ["planejado", "aberto", "lotado"])
       )
     )
-    .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id))
-    .limit(1);
+    .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id));
+
+  if (sessoes.length === 0) return null;
+
+  const vagasMap = new Map<number, number>();
+  const rows = await db
+    .select({ sessaoId: schema.corujaoVisitas.sessaoId, total: count() })
+    .from(schema.corujaoVisitas)
+    .where(inArray(schema.corujaoVisitas.sessaoId, sessoes.map((s) => s.id)))
+    .groupBy(schema.corujaoVisitas.sessaoId);
+
+  for (const r of rows) {
+    if (r.sessaoId !== null) vagasMap.set(r.sessaoId, r.total);
+  }
+
+  const sessao = sessoes.find((s) => {
+    const vendidas = vagasMap.get(s.id) ?? 0;
+    return vendidas < s.totalVagas;
+  });
 
   if (!sessao) return null;
 
-  const [row] = await db
-    .select({ total: count() })
-    .from(schema.corujaoVisitas)
-    .where(
-      inArray(schema.corujaoVisitas.sessaoId, [sessao.id])
-    );
-
-  const vagasVendidas = row?.total ?? 0;
+  const vagasVendidas = vagasMap.get(sessao.id) ?? 0;
 
   return {
     sessaoId: sessao.id,
