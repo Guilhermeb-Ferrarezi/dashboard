@@ -147,7 +147,7 @@ export const corujaoVisitas = pgTable("corujao_visitas", {
     .references(() => corujaoContatos.id, { onDelete: "cascade" }),
   sessaoId: integer("sessao_id")
     .references(() => corujaoSessoes.id, { onDelete: "set null" }),
-  dataVisita: date("data_visita").notNull(),
+  dataVisita: date("data_visita", { mode: "string" }).notNull(),
   amountCents: integer("amount_cents").notNull(),
   formaPagamento: text("forma_pagamento", {
     enum: ["pix", "dinheiro", "cartao", "gateway", "cortesia", "outro"]
