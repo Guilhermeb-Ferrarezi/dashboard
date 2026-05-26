@@ -215,6 +215,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           keywords: ["corujao", "contatos", "leads", "prospec", "trabalho"],
           children: [
             portalItem({
+              href: "/corujao/painel",
+              label: "Painel",
+              description: "Meta vs. realizado — fiscalização do Corujão",
+              icon: LayoutDashboardIcon,
+              kind: "resource",
+              keywords: ["painel", "fiscalizacao", "meta", "metodo 4", "kpi", "vendas"],
+            }),
+            portalItem({
               href: "/corujao",
               label: "Tela de trabalho",
               description: "Lista priorizada pra encher o próximo Corujão",
