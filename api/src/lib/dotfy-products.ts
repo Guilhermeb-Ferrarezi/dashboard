@@ -32,18 +32,13 @@ export type DotfyProductResult =
   | { ok: true; productId: string; slug: string }
   | { ok: false; error: string };
 
-function finalPrice(priceCents: number, discountPercent?: number | null): number {
-  if (!discountPercent) return priceCents / 100;
-  return Math.round(priceCents * (1 - discountPercent / 100)) / 100;
-}
-
 export async function createDotfyProduct(input: DotfyProductInput): Promise<DotfyProductResult> {
   if (!DOTFY_API_KEY) {
     return { ok: false, error: "DOTFY_API_KEY not configured" };
   }
 
   const slug = input.slug || toSlug(input.title);
-  const price = finalPrice(input.priceCents, input.discountPercent);
+  const price = input.priceCents / 100;
 
   const response = await fetch(`${DOTFY_API_URL}/api/products`, {
     method: "POST",
@@ -54,7 +49,8 @@ export async function createDotfyProduct(input: DotfyProductInput): Promise<Dotf
       price,
       slug,
       isActive: input.isActive ?? true,
-      ...(input.imageUrl ? { imageUrl: input.imageUrl } : {})
+      ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
+      ...(input.discountPercent ? { discountPercent: input.discountPercent } : {})
     })
   });
 
@@ -70,11 +66,31 @@ export async function createDotfyProduct(input: DotfyProductInput): Promise<Dotf
     return { ok: false, error: json.error ?? `HTTP ${response.status}` };
   }
 
+  const productId = json.data.id ?? "";
+
+  // Se o create não aceitou discountPercent inline, tenta aplicar via PATCH
+  if (input.discountPercent && productId) {
+    await applyDotfyDiscount(productId, input.discountPercent);
+  }
+
   return {
     ok: true,
-    productId: json.data.id ?? "",
+    productId,
     slug: json.data.slug ?? slug
   };
+}
+
+async function applyDotfyDiscount(productId: string, discountPercent: number): Promise<void> {
+  try {
+    const res = await fetch(`${DOTFY_API_URL}/api/products/${productId}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ discountPercent })
+    });
+    console.log("[dotfy] apply discount response", res.status);
+  } catch (err) {
+    console.warn("[dotfy] apply discount error:", err);
+  }
 }
 
 export async function deleteDotfyProduct(productId: string): Promise<{ ok: boolean; error?: string }> {
