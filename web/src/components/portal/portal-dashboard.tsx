@@ -285,13 +285,12 @@ function downloadCsv(filename: string, rows: Array<Record<string, string | numbe
 
 function InitialAvatar({ name }: { name: string }) {
   const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
+  // Paleta neutra (Linear-style) — diferenciação via inicial, não cor.
+  // Mantém uma variação sutil de opacidade pra não virar todo um chumbo.
   const palette = [
-    "bg-emerald-500/20 text-emerald-300",
-    "bg-sky-500/20 text-sky-300",
-    "bg-amber-500/20 text-amber-300",
-    "bg-violet-500/20 text-violet-300",
-    "bg-rose-500/20 text-rose-300",
-    "bg-cyan-500/20 text-cyan-300",
+    "bg-foreground/10 text-foreground/80",
+    "bg-foreground/8 text-foreground/75",
+    "bg-foreground/12 text-foreground/85",
   ];
   const code = initial.charCodeAt(0) || 0;
   const cls = palette[code % palette.length];
@@ -625,8 +624,8 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
       rawValue: ssoProjects,
       hint: totalProjects ? `${Math.round((ssoProjects / totalProjects) * 100)}% do catálogo` : "—",
       icon: ShieldCheckIcon,
-      tone: "bg-sky-500/10 text-sky-400",
-      progress: { value: ssoProjects, total: totalProjects, tone: "bg-sky-500" },
+      tone: "bg-foreground/8 text-foreground/80",
+      progress: { value: ssoProjects, total: totalProjects, tone: "bg-foreground/50" },
     },
     {
       label: "Live",
@@ -1096,7 +1095,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
                 </div>
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Beta</p>
-                  <p className="mt-0.5 text-2xl font-semibold tabular-nums text-sky-400">
+                  <p className="mt-0.5 text-2xl font-semibold tabular-nums text-foreground">
                     <AnimatedNumber value={betaProjects} />
                   </p>
                   <p className="text-[10px] text-muted-foreground">{pilotProjects} piloto</p>
@@ -1109,7 +1108,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
           <Card className="border-border/60 bg-card/80">
             <CardHeader className="border-b border-border/40 py-3">
               <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <ActivityIcon className="size-4 text-sky-400" />
+                <ActivityIcon className="size-4 text-muted-foreground" />
                 Performance
               </CardTitle>
             </CardHeader>
@@ -1137,7 +1136,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
                 </div>
               </div>
               {sparkLatency.some((v) => v > 0) ? (
-                <Sparkline data={sparkLatency} className="text-sky-400 opacity-80" />
+                <Sparkline data={sparkLatency} className="text-muted-foreground opacity-80" />
               ) : (
                 <div className="h-6 rounded bg-muted/20" />
               )}
@@ -1251,7 +1250,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <TimelineLine data={selectedWindow.buckets} strokeClass="text-sky-400" />
+                <TimelineLine data={selectedWindow.buckets} strokeClass="text-muted-foreground" />
               </CardContent>
             </Card>
           </div>
@@ -1442,7 +1441,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
                 { label: "Projetos", value: totalProjects, dotClass: "bg-muted-foreground/50" },
                 { label: "Live", value: liveProjects, dotClass: "bg-emerald-500" },
                 { label: "Piloto", value: pilotProjects, dotClass: "bg-amber-500" },
-                { label: "Beta", value: betaProjects, dotClass: "bg-sky-500" },
+                { label: "Beta", value: betaProjects, dotClass: "bg-foreground/40" },
               ].map((row) => (
                 <div
                   key={row.label}
