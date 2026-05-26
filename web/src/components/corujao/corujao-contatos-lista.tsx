@@ -146,7 +146,7 @@ function origemLabel(value: Origem) {
 
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <Skeleton className="h-9 w-72" />
       <div className="rounded-lg border border-border/60 overflow-hidden">
         <div className="flex gap-8 border-b border-border/40 px-4 py-3">
@@ -304,7 +304,7 @@ export function CorujaoContatosLista() {
   if (loading && contatos.length === 0) return <ListSkeleton />;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-80">
           <Input

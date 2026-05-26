@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CheckIcon, MoonIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
+import { SectionHeader } from "@/components/ui/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, type StatusBadgeTone } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -76,19 +77,19 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function statusToneClass(status: StatusSessao): string {
+function statusToTone(status: StatusSessao): StatusBadgeTone {
   switch (status) {
     case "realizado":
-      return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+      return "emerald";
     case "aberto":
-      return "bg-blue-500/15 text-blue-400 border-blue-500/30";
+      return "blue";
     case "lotado":
-      return "bg-amber-500/15 text-amber-400 border-amber-500/30";
+      return "amber";
     case "cancelado":
-      return "bg-red-500/15 text-red-400 border-red-500/30";
+      return "red";
     case "planejado":
     default:
-      return "bg-muted text-muted-foreground border-border/40";
+      return "muted";
   }
 }
 
@@ -102,7 +103,7 @@ function KpiCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 p-5">
+    <div className="rounded-xl border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
       <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="text-2xl font-semibold mt-2 tabular-nums">{value}</p>
       {hint ? <p className="text-xs text-muted-foreground mt-1">{hint}</p> : null}
@@ -114,7 +115,7 @@ function CardsSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border/60 bg-card/40 p-5">
+        <div key={i} className="rounded-xl border border-border/60 bg-card/40 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
           <Skeleton className="h-3 w-16 mb-3" />
           <Skeleton className="h-6 w-24" />
         </div>
@@ -181,7 +182,7 @@ export function CorujaoPainel() {
   const totalReceita = painel?.totais.receitaCents ?? 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       {/* Header com período + chips */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-medium capitalize">
@@ -260,7 +261,7 @@ export function CorujaoPainel() {
       {/* Bloco 2: por colaborador */}
       <div className="rounded-lg border border-border/60 overflow-hidden">
         <div className="border-b border-border/60 bg-card/40 px-4 py-3">
-          <h3 className="text-sm font-medium">Vendas por colaborador</h3>
+          <SectionHeader title="Vendas por colaborador" />
         </div>
         {painel && painel.porColaborador.length === 0 ? (
           <EmptyState
@@ -310,7 +311,7 @@ export function CorujaoPainel() {
       {/* Bloco 3: sessões */}
       <div className="rounded-lg border border-border/60 overflow-hidden">
         <div className="border-b border-border/60 bg-card/40 px-4 py-3">
-          <h3 className="text-sm font-medium">Sessões no período</h3>
+          <SectionHeader title="Sessões no período" />
         </div>
         {painel && painel.sessoesNoPeriodo.length === 0 ? (
           <EmptyState
@@ -339,12 +340,9 @@ export function CorujaoPainel() {
                       {formatDataCurta(s.data)}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`font-normal capitalize ${statusToneClass(s.status)}`}
-                      >
+                      <StatusBadge tone={statusToTone(s.status)} className="capitalize">
                         {s.status}
-                      </Badge>
+                      </StatusBadge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       <span className={lotada ? "text-emerald-400" : ""}>

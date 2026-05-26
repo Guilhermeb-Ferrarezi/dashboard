@@ -66,7 +66,7 @@ function formatDate(iso: string) {
 
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <Skeleton className="h-9 w-full max-w-md" />
       <div className="rounded-lg border border-border/60 overflow-hidden">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -189,7 +189,7 @@ export function CorujaoColaboradoresLista() {
   if (loading && colaboradores.length === 0) return <ListSkeleton />;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {colaboradores.length === 0

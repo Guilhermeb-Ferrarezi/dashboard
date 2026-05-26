@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +22,7 @@ import { MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon } from "@/components
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, type StatusBadgeTone } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -107,25 +107,9 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function toneClass(tone: string): string {
-  switch (tone) {
-    case "blue":
-      return "bg-blue-500/15 text-blue-400 border-blue-500/30";
-    case "amber":
-      return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    case "emerald":
-      return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    case "red":
-      return "bg-red-500/15 text-red-400 border-red-500/30";
-    case "muted":
-    default:
-      return "bg-muted text-muted-foreground border-border/40";
-  }
-}
-
 function ListSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <Skeleton className="h-9 w-full max-w-md" />
       <div className="rounded-lg border border-border/60 overflow-hidden">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -259,7 +243,7 @@ export function CorujaoSessoesLista() {
   if (loading && sessoes.length === 0) return <ListSkeleton />;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--card-gap)]">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {sessoes.length === 0
@@ -308,12 +292,9 @@ export function CorujaoSessoesLista() {
                             className="h-7 -mx-2 px-2 font-normal"
                             disabled={busy}
                           >
-                            <Badge
-                              variant="outline"
-                              className={`font-normal ${toneClass(statusOpt?.tone ?? "muted")}`}
-                            >
+                            <StatusBadge tone={(statusOpt?.tone ?? "muted") as StatusBadgeTone}>
                               {statusOpt?.label ?? sessao.status}
-                            </Badge>
+                            </StatusBadge>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
@@ -333,12 +314,9 @@ export function CorujaoSessoesLista() {
                         {sessao.vagasVendidas} / {sessao.totalVagas}
                       </span>
                       {lotada && (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 font-normal bg-amber-500/15 text-amber-400 border-amber-500/30"
-                        >
+                        <StatusBadge tone="amber" className="ml-2">
                           Lotado
-                        </Badge>
+                        </StatusBadge>
                       )}
                     </TableCell>
                     <TableCell
