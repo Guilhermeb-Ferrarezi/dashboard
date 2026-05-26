@@ -10,11 +10,14 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+// Paleta alinhada com StatusBadge do projeto (bg-X-500/15 text-X-400
+// border-X-500/30). Mantemos os 4 tons semânticos; 'info' e 'idle' viram
+// neutros pra não competir com o ember do tema.
 const TONE_BORDER: Record<StatusTone, string> = {
-  success: "border-emerald-500/30 bg-emerald-500/8 text-emerald-500",
-  warning: "border-amber-500/30 bg-amber-500/8 text-amber-500",
-  error: "border-rose-500/30 bg-rose-500/8 text-rose-500",
-  info: "border-sky-500/30 bg-sky-500/8 text-sky-500",
+  success: "border-emerald-500/30 bg-emerald-500/15 text-emerald-400",
+  warning: "border-amber-500/30 bg-amber-500/15 text-amber-400",
+  error: "border-red-500/30 bg-red-500/15 text-red-400",
+  info: "border-border/60 bg-muted/40 text-muted-foreground",
   idle: "border-border/60 bg-muted/40 text-muted-foreground",
 };
 
