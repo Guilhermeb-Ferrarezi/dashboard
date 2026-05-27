@@ -22,9 +22,11 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
     return res.status(503).json({ message: "GA4 não configurado." });
   }
 
+  // Substrings únicas para identificar cada página via unifiedScreenName do GA4
+  // Títulos reais: "Corujão — SGA Gaming Night" | "Mix — SGA Gaming"
   const PAGE_TITLES: Record<string, string> = {
-    "/play/corujao": "Corujão SGA",
-    "/play/mix": "Mix SGA",
+    "/play/corujao": "gaming night",
+    "/play/mix": "mix",
   };
 
   try {
