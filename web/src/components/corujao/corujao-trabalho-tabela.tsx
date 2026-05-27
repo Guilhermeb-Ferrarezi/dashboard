@@ -540,7 +540,7 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
-  function handleChamar(contato: Contato) {
+  async function handleChamar(contato: Contato) {
     if (!contato.telefone) {
       toast.error("Contato sem telefone — cadastre o número antes de chamar.");
       return;
@@ -551,6 +551,20 @@ export function CorujaoTrabalhoTabela() {
       return;
     }
     window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+
+    setRowBusy(contato.id);
+    try {
+      const res = await clientApi<{ contato: Contato }>(
+        `/corujao/contatos/${contato.id}/marcar-contato`,
+        { method: "POST" }
+      );
+      setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      reloadMetricas();
+    } catch {
+      // silencioso — WhatsApp já abriu, não travar a UX
+    } finally {
+      setRowBusy(null);
+    }
   }
 
   async function handleSetChamada(contato: Contato, action: "chamou" | "nao_respondeu" | "limpar") {
