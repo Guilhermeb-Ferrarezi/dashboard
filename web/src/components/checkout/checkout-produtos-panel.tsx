@@ -561,7 +561,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
   }
 
   function handleCopyLink(produto: CheckoutProductSummary) {
-    const base = process.env.NEXT_PUBLIC_CHECKOUT_WEB_URL ?? "";
+    const base = process.env.NEXT_PUBLIC_CHECKOUT_WEB_URL ?? "https://checkout.santos-games.com";
     navigator.clipboard.writeText(`${base}/produto/${produto.id}`);
     toast.success("Link copiado!");
   }
