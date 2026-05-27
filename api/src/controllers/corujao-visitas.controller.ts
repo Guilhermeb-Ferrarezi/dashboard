@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
@@ -324,6 +324,54 @@ export async function updateVisita(req: Request, res: Response) {
     }
     console.error("[corujao] updateVisita error:", error);
     return res.status(500).json({ message: "Erro ao atualizar visita." });
+  }
+}
+
+export async function listVisitasBySessao(req: Request, res: Response) {
+  try {
+    const sessaoId = Number(req.params.id);
+    if (!Number.isInteger(sessaoId) || sessaoId <= 0) {
+      return res.status(400).json({ message: "sessaoId inválido." });
+    }
+
+    const db = getCheckoutDb();
+    const visitas = await db
+      .select()
+      .from(schema.corujaoVisitas)
+      .where(eq(schema.corujaoVisitas.sessaoId, sessaoId))
+      .orderBy(desc(schema.corujaoVisitas.createdAt));
+
+    const contatoIds = [...new Set(visitas.map((v) => v.contatoId))];
+    const contatos = contatoIds.length > 0
+      ? await db.select().from(schema.corujaoContatos).where(inArray(schema.corujaoContatos.id, contatoIds))
+      : [];
+
+    const contatoMap = new Map(contatos.map((c) => [c.id, c]));
+
+    const customerUserIds = contatos.map((c) => c.checkoutUserId).filter((id): id is number => id !== null);
+    const customers = customerUserIds.length > 0
+      ? await db.select().from(schema.checkoutCustomers).where(inArray(schema.checkoutCustomers.userId, customerUserIds))
+      : [];
+
+    const customerMap = new Map(customers.map((c) => [c.userId, c]));
+
+    const result = visitas.map((v) => {
+      const contato = contatoMap.get(v.contatoId);
+      const customer = contato?.checkoutUserId ? customerMap.get(contato.checkoutUserId) : null;
+      return {
+        ...serializeVisita(v),
+        contato: contato ? {
+          nome: contato.nome ?? customer?.name ?? null,
+          telefone: contato.telefone ?? customer?.cellphone ?? null,
+          email: contato.email ?? customer?.userEmail ?? null
+        } : null
+      };
+    });
+
+    return res.json({ visitas: result });
+  } catch (error) {
+    console.error("[corujao] listVisitasBySessao error:", error);
+    return res.status(500).json({ message: "Erro ao listar visitas da sessão." });
   }
 }
 

@@ -5,9 +5,9 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 RUN apk add --no-cache curl ripgrep
 
-COPY package.json bun.lock ./
+COPY package.json ./
 
-RUN bun install --frozen-lockfile --production
+RUN bun install
 RUN bun install -g @openai/codex && command -v codex && codex --version
 
 COPY scripts/bootstrap-codex-home.sh /usr/local/bin/bootstrap-codex-home.sh

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon } from "@/components/ui/icons";
+import { MailIcon, MinusIcon, MoonIcon, MoreHorizontalIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -125,6 +125,70 @@ function ListSkeleton() {
   );
 }
 
+function EditableVagas({
+  sessaoId,
+  vagasVendidas,
+  totalVagas,
+  lotada,
+  disabled,
+  onSaveTotalVagas
+}: {
+  sessaoId: number;
+  vagasVendidas: number;
+  totalVagas: number;
+  lotada: boolean;
+  disabled: boolean;
+  onSaveTotalVagas: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(totalVagas));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function startEdit() {
+    if (disabled) return;
+    setValue(String(totalVagas));
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function save() {
+    setEditing(false);
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num >= 0 && num !== totalVagas) {
+      onSaveTotalVagas(num);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="flex items-center gap-0.5">
+        <span className={lotada ? "text-amber-400" : ""}>{vagasVendidas}</span>
+        <span className="text-muted-foreground">/</span>
+        <input
+          ref={inputRef}
+          type="number"
+          min={0}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+          className="w-10 bg-transparent border-b border-primary text-center text-sm font-medium outline-none tabular-nums"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`cursor-pointer hover:underline ${lotada ? "text-amber-400" : ""}`}
+      onClick={startEdit}
+      title="Clique para editar"
+    >
+      {vagasVendidas} / {totalVagas}
+    </span>
+  );
+}
+
 export function CorujaoSessoesLista() {
   const [sessoes, setSessoes] = useState<Sessao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +201,60 @@ export function CorujaoSessoesLista() {
 
   const [deleteTarget, setDeleteTarget] = useState<Sessao | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  type VisitaComContato = { id: number; contatoId: number; formaPagamento: string; amountCents: number; contato: { nome: string | null; telefone: string | null; email: string | null } | null };
+  const [participantesSessao, setParticipantesSessao] = useState<Sessao | null>(null);
+  const [participantes, setParticipantes] = useState<VisitaComContato[]>([]);
+  const [loadingParticipantes, setLoadingParticipantes] = useState(false);
+
+  const [emailMode, setEmailMode] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  async function handleSendEmail() {
+    const emails = participantes
+      .map((p) => p.contato?.email)
+      .filter((e): e is string => !!e && e.includes("@"));
+
+    if (emails.length === 0) {
+      toast.error("Nenhum participante tem email cadastrado.");
+      return;
+    }
+    if (!emailSubject.trim() || !emailBody.trim()) {
+      toast.error("Preencha assunto e mensagem.");
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      await clientApi("/email/send", {
+        method: "POST",
+        body: JSON.stringify({ to: emails, subject: emailSubject.trim(), body: emailBody.trim() })
+      });
+      toast.success(`Email enviado para ${emails.length} participante${emails.length > 1 ? "s" : ""}.`);
+      setEmailMode(false);
+      setEmailSubject("");
+      setEmailBody("");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Erro ao enviar email."));
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  async function openParticipantes(sessao: Sessao) {
+    setParticipantesSessao(sessao);
+    setLoadingParticipantes(true);
+    try {
+      const res = await clientApi<{ visitas: VisitaComContato[] }>(`/corujao/sessoes/${sessao.id}/visitas`);
+      setParticipantes(res.visitas);
+    } catch {
+      toast.error("Erro ao carregar participantes.");
+    } finally {
+      setLoadingParticipantes(false);
+    }
+  }
 
   async function reload() {
     setLoading(true);
@@ -225,6 +343,22 @@ export function CorujaoSessoesLista() {
       toast.error(extractErrorMessage(error, "Erro ao salvar sessão."));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function updateTotalVagas(sessaoId: number, novoTotal: number) {
+    if (!Number.isInteger(novoTotal) || novoTotal < 0) return;
+    setRowBusy(sessaoId);
+    try {
+      const res = await clientApi<{ sessao: Sessao }>(`/corujao/sessoes/${sessaoId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ totalVagas: novoTotal })
+      });
+      setSessoes((cur) => cur.map((s) => (s.id === sessaoId ? res.sessao : s)));
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao atualizar vagas."));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -363,9 +497,14 @@ export function CorujaoSessoesLista() {
                         >
                           <MinusIcon className="h-3 w-3" />
                         </Button>
-                        <span className={lotada ? "text-amber-400" : ""}>
-                          {sessao.vagasVendidas} / {sessao.totalVagas}
-                        </span>
+                        <EditableVagas
+                          sessaoId={sessao.id}
+                          vagasVendidas={sessao.vagasVendidas}
+                          totalVagas={sessao.totalVagas}
+                          lotada={lotada}
+                          disabled={busy}
+                          onSaveTotalVagas={(v) => updateTotalVagas(sessao.id, v)}
+                        />
                         <Button
                           variant="ghost"
                           size="icon"
@@ -396,6 +535,10 @@ export function CorujaoSessoesLista() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openParticipantes(sessao)}>
+                            <UsersIcon className="mr-2 h-4 w-4" />
+                            Ver participantes
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEdit(sessao)}>
                             <PencilIcon className="mr-2 h-4 w-4" />
                             Editar
@@ -538,6 +681,85 @@ export function CorujaoSessoesLista() {
               {deleting ? "Apagando…" : "Apagar sessão"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!participantesSessao} onOpenChange={(open) => !open && setParticipantesSessao(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Participantes — {participantesSessao ? formatDataLong(participantesSessao.data) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          {loadingParticipantes ? (
+            <div className="flex flex-col gap-2 py-4">
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : participantes.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Nenhum participante nesta sessão.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Contato</TableHead>
+                  <TableHead>Pagamento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {participantes.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.contato?.nome ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.contato?.email ?? p.contato?.telefone ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <StatusBadge tone={p.formaPagamento === "gateway" ? "emerald" : p.formaPagamento === "cortesia" ? "muted" : "blue"}>
+                        {p.formaPagamento}
+                      </StatusBadge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          {!loadingParticipantes && participantes.length > 0 && !emailMode && (
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setEmailMode(true)}>
+                <MailIcon className="mr-2 h-3.5 w-3.5" />
+                Enviar email para participantes
+              </Button>
+            </DialogFooter>
+          )}
+
+          {emailMode && (
+            <div className="flex flex-col gap-3 border-t border-border/40 pt-4">
+              <p className="text-xs text-muted-foreground">
+                Será enviado para {participantes.filter((p) => p.contato?.email?.includes("@")).length} participante(s) com email.
+              </p>
+              <Input
+                placeholder="Assunto do email"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+              <Textarea
+                placeholder="Mensagem..."
+                rows={4}
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEmailMode(false)} disabled={sendingEmail}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSendEmail} disabled={sendingEmail}>
+                  <MailIcon className="mr-2 h-3.5 w-3.5" />
+                  {sendingEmail ? "Enviando…" : "Enviar"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

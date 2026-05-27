@@ -15,6 +15,7 @@ function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
     active: row.active,
     imageKey: row.imageKey ?? null,
     imageUrl: row.imageUrl ?? null,
+    isCorujao: row.isCorujao,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -305,6 +306,22 @@ export async function deleteCliente(req: Request, res: Response) {
     if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
 
     const db = getCheckoutDb();
+
+    const [paidOrder] = await db
+      .select({ id: schema.checkoutOrders.id })
+      .from(schema.checkoutOrders)
+      .where(
+        and(
+          eq(schema.checkoutOrders.userId, userId),
+          eq(schema.checkoutOrders.status, "paid")
+        )
+      )
+      .limit(1);
+
+    if (paidOrder) {
+      return res.status(403).json({ message: "Não é possível remover um cliente com pagamentos confirmados." });
+    }
+
     const [deleted] = await db
       .delete(schema.checkoutCustomers)
       .where(eq(schema.checkoutCustomers.userId, userId))
@@ -603,7 +620,7 @@ export async function updateProduto(req: Request, res: Response) {
     const id = Number(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
 
-    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl } = req.body as {
+    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao } = req.body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
@@ -612,6 +629,7 @@ export async function updateProduto(req: Request, res: Response) {
       features?: unknown;
       imageKey?: string | null;
       imageUrl?: string | null;
+      isCorujao?: unknown;
     };
 
     const db = getCheckoutDb();
@@ -645,6 +663,7 @@ export async function updateProduto(req: Request, res: Response) {
       }
     }
     if (active !== undefined) updates.active = Boolean(active);
+    if (isCorujao !== undefined) updates.isCorujao = Boolean(isCorujao);
     if (imageKey !== undefined) updates.imageKey = imageKey?.trim() || null;
     if (imageUrl !== undefined) updates.imageUrl = imageUrl?.trim() || null;
 

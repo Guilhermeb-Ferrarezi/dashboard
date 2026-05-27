@@ -21,6 +21,7 @@ import {
   createVisita,
   deleteVisita,
   listVisitasByContato,
+  listVisitasBySessao,
   updateVisita
 } from "../controllers/corujao-visitas.controller";
 import {
@@ -52,6 +53,7 @@ router.post("/sessoes", createSessao);
 router.patch("/sessoes/:id", updateSessao);
 router.delete("/sessoes/:id", deleteSessao);
 
+router.get("/sessoes/:id/visitas", listVisitasBySessao);
 router.get("/contatos/:id/visitas", listVisitasByContato);
 router.post("/visitas", createVisita);
 router.patch("/visitas/:id", updateVisita);

@@ -518,6 +518,19 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     }
   }
 
+  async function handleToggleCorujao(produto: CheckoutProductSummary) {
+    try {
+      const { produto: updated } = await clientApi<{ produto: CheckoutProductSummary }>(
+        `/checkout/produtos/${produto.id}`,
+        { method: "PUT", body: JSON.stringify({ isCorujao: !produto.isCorujao }) }
+      );
+      setProdutos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      toast.success(updated.isCorujao ? "Produto marcado como Corujão." : "Produto desmarcado do Corujão.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao alterar produto.");
+    }
+  }
+
   async function handleDuplicate(produto: CheckoutProductSummary) {
     setPending(true);
     try {
@@ -725,6 +738,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                       <SortButton k="value" label="Valor" />
                     </TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Corujão</TableHead>
                     <TableHead>
                       <SortButton k="date" label="Criado em" />
                     </TableHead>
@@ -779,6 +793,13 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                             {produto.active ? "Clique para desativar" : "Clique para ativar"}
                           </TooltipContent>
                         </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={produto.isCorujao}
+                          onCheckedChange={() => handleToggleCorujao(produto)}
+                          label={produto.isCorujao ? "Remover do Corujão" : "Marcar como Corujão"}
+                        />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatDate(produto.createdAt)}
