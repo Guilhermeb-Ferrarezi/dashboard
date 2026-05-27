@@ -22,26 +22,34 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
     return res.status(503).json({ message: "GA4 não configurado." });
   }
 
+  const PAGE_TITLES: Record<string, string> = {
+    "/play/corujao": "Corujão SGA",
+    "/play/mix": "Mix SGA",
+  };
+
   try {
-    const [report] = await ga4.client.runRealtimeReport({
+    // Realtime API só aceita unifiedScreenName (título da página), não pagePath
+    const [rtAll] = await ga4.client.runRealtimeReport({
       property: `properties/${ga4.propertyId}`,
-      dimensions: [{ name: "unifiedPagePathScreen" }],
+      dimensions: [{ name: "unifiedScreenName" }],
       metrics: [{ name: "activeUsers" }],
     });
 
     const result: Record<string, number> = {};
     for (const page of SALES_PAGES) result[page] = 0;
 
-    for (const row of report.rows ?? []) {
-      const path = row.dimensionValues?.[0]?.value ?? "";
+    let totalActive = 0;
+    for (const row of rtAll.rows ?? []) {
+      const screenName = (row.dimensionValues?.[0]?.value ?? "").toLowerCase();
       const users = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
-      if (path in result) result[path] = users;
-    }
+      totalActive += users;
 
-    const totalActive = (report.rows ?? []).reduce(
-      (sum, row) => sum + parseInt(row.metricValues?.[0]?.value ?? "0", 10),
-      0
-    );
+      for (const [path, title] of Object.entries(PAGE_TITLES)) {
+        if (screenName.includes(title.toLowerCase())) {
+          result[path] = (result[path] ?? 0) + users;
+        }
+      }
+    }
 
     return res.json({ pages: result, totalActive });
   } catch (err: unknown) {
