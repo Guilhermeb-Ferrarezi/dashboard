@@ -33,7 +33,7 @@ function emit(state: ApiHealthState) {
 }
 
 function stateFromServerTs(serverTs: number): ApiHealthState {
-  const latencyMs = Math.round(Date.now() - serverTs);
+  const latencyMs = Math.max(0, Math.round(Date.now() - serverTs));
   const tone: StatusTone = latencyMs >= SLOW_THRESHOLD_MS ? "warning" : "success";
   return {
     tone,
@@ -60,13 +60,15 @@ function startSSEOnce() {
   };
 
   es.onerror = () => {
-    emit({
-      tone: "error",
-      label: "Offline",
-      detail: "Sem resposta do backend.",
-      latencyMs: null,
-      checkedAt: Date.now(),
-    });
+    if (es.readyState === EventSource.CLOSED) {
+      emit({
+        tone: "error",
+        label: "Offline",
+        detail: "Sem resposta do backend.",
+        latencyMs: null,
+        checkedAt: Date.now(),
+      });
+    }
   };
 }
 
