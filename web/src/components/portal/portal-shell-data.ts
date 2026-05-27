@@ -1,5 +1,6 @@
 import type { LucideIcon } from "@/components/ui/icons";
 import {
+  ActivityIcon,
   BadgeCheckIcon,
   CrosshairIcon,
   ImageIcon,
@@ -184,6 +185,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               keywords: ["cupons", "desconto", "promocao", "checkout"],
             }),
           ],
+        }),
+        portalItem({
+          href: "/admin/analytics",
+          label: "Analytics",
+          description: "Métricas das páginas de venda — Corujão e Mix",
+          icon: ActivityIcon,
+          kind: "page",
+          keywords: ["analytics", "ga4", "metricas", "corujao", "mix", "conversoes", "trafego"],
         }),
       ],
     },
