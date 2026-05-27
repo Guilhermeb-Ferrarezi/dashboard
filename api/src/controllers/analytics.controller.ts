@@ -63,7 +63,7 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
             {
               filter: {
                 fieldName: "eventName",
-                inListFilter: { values: ["whatsapp_click", "cta_visible"] },
+                inListFilter: { values: ["checkout_click", "whatsapp_click", "cta_visible"] },
               },
             },
           ],
@@ -77,7 +77,7 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
       activeUsers: number;
       avgSessionDuration: number;
       topChannels: { channel: string; sessions: number }[];
-      conversions: { whatsappClicks: number; ctaVisible: number };
+      conversions: { checkoutClicks: number; whatsappClicks: number; ctaVisible: number };
     };
 
     const pageMap: Record<string, PageMetrics> = {};
@@ -88,7 +88,7 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
         activeUsers: 0,
         avgSessionDuration: 0,
         topChannels: [],
-        conversions: { whatsappClicks: 0, ctaVisible: 0 },
+        conversions: { checkoutClicks: 0, whatsappClicks: 0, ctaVisible: 0 },
       };
     }
 
@@ -124,6 +124,7 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
       const event = row.dimensionValues?.[1]?.value ?? "";
       if (!pageMap[path]) continue;
       const count = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
+      if (event === "checkout_click") pageMap[path].conversions.checkoutClicks += count;
       if (event === "whatsapp_click") pageMap[path].conversions.whatsappClicks += count;
       if (event === "cta_visible") pageMap[path].conversions.ctaVisible += count;
     }

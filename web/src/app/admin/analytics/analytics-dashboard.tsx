@@ -6,7 +6,7 @@ interface PageMetrics {
   activeUsers: number;
   avgSessionDuration: number;
   topChannels: { channel: string; sessions: number }[];
-  conversions: { whatsappClicks: number; ctaVisible: number };
+  conversions: { checkoutClicks: number; whatsappClicks: number; ctaVisible: number };
 }
 
 function formatDuration(seconds: number) {
@@ -56,7 +56,7 @@ function PageCard({ page }: { page: PageMetrics }) {
         <MetricCard label="Sessões" value={page.sessions.toLocaleString("pt-BR")} />
         <MetricCard label="Usuários únicos" value={page.activeUsers.toLocaleString("pt-BR")} />
         <MetricCard label="Tempo médio" value={formatDuration(page.avgSessionDuration)} />
-        <MetricCard label="Cliques WhatsApp" value={page.conversions.whatsappClicks} />
+        <MetricCard label="Cliques Checkout" value={page.conversions.checkoutClicks} />
       </div>
 
       {page.topChannels.length > 0 && (
@@ -74,7 +74,11 @@ function PageCard({ page }: { page: PageMetrics }) {
           <p className="text-lg font-bold text-green-500">{page.conversions.ctaVisible}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Clicaram no WhatsApp</p>
+          <p className="text-xs text-muted-foreground">Clicaram no Checkout</p>
+          <p className="text-lg font-bold text-green-500">{page.conversions.checkoutClicks}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Suporte WhatsApp</p>
           <p className="text-lg font-bold text-green-500">{page.conversions.whatsappClicks}</p>
         </div>
       </div>
