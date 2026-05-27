@@ -79,11 +79,12 @@ function stopSSE() {
 }
 
 export function useApiHealth(): ApiHealthState {
-  const [state, setState] = useState<ApiHealthState>(() => cached ?? INITIAL_STATE);
+  const [state, setState] = useState<ApiHealthState>(cached ?? INITIAL_STATE);
 
   useEffect(() => {
     listeners.add(setState);
     startSSEOnce();
+    if (cached) setState(cached);
     return () => {
       listeners.delete(setState);
       if (listeners.size === 0) stopSSE();
