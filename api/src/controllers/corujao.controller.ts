@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
@@ -146,7 +146,7 @@ export async function listContatos(req: Request, res: Response) {
     const chamou = req.query.chamou === "true";
     const naoChamou = req.query.naoChamou === "true";
 
-    const sortBy = req.query.sortBy === "recente" ? "recente" : "prioridade";
+    const sortBy = req.query.sortBy === "recente" ? "recente" : req.query.sortBy === "nome" ? "nome" : "prioridade";
 
     const conditions: SQL[] = [];
     if (q) {
@@ -188,10 +188,12 @@ export async function listContatos(req: Request, res: Response) {
     const orderByClause =
       sortBy === "recente"
         ? [desc(schema.corujaoContatos.createdAt)]
-        : [
-            sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
-            desc(schema.corujaoContatos.createdAt)
-          ];
+        : sortBy === "nome"
+          ? [sql`${schema.corujaoContatos.nome} ASC NULLS LAST`, asc(schema.corujaoContatos.id)]
+          : [
+              sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
+              desc(schema.corujaoContatos.createdAt)
+            ];
 
     const [[totalRow], contatos] = await Promise.all([
       db.select({ value: count() }).from(schema.corujaoContatos).where(whereClause),

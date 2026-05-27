@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  ArrowUpDownIcon,
   DownloadIcon,
   MoonIcon,
   MoreHorizontalIcon,
@@ -232,6 +233,8 @@ export function CorujaoContatosLista() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
 
+  const [sortByNome, setSortByNome] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importData, setImportData] = useState<Array<{ telefone: string; nome?: string; email?: string; dataNascimento?: string }>>([]);
   const [importing, setImporting] = useState(false);
@@ -248,6 +251,7 @@ export function CorujaoContatosLista() {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
     if (debouncedQuery) params.set("q", debouncedQuery);
+    if (sortByNome) params.set("sortBy", "nome");
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
         `/corujao/contatos?${params.toString()}`
@@ -264,7 +268,7 @@ export function CorujaoContatosLista() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedQuery]);
+  }, [page, debouncedQuery, sortByNome]);
 
   async function handleExportar() {
     try {
@@ -473,7 +477,16 @@ export function CorujaoContatosLista() {
           <Table variant="linear">
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => { setSortByNome((v) => !v); setPage(1); }}
+                    className={`flex items-center gap-1.5 transition-colors hover:text-foreground ${sortByNome ? "text-primary" : "text-muted-foreground"}`}
+                  >
+                    Nome
+                    <ArrowUpDownIcon className="size-3" />
+                  </button>
+                </TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead>Status</TableHead>
