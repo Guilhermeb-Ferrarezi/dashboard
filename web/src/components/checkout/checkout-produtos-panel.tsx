@@ -13,6 +13,7 @@ import {
   ArrowUpDownIcon,
   CopyIcon,
   EyeIcon,
+  LinkIcon,
   MinusIcon,
   PackageIcon,
   PencilIcon,
@@ -559,6 +560,12 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     toast.success("Produto removido.");
   }
 
+  function handleCopyLink(produto: CheckoutProductSummary) {
+    const base = process.env.NEXT_PUBLIC_CHECKOUT_WEB_URL ?? "";
+    navigator.clipboard.writeText(`${base}/produto/${produto.id}`);
+    toast.success("Link copiado!");
+  }
+
   const SortButton = ({ k, label }: { k: SortKey; label: string }) => (
     <button
       type="button"
@@ -831,6 +838,19 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="size-7"
+                                onClick={() => handleCopyLink(produto)}
+                              >
+                                <LinkIcon className="size-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copiar link de pagamento</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
