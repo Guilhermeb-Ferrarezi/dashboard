@@ -23,9 +23,9 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
   }
 
   // Substrings únicas para identificar cada página via unifiedScreenName do GA4
-  // Títulos reais: "Corujão — SGA Gaming Night" | "Mix — SGA Gaming"
+  // Títulos reais: "Corujão — Santos Games Arena" | "Mix — SGA Gaming"
   const PAGE_TITLES: Record<string, string> = {
-    "/play/corujao": "gaming night",
+    "/play/corujao": "coruj",
     "/play/mix": "mix",
   };
 
