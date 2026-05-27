@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { clientApi } from "@/lib/api";
+
 interface PageMetrics {
   path: string;
   sessions: number;
@@ -7,6 +10,11 @@ interface PageMetrics {
   avgSessionDuration: number;
   topChannels: { channel: string; sessions: number }[];
   conversions: { checkoutClicks: number; whatsappClicks: number; ctaVisible: number };
+}
+
+interface RealtimeData {
+  pages: Record<string, number>;
+  totalActive: number;
 }
 
 function formatDuration(seconds: number) {
@@ -43,13 +51,59 @@ function ChannelBar({ channel, sessions, max }: { channel: string; sessions: num
   );
 }
 
-function PageCard({ page }: { page: PageMetrics }) {
+function RealtimeBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2.5 py-1">
+      <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+      {count} agora
+    </span>
+  );
+}
+
+function RealtimePanel({ data }: { data: RealtimeData | null }) {
+  const pages = ["/play/corujao", "/play/mix"];
+
+  return (
+    <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-5 flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+          <p className="text-sm font-semibold text-green-400 uppercase tracking-wider">Ao vivo agora</p>
+        </div>
+        {data && (
+          <span className="text-2xl font-bold text-green-400">{data.totalActive} usuários ativos</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {pages.map((path) => (
+          <div key={path} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest mb-0.5">{path}</p>
+              <p className="text-base font-bold">{pageName(path)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-bold text-green-400">{data?.pages[path] ?? 0}</p>
+              <p className="text-xs text-muted-foreground">ativos</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PageCard({ page, realtimeCount }: { page: PageMetrics; realtimeCount: number }) {
   const maxChannel = page.topChannels[0]?.sessions ?? 1;
   return (
     <div className="rounded-xl border border-border bg-card p-6 flex flex-col gap-6">
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">{page.path}</p>
-        <h2 className="text-2xl font-bold text-foreground">{pageName(page.path)}</h2>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">{page.path}</p>
+          <h2 className="text-2xl font-bold text-foreground">{pageName(page.path)}</h2>
+        </div>
+        <RealtimeBadge count={realtimeCount} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -93,6 +147,23 @@ export function AnalyticsDashboard({
   pages: PageMetrics[] | null;
   error: string | null;
 }) {
+  const [realtime, setRealtime] = useState<RealtimeData | null>(null);
+
+  useEffect(() => {
+    async function fetchRealtime() {
+      try {
+        const data = await clientApi<RealtimeData>("/analytics/realtime");
+        setRealtime(data);
+      } catch {
+        // silencia erros de realtime — não bloqueia o dashboard
+      }
+    }
+
+    fetchRealtime();
+    const id = setInterval(fetchRealtime, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   if (error) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-destructive text-sm">
@@ -102,15 +173,23 @@ export function AnalyticsDashboard({
     );
   }
 
-  if (!pages || pages.length === 0) {
-    return <p className="text-muted-foreground">Nenhum dado disponível.</p>;
-  }
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {pages.map((page) => (
-        <PageCard key={page.path} page={page} />
-      ))}
+    <div className="flex flex-col gap-6">
+      <RealtimePanel data={realtime} />
+
+      {(!pages || pages.length === 0) ? (
+        <p className="text-muted-foreground text-sm">Sem dados históricos ainda — aguarde 24-48h após a primeira visita às páginas de venda.</p>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {pages.map((page) => (
+            <PageCard
+              key={page.path}
+              page={page}
+              realtimeCount={realtime?.pages[page.path] ?? 0}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

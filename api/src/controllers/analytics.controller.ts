@@ -6,31 +6,67 @@ const CREDENTIALS_JSON = process.env.GA4_CREDENTIALS_JSON;
 
 const SALES_PAGES = ["/play/corujao", "/play/mix"];
 
+function getClient() {
+  if (!PROPERTY_ID || !CREDENTIALS_JSON) return null;
+  try {
+    const credentials = JSON.parse(Buffer.from(CREDENTIALS_JSON, "base64").toString("utf-8"));
+    return { client: new BetaAnalyticsDataClient({ credentials }), propertyId: PROPERTY_ID };
+  } catch {
+    return null;
+  }
+}
+
+export async function getRealtimeAnalytics(_req: Request, res: Response) {
+  const ga4 = getClient();
+  if (!ga4) {
+    return res.status(503).json({ message: "GA4 não configurado." });
+  }
+
+  try {
+    const [report] = await ga4.client.runRealtimeReport({
+      property: `properties/${ga4.propertyId}`,
+      dimensions: [{ name: "unifiedPagePathScreen" }],
+      metrics: [{ name: "activeUsers" }],
+    });
+
+    const result: Record<string, number> = {};
+    for (const page of SALES_PAGES) result[page] = 0;
+
+    for (const row of report.rows ?? []) {
+      const path = row.dimensionValues?.[0]?.value ?? "";
+      const users = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
+      if (path in result) result[path] = users;
+    }
+
+    const totalActive = (report.rows ?? []).reduce(
+      (sum, row) => sum + parseInt(row.metricValues?.[0]?.value ?? "0", 10),
+      0
+    );
+
+    return res.json({ pages: result, totalActive });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ message: msg });
+  }
+}
+
 export async function getSalesPagesAnalytics(req: Request, res: Response) {
-  if (!PROPERTY_ID || !CREDENTIALS_JSON) {
+  const ga4 = getClient();
+  if (!ga4) {
     return res.status(503).json({
       error: "GA4 not configured",
       message: "GA4_PROPERTY_ID e GA4_CREDENTIALS_JSON são necessários.",
     });
   }
 
-  let credentials: object;
-  try {
-    credentials = JSON.parse(
-      Buffer.from(CREDENTIALS_JSON, "base64").toString("utf-8")
-    );
-  } catch {
-    return res.status(500).json({ error: "Invalid GA4 credentials format" });
-  }
-
   const startDate = (req.query.startDate as string) || "30daysAgo";
   const endDate = (req.query.endDate as string) || "today";
 
-  const analyticsClient = new BetaAnalyticsDataClient({ credentials });
+  const analyticsClient = ga4.client;
 
   try {
     const [sessionReport] = await analyticsClient.runReport({
-      property: `properties/${PROPERTY_ID}`,
+      property: `properties/${ga4.propertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "pagePath" }, { name: "sessionDefaultChannelGrouping" }],
       metrics: [
@@ -47,7 +83,7 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
     });
 
     const [eventsReport] = await analyticsClient.runReport({
-      property: `properties/${PROPERTY_ID}`,
+      property: `properties/${ga4.propertyId}`,
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "pagePath" }, { name: "eventName" }],
       metrics: [{ name: "eventCount" }],
