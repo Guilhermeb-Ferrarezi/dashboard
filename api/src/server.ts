@@ -19,8 +19,10 @@ import checkoutRoutes from "./routes/checkout.routes";
 import corujaoRoutes from "./routes/corujao.routes";
 import corujaoPublicRoutes from "./routes/corujao-public.routes";
 import emailRoutes from "./routes/email.routes";
+import analyticsRoutes from "./routes/analytics.routes";
 import { runCheckoutMigrations } from "./db/index";
 import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
+import { addHealthClient, startHealthBroadcast, stopHealthBroadcast } from "./lib/health-sse";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -202,6 +204,9 @@ app.use("/api/checkout", checkoutRoutes);
 app.use("/api/corujao/public", corujaoPublicRoutes);
 app.use("/api/corujao", corujaoRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
+app.get("/api/health/sse", (req, res) => addHealthClient(res));
 
 app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
 app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
@@ -255,6 +260,7 @@ async function start() {
 
     attachCodexGateway(server);
     startPortalRecentsFlushLoop();
+    startHealthBroadcast();
     // runCheckoutMigrations() desativado em 2026-05-26 — todas as 5
     // operações estão cobertas pelas migrations Drizzle 0003/0004/0008.
     // Função preservada em db/index.ts (@deprecated) por 1-2 sessões pra
@@ -266,6 +272,7 @@ async function start() {
     function shutdown() {
       console.log("Shutting down…");
       stopPortalRecentsFlushLoop();
+      stopHealthBroadcast();
       server.close(() => process.exit(0));
       setTimeout(() => process.exit(1), 5000);
     }
