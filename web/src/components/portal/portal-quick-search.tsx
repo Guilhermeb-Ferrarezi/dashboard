@@ -451,19 +451,19 @@ export function PortalSearchLauncher({
       type="button"
       onClick={openPortalQuickSearch}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-background/80 px-3 text-left text-sm text-muted-foreground shadow-sm transition-all hover:border-border hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "group flex w-full items-center gap-3 rounded-lg border border-border/70 bg-background/80 px-3 text-left text-sm text-muted-foreground shadow-sm transition-all hover:border-border hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         variant === "header" && "h-11",
         variant === "sidebar" &&
-          "h-10 bg-sidebar-accent/50 text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+          "h-10 bg-sidebar-accent/50 text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:shadow-none",
         variant === "compact" && "h-9 max-w-[280px]",
         className,
       )}
     >
       <SearchIcon className="size-4 shrink-0 opacity-70" />
-      <span className="min-w-0 flex-1 truncate">
+      <span className="min-w-0 flex-1 truncate group-data-[collapsible=icon]:hidden">
         {label}
       </span>
-      <KbdGroup className="hidden shrink-0 sm:inline-flex">
+      <KbdGroup className="hidden shrink-0 sm:inline-flex group-data-[collapsible=icon]:!hidden">
         <Kbd>⌘</Kbd>
         <Kbd>K</Kbd>
       </KbdGroup>

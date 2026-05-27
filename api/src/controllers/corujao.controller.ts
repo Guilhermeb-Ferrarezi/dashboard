@@ -3,6 +3,16 @@ import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
 
+const IMPORT_BATCH_SIZE = 100;
+
+function duplicateMessage(error: unknown): string {
+  const detail = (error as { detail?: string }).detail ?? "";
+  if (detail.includes("email")) {
+    return "Já existe um contato com esse email. Busque por ele na lista.";
+  }
+  return "Já existe um contato com esse telefone. Busque por ele na lista.";
+}
+
 const ORIGENS_VALIDAS = ["anuncio", "indicacao", "espontaneo", "outro"] as const;
 type Origem = (typeof ORIGENS_VALIDAS)[number];
 
@@ -132,6 +142,10 @@ export async function listContatos(req: Request, res: Response) {
       jaParticipouFilter = raw === "true";
     }
 
+    const naoRespondeu = req.query.naoRespondeu === "true";
+    const chamou = req.query.chamou === "true";
+    const naoChamou = req.query.naoChamou === "true";
+
     const sortBy = req.query.sortBy === "recente" ? "recente" : "prioridade";
 
     const conditions: SQL[] = [];
@@ -152,6 +166,19 @@ export async function listContatos(req: Request, res: Response) {
     }
     if (jaParticipouFilter !== undefined) {
       conditions.push(eq(schema.corujaoContatos.jaParticipou, jaParticipouFilter));
+    }
+    if (naoRespondeu) {
+      conditions.push(
+        sql`${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL
+          AND ${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours'
+          AND (${schema.corujaoContatos.statusConversa} IS NULL OR ${schema.corujaoContatos.statusConversa} = 'sem_resposta')`
+      );
+    }
+    if (chamou) {
+      conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL`);
+    }
+    if (naoChamou) {
+      conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NULL`);
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -231,9 +258,7 @@ export async function createContato(req: Request, res: Response) {
     return res.status(201).json({ contato: serializeContato(contato!) });
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "23505") {
-      return res
-        .status(409)
-        .json({ message: "Já existe um contato com esse telefone. Busque por ele na lista." });
+      return res.status(409).json({ message: duplicateMessage(error) });
     }
     console.error("[corujao] createContato error:", error);
     return res.status(500).json({ message: "Erro ao criar contato." });
@@ -253,7 +278,8 @@ export async function updateContato(req: Request, res: Response) {
       observacoes,
       dataNascimento,
       statusConversa,
-      statusPagamento
+      statusPagamento,
+      ultimoContatoEm
     } = req.body as {
       nome?: string | null;
       telefone?: string;
@@ -263,6 +289,7 @@ export async function updateContato(req: Request, res: Response) {
       dataNascimento?: string | null;
       statusConversa?: string | null;
       statusPagamento?: string | null;
+      ultimoContatoEm?: string | null;
     };
 
     const updates: Partial<typeof schema.corujaoContatos.$inferInsert> = {
@@ -311,6 +338,10 @@ export async function updateContato(req: Request, res: Response) {
       updates.statusPagamento = parsed.value;
     }
 
+    if (ultimoContatoEm !== undefined) {
+      updates.ultimoContatoEm = ultimoContatoEm === null ? null : new Date(ultimoContatoEm);
+    }
+
     const db = getCheckoutDb();
     const [contato] = await db
       .update(schema.corujaoContatos)
@@ -323,9 +354,7 @@ export async function updateContato(req: Request, res: Response) {
     return res.json({ contato: serializeContato(contato) });
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "23505") {
-      return res
-        .status(409)
-        .json({ message: "Já existe um contato com esse telefone. Busque por ele na lista." });
+      return res.status(409).json({ message: duplicateMessage(error) });
     }
     console.error("[corujao] updateContato error:", error);
     return res.status(500).json({ message: "Erro ao atualizar contato." });
@@ -403,4 +432,154 @@ export async function deleteContato(req: Request, res: Response) {
     console.error("[corujao] deleteContato error:", error);
     return res.status(500).json({ message: "Erro ao apagar contato." });
   }
+}
+
+export async function importarContatos(req: Request, res: Response) {
+  try {
+    const { contatos } = req.body as {
+      contatos?: Array<{
+        telefone?: string;
+        nome?: string | null;
+        email?: string | null;
+        dataNascimento?: string | null;
+        origem?: string | null;
+        observacoes?: string | null;
+      }>;
+    };
+
+    if (!Array.isArray(contatos) || contatos.length === 0) {
+      return res.status(400).json({ message: "Envie um array 'contatos' com pelo menos 1 item." });
+    }
+
+    if (contatos.length > 5000) {
+      return res.status(400).json({ message: "Máximo de 5000 contatos por importação." });
+    }
+
+    const db = getCheckoutDb();
+
+    const validRows: Array<typeof schema.corujaoContatos.$inferInsert> = [];
+    const erros: Array<{ linha: number; motivo: string }> = [];
+
+    for (let i = 0; i < contatos.length; i++) {
+      const row = contatos[i]!;
+      const telefone = row.telefone?.toString().trim();
+
+      if (!telefone) {
+        erros.push({ linha: i + 1, motivo: "Telefone vazio." });
+        continue;
+      }
+
+      let origemVal: Origem = "espontaneo";
+      if (row.origem && ORIGENS_VALIDAS.includes(row.origem as Origem)) {
+        origemVal = row.origem as Origem;
+      }
+
+      let dataNascimento: string | null = null;
+      if (row.dataNascimento) {
+        const birth = parseOptionalBirthDate(row.dataNascimento);
+        if (birth.ok) dataNascimento = birth.value;
+      }
+
+      validRows.push({
+        telefone,
+        nome: row.nome?.trim() || null,
+        email: row.email?.trim() || null,
+        dataNascimento,
+        origem: origemVal,
+        observacoes: row.observacoes?.trim() || null
+      });
+    }
+
+    let importados = 0;
+    let duplicados = 0;
+
+    for (let i = 0; i < validRows.length; i += IMPORT_BATCH_SIZE) {
+      const batch = validRows.slice(i, i + IMPORT_BATCH_SIZE);
+      const result = await db
+        .insert(schema.corujaoContatos)
+        .values(batch)
+        .onConflictDoNothing({ target: schema.corujaoContatos.telefone })
+        .returning({ id: schema.corujaoContatos.id });
+
+      importados += result.length;
+      duplicados += batch.length - result.length;
+    }
+
+    return res.json({
+      importados,
+      duplicados,
+      erros: erros.slice(0, 50),
+      totalEnviados: contatos.length
+    });
+  } catch (error) {
+    console.error("[corujao] importarContatos error:", error);
+    return res.status(500).json({ message: "Erro ao importar contatos." });
+  }
+}
+
+export async function exportarContatos(_req: Request, res: Response) {
+  try {
+    const db = getCheckoutDb();
+    const contatos = await db
+      .select()
+      .from(schema.corujaoContatos)
+      .orderBy(desc(schema.corujaoContatos.createdAt));
+
+    const header = "nome,telefone,email,data_nascimento,origem,ja_participou,observacoes,criado_em";
+    const rows = contatos.map((c) => {
+      const fields = [
+        csvEscape(c.nome ?? ""),
+        csvEscape(c.telefone ?? ""),
+        csvEscape(c.email ?? ""),
+        csvEscape(c.dataNascimento ?? ""),
+        csvEscape(c.origem),
+        c.jaParticipou ? "sim" : "nao",
+        csvEscape(c.observacoes ?? ""),
+        c.createdAt.toISOString().slice(0, 10)
+      ];
+      return fields.join(",");
+    });
+
+    const csv = [header, ...rows].join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=contatos-corujao.csv");
+    return res.send(csv);
+  } catch (error) {
+    console.error("[corujao] exportarContatos error:", error);
+    return res.status(500).json({ message: "Erro ao exportar contatos." });
+  }
+}
+
+export async function getContatosMetricas(_req: Request, res: Response) {
+  try {
+    const db = getCheckoutDb();
+    const [row] = await db
+      .select({
+        total: sql<number>`COUNT(*)::int`,
+        naoChamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NULL)::int`,
+        chamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL)::int`,
+        respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} != 'sem_resposta')::int`,
+        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND ${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND (${schema.corujaoContatos.statusConversa} IS NULL OR ${schema.corujaoContatos.statusConversa} = 'sem_resposta'))::int`
+      })
+      .from(schema.corujaoContatos);
+
+    return res.json({
+      total: row?.total ?? 0,
+      naoChamou: row?.naoChamou ?? 0,
+      chamou: row?.chamou ?? 0,
+      respondeu: row?.respondeu ?? 0,
+      naoRespondeu: row?.naoRespondeu ?? 0
+    });
+  } catch (error) {
+    console.error("[corujao] getContatosMetricas error:", error);
+    return res.status(500).json({ message: "Erro ao calcular métricas." });
+  }
+}
+
+function csvEscape(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }

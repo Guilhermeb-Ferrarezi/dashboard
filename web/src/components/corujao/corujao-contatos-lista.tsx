@@ -20,11 +20,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  DownloadIcon,
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
+  UploadIcon,
   UsersIcon
 } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -41,7 +43,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { clientApi } from "@/lib/api";
+import { clientApi, getClientApiBaseUrl } from "@/lib/api";
 
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
 
@@ -170,6 +172,46 @@ function ListSkeleton() {
   );
 }
 
+function parseCSV(text: string): Array<{ telefone: string; nome?: string; email?: string; dataNascimento?: string }> {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+
+  const headerLine = lines[0]!.toLowerCase();
+  const separator = headerLine.includes(";") ? ";" : ",";
+  const headers = headerLine.split(separator).map((h) => h.trim().replace(/^["']|["']$/g, ""));
+
+  const phoneCol = headers.findIndex((h) =>
+    ["telefone", "whatsapp", "phone", "celular", "tel", "numero", "número"].includes(h)
+  );
+  const nameCol = headers.findIndex((h) =>
+    ["nome", "name", "cliente", "contato"].includes(h)
+  );
+  const emailCol = headers.findIndex((h) =>
+    ["email", "e-mail", "e_mail"].includes(h)
+  );
+  const birthCol = headers.findIndex((h) =>
+    ["data_nascimento", "datanascimento", "nascimento", "data nascimento", "birthday", "aniversario", "aniversário"].includes(h)
+  );
+
+  if (phoneCol === -1) return [];
+
+  const results: Array<{ telefone: string; nome?: string; email?: string; dataNascimento?: string }> = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i]!.split(separator).map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const telefone = cols[phoneCol]?.replace(/\D/g, "");
+    if (!telefone) continue;
+
+    const row: { telefone: string; nome?: string; email?: string; dataNascimento?: string } = { telefone };
+    if (nameCol >= 0 && cols[nameCol]) row.nome = cols[nameCol];
+    if (emailCol >= 0 && cols[emailCol]) row.email = cols[emailCol];
+    if (birthCol >= 0 && cols[birthCol]) row.dataNascimento = cols[birthCol];
+    results.push(row);
+  }
+
+  return results;
+}
+
 export function CorujaoContatosLista() {
   const [contatos, setContatos] = useState<Contato[]>([]);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -189,6 +231,11 @@ export function CorujaoContatosLista() {
   const [form, setForm] = useState<FormValues>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importData, setImportData] = useState<Array<{ telefone: string; nome?: string; email?: string; dataNascimento?: string }>>([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -218,6 +265,67 @@ export function CorujaoContatosLista() {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, debouncedQuery]);
+
+  async function handleExportar() {
+    try {
+      const response = await fetch(`${getClientApiBaseUrl()}/corujao/contatos/exportar`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Erro ao exportar.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contatos-corujao.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Erro ao exportar contatos.");
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const parsed = parseCSV(text);
+      if (parsed.length === 0) {
+        toast.error("Nenhum contato encontrado no arquivo. Verifique o formato.");
+        return;
+      }
+      setImportData(parsed);
+      setImportOpen(true);
+    };
+    reader.readAsText(file);
+  }
+
+  async function handleImportConfirm() {
+    if (importing || importData.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await clientApi<{
+        importados: number;
+        duplicados: number;
+        erros: Array<{ linha: number; motivo: string }>;
+        totalEnviados: number;
+      }>("/corujao/contatos/importar", {
+        method: "POST",
+        body: JSON.stringify({ contatos: importData })
+      });
+      toast.success(`${res.importados} contatos importados. ${res.duplicados} duplicados ignorados.`);
+      setImportOpen(false);
+      setImportData([]);
+      reload();
+    } catch (error) {
+      toast.error(extractErrorMessage(error, "Erro ao importar contatos."));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -311,18 +419,42 @@ export function CorujaoContatosLista() {
   return (
     <div className="flex flex-col gap-[var(--card-gap)]">
       <div className="flex items-center justify-between gap-4">
-        <div className="relative w-80">
-          <Input
-            placeholder="Buscar por nome, telefone ou email…"
-            value={query}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="h-9 text-sm"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative w-80">
+            <Input
+              placeholder="Buscar por nome, telefone ou email…"
+              value={query}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          {!loading && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {pagination.total} {pagination.total === 1 ? "contato" : "contatos"}
+            </span>
+          )}
         </div>
-        <Button onClick={openCreate} className="gap-1.5">
-          <PlusIcon className="h-4 w-4" />
-          Novo contato
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportar} className="gap-1.5">
+            <DownloadIcon className="h-4 w-4" />
+            Exportar
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
+            <UploadIcon className="h-4 w-4" />
+            Importar
+          </Button>
+          <Button onClick={openCreate} className="gap-1.5">
+            <PlusIcon className="h-4 w-4" />
+            Novo contato
+          </Button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.txt"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
@@ -511,6 +643,54 @@ export function CorujaoContatosLista() {
           setDeleteTarget(null);
         }}
       />
+
+      <Dialog open={importOpen} onOpenChange={(open) => { if (!open && !importing) { setImportOpen(false); setImportData([]); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Importar contatos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {importData.length} contatos encontrados no arquivo. Telefones duplicados serão ignorados automaticamente.
+            </p>
+            <div className="rounded-md border border-border/60 overflow-hidden max-h-60 overflow-y-auto">
+              <Table variant="linear">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importData.slice(0, 20).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-sm">{row.telefone}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{row.nome ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{row.email ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                  {importData.length > 20 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground">
+                        …e mais {importData.length - 20} contatos
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportOpen(false); setImportData([]); }} disabled={importing}>
+              Cancelar
+            </Button>
+            <Button onClick={handleImportConfirm} disabled={importing}>
+              {importing ? "Importando…" : `Importar ${importData.length} contatos`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

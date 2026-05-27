@@ -3,6 +3,9 @@ import { Router } from "express";
 import {
   createContato,
   deleteContato,
+  exportarContatos,
+  getContatosMetricas,
+  importarContatos,
   listContatos,
   marcarContato,
   updateContato
@@ -36,6 +39,9 @@ router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 
 router.get("/contatos", listContatos);
 router.post("/contatos", createContato);
+router.post("/contatos/importar", importarContatos);
+router.get("/contatos/exportar", exportarContatos);
+router.get("/contatos/metricas", getContatosMetricas);
 router.patch("/contatos/:id", updateContato);
 router.post("/contatos/:id/marcar-contato", marcarContato);
 router.delete("/contatos/:id", deleteContato);

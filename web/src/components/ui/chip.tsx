@@ -30,7 +30,7 @@ function Chip({
   return (
     <span
       className={cn(
-        "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-medium",
+        "inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] font-medium",
         TONE[tone],
         className,
       )}

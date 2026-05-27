@@ -22,6 +22,7 @@ import {
   ClockCountdown,
   Copy,
   Crosshair,
+  DownloadSimple,
   DotOutline,
   DotsThree,
   EnvelopeSimple,
@@ -81,6 +82,7 @@ import {
   UsersThree,
   WarningCircle,
   WarningOctagon,
+  WhatsappLogo,
   X,
   XCircle,
 } from "@phosphor-icons/react/ssr";
@@ -107,6 +109,7 @@ export const Clock3Icon = ClockCountdown;
 export const ClockIcon = Clock;
 export const CopyIcon = Copy;
 export const CrosshairIcon = Crosshair;
+export const DownloadIcon = DownloadSimple;
 export const ExternalLinkIcon = ArrowSquareOut;
 export const FolderSearch2Icon = FolderOpen;
 export const GroupIcon = UsersThree;
@@ -171,5 +174,6 @@ export const UserRoundIcon = UserCircle;
 export const UserRoundPenIcon = UserCircle;
 export const UsersIcon = Users;
 export const WandSparklesIcon = MagicWand;
+export const WhatsAppIcon = WhatsappLogo;
 export const XIcon = X;
 export const ZapIcon = Lightning;

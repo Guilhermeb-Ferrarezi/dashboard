@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { clientApi } from "@/lib/api";
 import {
   applyThemePreferencesToDocument,
+  DEFAULT_THEME_PREFERENCES,
   THEME_ACCENT_OPTIONS,
   THEME_DENSITY_OPTIONS,
   THEME_MODE_OPTIONS,
@@ -306,6 +307,17 @@ export function AppearanceSettingsPanel({
             />
           </Row>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(DEFAULT_THEME_PREFERENCES);
+            toggleCompactDensity(false);
+          }}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Restaurar padrão
+        </button>
       </CardContent>
     </>
   );

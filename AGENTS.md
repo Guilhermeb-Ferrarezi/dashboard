@@ -88,7 +88,7 @@ docker compose up -d --build
 - **Frontend:** Next 16 + vinext (Vite com plugins React Server Components), React 19, Tailwind v4, shadcn, Phosphor icons, framer-motion, next-themes, sonner, react-markdown.
 - **Dados:** MongoDB (Mongoose), Redis (códigos SSO efêmeros), Cloudflare R2 (uploads de imagens e logos VCT).
 
-### Estilo
+### Estilo de código
 
 - Texto e UI em **pt-BR** com acentuação completa.
 - Sem comentários supérfluos. Comente apenas o **porquê** quando não for óbvio.
@@ -96,6 +96,10 @@ docker compose up -d --build
 - Validação só em fronteiras de sistema (input de usuário, APIs externas). Não validar entre módulos internos confiáveis.
 - Não criar arquivos `.md` ou READMEs sem o usuário pedir.
 - Não adicionar emojis em arquivos a menos que o usuário peça.
+
+### Estilo visual
+
+Toda UI segue o **Design System Onix** documentado na seção [Design System — Identidade Visual](#design-system--identidade-visual-tema-onix) abaixo. Não usar cores hardcoded, `<select>` HTML nativo, importações diretas de Phosphor, padding fixo, ou border radius grandes. Consulte a checklist de página nova antes de criar qualquer componente.
 
 ### Testes
 
@@ -169,6 +173,81 @@ O portal embarca o `codex` CLI como agente interno via WebSocket (`attachCodexGa
 - `CODEX_INTERNAL_API_TOKEN` é provisionado automaticamente como token de serviço delegado — internamente derivado de `CODEX_ACCESS_TOKEN`. Cabeçalhos: `Authorization: Bearer …` e `X-Codex-User-Id: …`.
 
 Veja `api/codex/AGENTS.md` para o guia que o próprio Codex carrega em `CODEX_HOME`.
+
+## Design System — Identidade Visual (tema Onix)
+
+O tema **Onix** é o default do projeto. Toda página nova deve nascer seguindo estas diretrizes. Referências visuais: Vercel, Linear, Cloudflare, Dotfy.
+
+### Paleta Onix (globals.css `.onix`)
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--background` | `oklch(0.21 0 0)` ~`#333` | Fundo geral da aplicação |
+| `--foreground` | `oklch(0.98 0 0)` | Texto principal (branco off-white) |
+| `--card` | `oklch(0.24 0 0)` ~`#3a3a3a` | Fundo de cards e containers de conteúdo |
+| `--popover` | `oklch(0.22 0 0)` | Fundo de menus dropdown e popovers |
+| `--primary` | `oklch(0.96 0 0)` | **Branco** — botões default, links ativos |
+| `--primary-foreground` | `oklch(0.1 0 0)` | Texto dentro de botões (preto) |
+| `--secondary` | `oklch(0.27 0 0)` | Fundo de botões secundários |
+| `--muted` | `oklch(0.26 0 0)` | Fundo de áreas neutras |
+| `--muted-foreground` | `oklch(0.65 0 0)` | Texto secundário / labels discretos |
+| `--border` | `oklch(1 0 0 / 13%)` | Bordas sutis (branco 13%) |
+| `--input` | `oklch(1 0 0 / 15%)` | Borda de inputs |
+| `--sidebar` | `oklch(0.18 0 0)` | Fundo da sidebar (mais escuro que `--background`) |
+| `--sidebar-accent` | `oklch(0.26 0 0)` | Fundo de itens hover/busca rápida na sidebar |
+| `--sidebar-primary` | `oklch(0.96 0 0)` | Indicadores ativos na sidebar (branco) |
+| `--sidebar-border` | `oklch(1 0 0 / 13%)` | Bordas da sidebar |
+
+### Princípios visuais
+
+1. **Camadas de profundidade** — sidebar (`0.18`) < background (`0.21`) < card (`0.24`). A diferença entre camadas é sutil mas perceptível, sem saltos bruscos.
+2. **Botões brancos** — no tema Onix, `--primary` é branco com texto preto. O JS em `getThemeVariables()` (`theme-preferences.ts`) força esse override quando `preferences.mode === "onix"`, inclusive para `--sidebar-primary`, `--sidebar-ring` e `--ring`.
+3. **Sem cores de marca nos botões** — a cor de accent (ember, sky, etc.) NÃO afeta `--primary` no Onix. Botões são sempre brancos.
+4. **Linhas divisórias finas** — `border-l border-sidebar-border` entre sidebar e conteúdo; `border-b border-sidebar-border` abaixo do header. Todas com opacidade 13%.
+5. **Sidebar ativa com fundo** — item selecionado usa `bg-sidebar-foreground/10` (cinza sutil), NÃO usa linha inset colorida.
+6. **Border radius reduzido** — raios pequenos e contidos (sm: `0.25rem`, md: `0.4rem`, lg: `0.625rem`). Card principal do app-shell usa `rounded-xl`, cards internos usam `rounded-lg`. Badges usam `rounded-md` (não `rounded-full`). Nunca usar `rounded-2xl`, `rounded-3xl` ou `rounded-4xl`. Referência: Linear/Vercel/Cloudflare.
+7. **Tipografia** — `tracking-tight` em títulos. Labels e eyebrows em `text-[10px] tracking-[0.14em]` uppercase.
+8. **Header fino** — altura ~44px, tipografia compacta, botões ghost.
+
+### Componentes e padrões reutilizáveis
+
+| Componente | Arquivo | Quando usar |
+|---|---|---|
+| `StatusBadge` | `ui/status-badge.tsx` | Status coloridos (emerald/amber/red/blue/muted) |
+| `SectionHeader` | `portal/section-header.tsx` | Títulos de seções dentro de cards |
+| `Select` Linear-style | `ui/select.tsx` | Selects — nunca usar `<select>` HTML nativo |
+| `Table variant="linear"` | `ui/table.tsx` | Tabelas — sem border-b permanente, hover sutil, padding apertado |
+| `EmptyState` | `ui/empty-state.tsx` | Estado vazio de listas |
+| `Pagination` | `ui/pagination.tsx` | Paginação (PAGE_SIZE = 50) |
+
+### Ícones
+
+- Usar **apenas** `@/components/ui/icons.tsx` — nunca importar direto de `@phosphor-icons/react`.
+- Adicionar aliases novos em `icons.tsx` quando precisar de ícones que ainda não estão mapeados.
+- WhatsApp: usar `WhatsAppIcon` (Phosphor `WhatsappLogo`) com `className="!size-4"`.
+
+### Tokens de densidade
+
+Padding e gaps usam CSS custom properties que respondem ao switch de densidade em Preferências:
+
+- `--app-page-padding-x/y` — gutter externo da página.
+- `--card-padding-x/y` — padding interno de cards.
+- `--card-gap` — gap entre elementos dentro de cards.
+
+Ao criar um novo componente, usar `var(--card-padding-x)` / `var(--card-gap)` em vez de valores fixos como `p-5` ou `gap-6`.
+
+### Checklist para página nova
+
+1. Página em `web/src/app/<area>/page.tsx`, protegida com `getSessionUser()` + redirect.
+2. Envolver com `<AppShell>` passando `user`, `title`, `description`, `breadcrumb`.
+3. Componente principal em `web/src/components/<area>/`.
+4. Tabelas com `<Table variant="linear">`.
+5. Selects com `<Select>` de `ui/select.tsx`.
+6. Status com `<StatusBadge>`.
+7. Ícones via `icons.tsx`.
+8. Gaps/paddings via tokens de densidade (`var(--card-gap)`, `var(--card-padding-x)`).
+9. Tema default Onix — não hardcodar cores. Usar tokens CSS (`bg-card`, `text-muted-foreground`, `border-border/60`, etc.).
+10. Testar no browser no tema Onix antes de declarar pronto.
 
 ## Commits e PRs
 

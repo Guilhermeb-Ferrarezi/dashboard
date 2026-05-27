@@ -36,7 +36,7 @@ function formatDataLong(iso: string): string {
 export function CorujaoProximaSessaoCard({ sessao, loading }: Props) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-border/60 bg-card/40 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
+      <div className="rounded-lg border border-border/60 bg-card/40 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
         <Skeleton className="h-4 w-32 mb-3" />
         <Skeleton className="h-7 w-64 mb-4" />
         <Skeleton className="h-12 w-40" />
@@ -46,7 +46,7 @@ export function CorujaoProximaSessaoCard({ sessao, loading }: Props) {
 
   if (!sessao) {
     return (
-      <div className="rounded-xl border border-dashed border-border/60 bg-card/30 px-[var(--card-padding-x)] py-[var(--card-padding-y)] flex items-center justify-between gap-4">
+      <div className="rounded-lg border border-dashed border-border/60 bg-card/30 px-[var(--card-padding-x)] py-[var(--card-padding-y)] flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-muted/60 p-2.5">
             <MoonIcon className="h-5 w-5 text-muted-foreground" />
@@ -73,7 +73,7 @@ export function CorujaoProximaSessaoCard({ sessao, loading }: Props) {
   const percent = Math.min(100, (sessao.vagasVendidas / sessao.totalVagas) * 100);
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
+    <div className="rounded-lg border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 mb-1.5">

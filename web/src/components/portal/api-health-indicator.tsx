@@ -38,7 +38,7 @@ export function ApiHealthIndicator({ className }: { className?: string }) {
       <Tooltip>
         <TooltipTrigger
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+            "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors",
             TONE_BORDER[state.tone],
             className,
           )}

@@ -145,7 +145,7 @@ export const corujaoContatos = pgTable("corujao_contatos", {
   }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-}, (t) => [unique().on(t.telefone)]);
+}, (t) => [unique().on(t.telefone), unique().on(t.email)]);
 
 export const corujaoVisitas = pgTable("corujao_visitas", {
   id: serial("id").primaryKey(),

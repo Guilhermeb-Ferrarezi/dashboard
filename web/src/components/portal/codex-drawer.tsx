@@ -881,7 +881,7 @@ export function CodexDrawer({
   if (accessBlocked) {
     return (
       <div ref={drawerRef} className="flex h-full min-h-0 min-w-0 w-full items-center justify-center overflow-hidden bg-background p-4">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
+        <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
               <ShieldIcon className="size-5" />
@@ -943,7 +943,7 @@ export function CodexDrawer({
               {historyOpen ? (
                 <div
                   className={cn(
-                    "absolute left-0 top-[calc(100%+0.5rem)] z-30 w-[min(320px,calc(100vw-3rem))] origin-top-left rounded-2xl border border-border bg-popover p-2 shadow-[0_14px_40px_rgba(0,0,0,0.38)] duration-150 ease-out",
+                    "absolute left-0 top-[calc(100%+0.5rem)] z-30 w-[min(320px,calc(100vw-3rem))] origin-top-left rounded-xl border border-border bg-popover p-2 shadow-[0_14px_40px_rgba(0,0,0,0.38)] duration-150 ease-out",
                     historyClosing
                       ? "animate-out fade-out-0 zoom-out-95 slide-out-to-top-2"
                       : "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2",
@@ -1105,7 +1105,7 @@ export function CodexDrawer({
             {timeline.map((entry) => {
               if (entry.kind === "user") {
                 return (
-                  <div key={entry.id} className="ml-auto max-w-[88%] rounded-2xl bg-primary px-3 py-2 text-sm text-primary-foreground">
+                  <div key={entry.id} className="ml-auto max-w-[88%] rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground">
                     <CodexMarkdown tone="inverse" className="text-sm leading-7">
                       {entry.text}
                     </CodexMarkdown>
@@ -1278,7 +1278,7 @@ export function CodexDrawer({
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  className="inline-flex h-6 items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+                  className="inline-flex h-6 items-center gap-1.5 rounded-md border border-border/60 bg-background/30 px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
                 >
                   <span className="text-sm">✎</span>
                   Ask
@@ -1290,7 +1290,7 @@ export function CodexDrawer({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="rounded-full text-muted-foreground"
+                      className="rounded-md text-muted-foreground"
                       onClick={interruptTurn}
                     >
                       <SquareIcon className="size-3.5" />
@@ -1301,7 +1301,7 @@ export function CodexDrawer({
                       type="button"
                       variant="ghost"
                       size="icon-sm"
-                      className="rounded-full text-muted-foreground"
+                      className="rounded-md text-muted-foreground"
                     >
                       <SlidersHorizontalIcon className="size-3.5" />
                       <span className="sr-only">Ajustes</span>
@@ -1311,7 +1311,7 @@ export function CodexDrawer({
                   <Button
                     type="button"
                     size="icon-sm"
-                    className="rounded-full bg-primary/90 text-primary-foreground"
+                    className="rounded-md bg-primary/90 text-primary-foreground"
                     onClick={() => sendPrompt()}
                     disabled={!canChat || sending}
                   >

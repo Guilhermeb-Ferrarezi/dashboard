@@ -149,7 +149,7 @@ export function Select({
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                   highlighted ? "bg-foreground/8 text-foreground" : "text-foreground/85 hover:bg-foreground/5",
-                  active && "font-medium shadow-[inset_2px_0_0_var(--primary)]",
+                  active && "font-medium bg-foreground/10",
                 )}
               >
                 <span className="min-w-0 truncate">{option.label}</span>

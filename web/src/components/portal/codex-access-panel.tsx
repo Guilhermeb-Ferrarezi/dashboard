@@ -216,7 +216,7 @@ const MAX_VISIBLE_SCOPES = 3;
 function ScopeBadges({ permissions }: { permissions: string[] }) {
   if (permissions.length === 0) {
     return (
-      <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px] font-medium">
+      <Badge variant="secondary" className="px-2 py-0 text-[10px] font-medium">
         Acesso total
       </Badge>
     );
@@ -228,12 +228,12 @@ function ScopeBadges({ permissions }: { permissions: string[] }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {visible.map((s) => (
-        <Badge key={s} variant="outline" className="rounded-full px-2 py-0 text-[10px] font-mono font-normal">
+        <Badge key={s} variant="outline" className="px-2 py-0 text-[10px] font-mono font-normal">
           {s}
         </Badge>
       ))}
       {extra > 0 && (
-        <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px] text-muted-foreground">
+        <Badge variant="outline" className="px-2 py-0 text-[10px] text-muted-foreground">
           +{extra}
         </Badge>
       )}
@@ -350,7 +350,7 @@ function TokenRow({
       return (
         <Badge
           variant="outline"
-          className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] border-border text-muted-foreground"
+          className="px-3 py-1 text-[11px] uppercase tracking-[0.18em] border-border text-muted-foreground"
         >
           Revogado
         </Badge>
@@ -360,7 +360,7 @@ function TokenRow({
       return (
         <Badge
           variant="outline"
-          className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] border-destructive/30 bg-destructive/10 text-destructive"
+          className="px-3 py-1 text-[11px] uppercase tracking-[0.18em] border-destructive/30 bg-destructive/10 text-destructive"
         >
           Expirado
         </Badge>
@@ -369,7 +369,7 @@ function TokenRow({
     return (
       <Badge
         variant="outline"
-        className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
+        className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] border-emerald-500/30 bg-emerald-500/15 text-emerald-400"
       >
         Ativo
       </Badge>

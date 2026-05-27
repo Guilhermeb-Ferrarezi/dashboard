@@ -302,17 +302,19 @@ export function getThemeVariables(
       ? getCustomPalette(preferences.customAccentColor, resolvedTheme)
       : getPalette(preferences.accent, resolvedTheme);
 
+  const isOnix = preferences.mode === "onix";
+
   return {
-    "--primary": palette.primary,
-    "--primary-foreground": palette.primaryForeground,
+    "--primary": isOnix ? "oklch(0.96 0 0)" : palette.primary,
+    "--primary-foreground": isOnix ? "oklch(0.1 0 0)" : palette.primaryForeground,
     "--accent": palette.accent,
     "--accent-foreground": palette.accentForeground,
-    "--ring": palette.ring,
-    "--sidebar-primary": palette.sidebarPrimary,
-    "--sidebar-primary-foreground": palette.sidebarPrimaryForeground,
-    "--sidebar-accent": palette.sidebarAccent,
-    "--sidebar-accent-foreground": palette.sidebarAccentForeground,
-    "--sidebar-ring": palette.sidebarRing,
+    "--ring": isOnix ? "oklch(0.96 0 0)" : palette.ring,
+    "--sidebar-primary": isOnix ? "oklch(0.96 0 0)" : palette.sidebarPrimary,
+    "--sidebar-primary-foreground": isOnix ? "oklch(0.1 0 0)" : palette.sidebarPrimaryForeground,
+    "--sidebar-accent": isOnix ? "oklch(0.22 0 0)" : palette.sidebarAccent,
+    "--sidebar-accent-foreground": isOnix ? "oklch(0.98 0 0)" : palette.sidebarAccentForeground,
+    "--sidebar-ring": isOnix ? "oklch(0.96 0 0)" : palette.sidebarRing,
     "--chart-1": palette.chart1,
     "--chart-2": palette.chart2,
     "--chart-3": palette.chart3,
@@ -320,10 +322,10 @@ export function getThemeVariables(
     "--chart-5": palette.chart5,
     "--radius":
       preferences.radius === "sm"
-        ? "0.45rem"
+        ? "0.25rem"
         : preferences.radius === "lg"
-          ? "0.9rem"
-          : "0.625rem",
+          ? "0.625rem"
+          : "0.4rem",
   } as const;
 }
 

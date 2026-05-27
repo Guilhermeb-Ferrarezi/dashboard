@@ -87,7 +87,7 @@ export function LoginForm({ error }: LoginFormProps) {
       <Card className="page-fade-in w-full max-w-md border-border/60 bg-card/92 shadow-2xl shadow-black/25 backdrop-blur">
         <CardHeader className="gap-6">
           <div className="flex items-center gap-4">
-            <div className="flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/60">
+            <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-background/60">
               <img
                 src="/assets/Logo.png"
                 alt="Santos Tech"

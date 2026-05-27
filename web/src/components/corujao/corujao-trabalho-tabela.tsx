@@ -24,7 +24,7 @@ import {
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  PhoneIcon,
+  WhatsAppIcon,
   PlusIcon,
   Trash2Icon,
   UsersIcon,
@@ -91,9 +91,7 @@ const FORMA_PAGAMENTO_OPTIONS = [
   { value: "pix", label: "PIX" },
   { value: "dinheiro", label: "Dinheiro" },
   { value: "cartao", label: "Cartão" },
-  { value: "gateway", label: "Gateway (Asaas/Abacate)" },
-  { value: "cortesia", label: "Cortesia" },
-  { value: "outro", label: "Outro" }
+  { value: "cortesia", label: "Cortesia" }
 ] as const;
 type FormaPagamento = (typeof FORMA_PAGAMENTO_OPTIONS)[number]["value"];
 
@@ -271,6 +269,15 @@ function formatRelativeContact(iso: string | null): string {
   return formatDate(iso);
 }
 
+function getStatusChamada(contato: { ultimoContatoEm: string | null; statusConversa: string | null }): { label: string; tone: StatusBadgeTone } {
+  if (!contato.ultimoContatoEm) return { label: "Não chamou", tone: "muted" };
+  const respondeu = contato.statusConversa && contato.statusConversa !== "sem_resposta";
+  if (respondeu) return { label: "Respondeu", tone: "emerald" };
+  const horasDesde = (Date.now() - new Date(contato.ultimoContatoEm).getTime()) / 3_600_000;
+  if (horasDesde < 24) return { label: "Chamou", tone: "blue" };
+  return { label: "Não respondeu", tone: "red" };
+}
+
 // "(11) 99999-9999" → "5511999999999". Se já tem DDI 55, mantém.
 function normalizePhoneForWhatsApp(phone: string): string | null {
   const digits = phone.replace(/\D/g, "");
@@ -315,6 +322,10 @@ export function CorujaoTrabalhoTabela() {
   const [page, setPage] = useState(1);
   const [filterConversa, setFilterConversa] = useState<StatusConversa | "">("");
   const [filterPagamento, setFilterPagamento] = useState<StatusPagamento | "">("");
+  const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu">("");
+
+  type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number };
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -357,6 +368,9 @@ export function CorujaoTrabalhoTabela() {
     if (debouncedQuery) params.set("q", debouncedQuery);
     if (filterConversa) params.set("statusConversa", filterConversa);
     if (filterPagamento) params.set("statusPagamento", filterPagamento);
+    if (filterChamada === "nao_respondeu") params.set("naoRespondeu", "true");
+    if (filterChamada === "chamou") params.set("chamou", "true");
+    if (filterChamada === "nao_chamou") params.set("naoChamou", "true");
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
         `/corujao/contatos?${params.toString()}`
@@ -370,10 +384,20 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
+  async function reloadMetricas() {
+    try {
+      const res = await clientApi<Metricas>("/corujao/contatos/metricas");
+      setMetricas(res);
+    } catch {
+      // silencioso
+    }
+  }
+
   useEffect(() => {
     reload();
+    reloadMetricas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedQuery, filterConversa, filterPagamento]);
+  }, [page, debouncedQuery, filterConversa, filterPagamento, filterChamada]);
 
   async function reloadProximaSessao() {
     setProximaLoading(true);
@@ -508,6 +532,7 @@ export function CorujaoTrabalhoTabela() {
       });
       setContatos((cur) => cur.map((c) => (c.id === id ? res.contato : c)));
       if (successMsg) toast.success(successMsg);
+      reloadMetricas();
     } catch (error) {
       toast.error(extractErrorMessage(error, "Erro ao atualizar."));
     } finally {
@@ -515,7 +540,7 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
-  async function handleChamar(contato: Contato) {
+  function handleChamar(contato: Contato) {
     if (!contato.telefone) {
       toast.error("Contato sem telefone — cadastre o número antes de chamar.");
       return;
@@ -525,23 +550,38 @@ export function CorujaoTrabalhoTabela() {
       toast.error("Telefone inválido para WhatsApp.");
       return;
     }
-    // window.open precisa ser SÍNCRONO no handler do click pra escapar do popup blocker.
     window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+  }
 
+  async function handleSetChamada(contato: Contato, action: "chamou" | "nao_respondeu" | "limpar") {
     setRowBusy(contato.id);
     try {
-      const res = await clientApi<{ contato: Contato }>(
-        `/corujao/contatos/${contato.id}/marcar-contato`,
-        { method: "POST" }
-      );
-      setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      if (action === "chamou") {
+        const res = await clientApi<{ contato: Contato }>(
+          `/corujao/contatos/${contato.id}/marcar-contato`,
+          { method: "POST" }
+        );
+        setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      } else if (action === "nao_respondeu") {
+        const forceOld = new Date(Date.now() - 25 * 3600_000).toISOString();
+        const res = await clientApi<{ contato: Contato }>(`/corujao/contatos/${contato.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ultimoContatoEm: contato.ultimoContatoEm ?? forceOld,
+            statusConversa: "sem_resposta"
+          })
+        });
+        setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      } else {
+        const res = await clientApi<{ contato: Contato }>(`/corujao/contatos/${contato.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ultimoContatoEm: null, statusConversa: null })
+        });
+        setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      }
+      reloadMetricas();
     } catch (error) {
-      toast.error(
-        extractErrorMessage(
-          error,
-          "Não foi possível registrar o contato no servidor — WhatsApp já abriu."
-        )
-      );
+      toast.error(extractErrorMessage(error, "Erro ao atualizar."));
     } finally {
       setRowBusy(null);
     }
@@ -726,11 +766,42 @@ export function CorujaoTrabalhoTabela() {
 
   if (loading && contatos.length === 0) return <ListSkeleton />;
 
-  const showingFiltered = !!(query || filterConversa || filterPagamento);
+  const showingFiltered = !!(query || filterConversa || filterPagamento || filterChamada);
 
   return (
     <div className="flex flex-col gap-[var(--card-gap)]">
-      <CorujaoProximaSessaoCard sessao={proximaSessao} loading={proximaLoading} />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-[var(--card-gap)]">
+        {metricas && (
+          <div className="rounded-lg border border-border/60 bg-card/60 px-[var(--card-padding-x)] py-[var(--card-padding-y)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 mb-3">
+              Métricas da folha
+            </p>
+            <div className="flex flex-wrap gap-6">
+              <button type="button" onClick={() => { setFilterChamada(""); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums">{metricas.total}</span>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </button>
+              <button type="button" onClick={() => { setFilterChamada(filterChamada === "nao_chamou" ? "" : "nao_chamou"); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "nao_chamou" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-muted-foreground">{metricas.naoChamou}</span>
+                <p className="text-xs text-muted-foreground">Não chamou</p>
+              </button>
+              <button type="button" onClick={() => { setFilterChamada(filterChamada === "chamou" ? "" : "chamou"); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "chamou" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-blue-400">{metricas.chamou}</span>
+                <p className="text-xs text-muted-foreground">Chamou</p>
+              </button>
+              <button type="button" onClick={() => { setFilterConversa(filterConversa ? "" : "confirmou"); setPage(1); }} className={`text-left transition-opacity ${filterConversa ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-emerald-400">{metricas.respondeu}</span>
+                <p className="text-xs text-muted-foreground">Respondeu</p>
+              </button>
+              <button type="button" onClick={() => { setFilterChamada(filterChamada === "nao_respondeu" ? "" : "nao_respondeu"); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "nao_respondeu" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-red-400">{metricas.naoRespondeu}</span>
+                <p className="text-xs text-muted-foreground">Não respondeu</p>
+              </button>
+            </div>
+          </div>
+        )}
+        <CorujaoProximaSessaoCard sessao={proximaSessao} loading={proximaLoading} />
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -764,6 +835,20 @@ export function CorujaoTrabalhoTabela() {
             ]}
             className="w-56"
           />
+          <Select
+            value={filterChamada}
+            onValueChange={(value) => {
+              setFilterChamada(value as typeof filterChamada);
+              setPage(1);
+            }}
+            options={[
+              { value: "", label: "Todos (chamada)" },
+              { value: "nao_chamou", label: `Não chamou${metricas ? ` (${metricas.naoChamou})` : ""}` },
+              { value: "chamou", label: `Chamou${metricas ? ` (${metricas.chamou})` : ""}` },
+              { value: "nao_respondeu", label: `Não respondeu${metricas ? ` (${metricas.naoRespondeu})` : ""}` },
+            ]}
+            className="w-52"
+          />
           {showingFiltered && (
             <Button
               variant="ghost"
@@ -773,6 +858,7 @@ export function CorujaoTrabalhoTabela() {
                 setDebouncedQuery("");
                 setFilterConversa("");
                 setFilterPagamento("");
+                setFilterChamada("");
                 setPage(1);
               }}
               className="gap-1.5"
@@ -809,6 +895,7 @@ export function CorujaoTrabalhoTabela() {
                 <TableHead>Conversa</TableHead>
                 <TableHead>Pagamento</TableHead>
                 <TableHead>Últ. contato</TableHead>
+                <TableHead>Chamou?</TableHead>
                 <TableHead className="max-w-[180px]">Observações</TableHead>
                 <TableHead className="w-32 text-right">Ações</TableHead>
               </TableRow>
@@ -817,7 +904,7 @@ export function CorujaoTrabalhoTabela() {
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-20" />
                         </TableCell>
@@ -935,6 +1022,39 @@ export function CorujaoTrabalhoTabela() {
                         <TableCell className="text-sm text-muted-foreground">
                           {formatRelativeContact(contato.ultimoContatoEm)}
                         </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 -mx-2 px-2 font-normal"
+                                disabled={busy}
+                              >
+                                {(() => {
+                                  const sc = getStatusChamada(contato);
+                                  return <StatusBadge tone={sc.tone}>{sc.label}</StatusBadge>;
+                                })()}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem onClick={() => handleSetChamada(contato, "chamou")}>
+                                Chamou
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetChamada(contato, "nao_respondeu")}>
+                                Não respondeu
+                              </DropdownMenuItem>
+                              {contato.ultimoContatoEm && (
+                                <DropdownMenuItem
+                                  onClick={() => handleSetChamada(contato, "limpar")}
+                                  className="text-muted-foreground"
+                                >
+                                  Limpar
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                         <TableCell
                           className="max-w-[180px] truncate text-sm text-muted-foreground"
                           title={contato.observacoes ?? ""}
@@ -950,7 +1070,7 @@ export function CorujaoTrabalhoTabela() {
                               onClick={() => handleChamar(contato)}
                               disabled={busy}
                             >
-                              <PhoneIcon className="h-3.5 w-3.5" />
+                              <WhatsAppIcon className="!size-4" />
                               Chamar
                             </Button>
                             <DropdownMenu>

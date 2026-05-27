@@ -128,7 +128,7 @@ function Combobox({
                   className={cn(
                     "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                     highlighted ? "bg-muted/60" : "hover:bg-muted/40",
-                    active && "bg-primary/12 text-foreground shadow-[inset_2px_0_0_var(--primary)]",
+                    active && "bg-foreground/10 text-foreground font-medium",
                   )}
                 >
                   <span className="min-w-0 truncate">{option.label}</span>

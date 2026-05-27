@@ -419,7 +419,7 @@ export function AppShell({
         </SidebarHeader>
 
         <SidebarContent>
-          <div className="px-2 py-2">
+          <div className="px-2 py-2 group-data-[collapsible=icon]:px-1.5">
             <PortalSearchLauncher variant="sidebar" />
           </div>
 
@@ -497,19 +497,16 @@ export function AppShell({
             }}
             onSettingsOpenChange={setSettingsOpen}
           />
-          <p className="px-2 pt-1 text-center text-[10px] font-medium tracking-[0.2em] uppercase text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">
-            Santos Tech · {new Date().getFullYear()}
-          </p>
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-sidebar h-screen overflow-hidden">
+      <SidebarInset className="bg-sidebar h-screen overflow-hidden border-l border-sidebar-border">
         <div className="relative flex h-full">
           <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
             <SystemBanner />
             {/* Header Linear-style: fino (~44px), tipografia compacta,
                actions ghost com hover sutil. */}
-            <header className="shrink-0 z-20 bg-sidebar">
+            <header className="shrink-0 z-20 bg-sidebar border-b border-sidebar-border">
               <div className="flex w-full items-center gap-3 px-4 py-2">
                 <SidebarTrigger />
                 <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-muted-foreground">
@@ -536,7 +533,6 @@ export function AppShell({
                 </nav>
                 <div className="flex items-center gap-1">
                   <ApiHealthIndicator className="hidden md:inline-flex" />
-                  <ThemeCycleButton />
                   {user.role === "admin" ? (
                     <Button
                       type="button"
@@ -565,10 +561,9 @@ export function AppShell({
                 id="main-content"
                 key={pathname}
                 className={cn(
-                  // Main é um card visual — raio entra na escala de --radius
-                  // (rounded-3xl ≈ 22px, antes era hardcoded em 24px) e
+                  // Main é um card visual — raio reduzido (rounded-xl) e
                   // padding usa --card-padding-* pra também responder à densidade.
-                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col rounded-3xl bg-card border border-border/30 shadow-sm overflow-y-auto",
+                  "page-fade-in flex min-h-0 min-w-0 flex-1 flex-col rounded-xl bg-card border border-border/30 shadow-sm overflow-y-auto",
                   "px-[var(--card-padding-x)] py-[var(--card-padding-y)]",
                   lockViewport && "overflow-hidden",
                 )}

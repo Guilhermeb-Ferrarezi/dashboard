@@ -55,17 +55,17 @@ export function UserMenu({
 
   return (
     <>
-      <div className="flex items-center gap-2 rounded-xl bg-sidebar-accent/70 p-2 text-sidebar-accent-foreground ring-1 ring-sidebar-border group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5">
+      <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent/70 p-2 text-sidebar-accent-foreground ring-1 ring-sidebar-border group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:p-0.5 group-data-[collapsible=icon]:ring-0 group-data-[collapsible=icon]:bg-transparent">
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center"
               />
             }
           >
-            <Avatar className="size-8 border border-sidebar-border">
+            <Avatar className="size-8 shrink-0 border border-sidebar-border group-data-[collapsible=icon]:size-7">
               <AvatarFallback>
                 {user.username.slice(0, 1).toUpperCase()}
               </AvatarFallback>

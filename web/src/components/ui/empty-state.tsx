@@ -22,7 +22,7 @@ function EmptyState({
     <div
       role="status"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-background/40 px-6 py-10 text-center",
+        "flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 bg-background/40 px-6 py-10 text-center",
         className,
       )}
       {...props}

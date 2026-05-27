@@ -19,7 +19,7 @@ export function ClientRedirect({ to, label }: ClientRedirectProps) {
 
   return (
     <div className="grid min-h-screen place-items-center px-[var(--app-page-padding-x)] py-[var(--app-page-padding-y)]">
-      <div className="w-full max-w-sm rounded-3xl border border-border/60 bg-card/90 p-6 text-center shadow-xl shadow-black/20 backdrop-blur">
+      <div className="w-full max-w-sm rounded-xl border border-border/60 bg-card/90 p-6 text-center shadow-xl shadow-black/20 backdrop-blur">
         <Spinner size="lg" className="mx-auto text-primary" label={`Redirecionando para ${label ?? to}`} />
         <p className="mt-4 text-sm font-medium text-foreground">
           Abrindo {label ?? to}

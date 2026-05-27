@@ -291,6 +291,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           kind: "resource",
           keywords: ["logs", "observabilidade", "eventos"],
         }),
+        portalItem({
+          href: "/home/ops",
+          label: "Dashboard Ops",
+          description: "Métricas de infraestrutura e tráfego da API",
+          icon: LayoutDashboardIcon,
+          kind: "resource",
+          keywords: ["dashboard", "operacional", "devops", "infra", "api", "trafego", "metricas"],
+        }),
       ],
     },
   ];
