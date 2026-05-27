@@ -15,6 +15,8 @@ interface PageMetrics {
 interface RealtimeData {
   pages: Record<string, number>;
   totalActive: number;
+  pages5min: Record<string, number>;
+  totalActive5min: number;
 }
 
 function formatDuration(seconds: number) {
@@ -66,13 +68,22 @@ function RealtimePanel({ data }: { data: RealtimeData | null }) {
 
   return (
     <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-5 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
           <p className="text-sm font-semibold text-green-400 uppercase tracking-wider">Ao vivo agora</p>
         </div>
         {data && (
-          <span className="text-2xl font-bold text-green-400">{data.totalActive} usuários ativos</span>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Últimos 5 min</p>
+              <p className="text-2xl font-bold text-green-400">{data.totalActive5min}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Últimos 30 min</p>
+              <p className="text-2xl font-bold text-green-400/60">{data.totalActive}</p>
+            </div>
+          </div>
         )}
       </div>
 
@@ -83,9 +94,11 @@ function RealtimePanel({ data }: { data: RealtimeData | null }) {
               <p className="text-xs text-muted-foreground uppercase tracking-widest mb-0.5">{path}</p>
               <p className="text-base font-bold">{pageName(path)}</p>
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-green-400">{data?.pages[path] ?? 0}</p>
-              <p className="text-xs text-muted-foreground">ativos</p>
+            <div className="text-right flex flex-col items-end gap-0.5">
+              <p className="text-3xl font-bold text-green-400">{data?.pages5min[path] ?? 0}</p>
+              <p className="text-xs text-muted-foreground">
+                5 min · <span className="text-green-400/50">{data?.pages[path] ?? 0} em 30 min</span>
+              </p>
             </div>
           </div>
         ))}
@@ -185,7 +198,7 @@ export function AnalyticsDashboard({
             <PageCard
               key={page.path}
               page={page}
-              realtimeCount={realtime?.pages[page.path] ?? 0}
+              realtimeCount={realtime?.pages5min[page.path] ?? 0}
             />
           ))}
         </div>

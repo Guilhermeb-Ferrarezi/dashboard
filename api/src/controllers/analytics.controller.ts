@@ -31,29 +31,46 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
 
   try {
     // Realtime API só aceita unifiedScreenName (título da página), não pagePath
-    const [rtAll] = await ga4.client.runRealtimeReport({
-      property: `properties/${ga4.propertyId}`,
-      dimensions: [{ name: "unifiedScreenName" }],
-      metrics: [{ name: "activeUsers" }],
-    });
+    // Duas chamadas em paralelo: 30 min (padrão) e últimos 5 min
+    const [rt30, rt5] = await Promise.all([
+      ga4.client.runRealtimeReport({
+        property: `properties/${ga4.propertyId}`,
+        dimensions: [{ name: "unifiedScreenName" }],
+        metrics: [{ name: "activeUsers" }],
+      }),
+      ga4.client.runRealtimeReport({
+        property: `properties/${ga4.propertyId}`,
+        dimensions: [{ name: "unifiedScreenName" }],
+        metrics: [{ name: "activeUsers" }],
+        minuteRanges: [{ startMinutesAgo: 4, endMinutesAgo: 0 }],
+      }),
+    ]);
 
-    const result: Record<string, number> = {};
-    for (const page of SALES_PAGES) result[page] = 0;
+    function aggregateRows(rows: typeof rt30[0]["rows"]) {
+      const pages: Record<string, number> = {};
+      for (const page of SALES_PAGES) pages[page] = 0;
+      let total = 0;
 
-    let totalActive = 0;
-    for (const row of rtAll.rows ?? []) {
-      const screenName = (row.dimensionValues?.[0]?.value ?? "").toLowerCase();
-      const users = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
-      totalActive += users;
-
-      for (const [path, title] of Object.entries(PAGE_TITLES)) {
-        if (screenName.includes(title.toLowerCase())) {
-          result[path] = (result[path] ?? 0) + users;
+      for (const row of rows ?? []) {
+        const screenName = (row.dimensionValues?.[0]?.value ?? "").toLowerCase();
+        const users = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
+        total += users;
+        for (const [path, title] of Object.entries(PAGE_TITLES)) {
+          if (screenName.includes(title)) pages[path] = (pages[path] ?? 0) + users;
         }
       }
+      return { pages, total };
     }
 
-    return res.json({ pages: result, totalActive });
+    const w30 = aggregateRows(rt30[0].rows);
+    const w5 = aggregateRows(rt5[0].rows);
+
+    return res.json({
+      pages: w30.pages,
+      totalActive: w30.total,
+      pages5min: w5.pages,
+      totalActive5min: w5.total,
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return res.status(500).json({ message: msg });
