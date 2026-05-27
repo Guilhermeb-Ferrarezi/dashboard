@@ -4,9 +4,11 @@ import Link from "next/link";
 
 import {
   CrosshairIcon,
+  GameControllerIcon,
   MoonIcon,
-  ShoppingCartIcon,
-  SparklesIcon,
+  StorefrontIcon,
+  StrategyIcon,
+  SwordIcon,
 } from "@/components/ui/icons";
 import type { LucideIcon } from "@/components/ui/icons";
 
@@ -61,7 +63,7 @@ const SHORTCUTS: Shortcut[] = [
     href: "/checkout",
     label: "Checkout",
     description: "Pagamentos, clientes e produtos",
-    icon: ShoppingCartIcon,
+    icon: StorefrontIcon,
   },
   {
     href: "/vct",
@@ -73,13 +75,13 @@ const SHORTCUTS: Shortcut[] = [
     href: "/counter-strike",
     label: "Counter-Strike",
     description: "Inscrições do CS",
-    icon: SparklesIcon,
+    icon: SwordIcon,
   },
   {
     href: "/league-of-legends",
     label: "League of Legends",
     description: "Inscrições do LoL",
-    icon: SparklesIcon,
+    icon: StrategyIcon,
   },
 ];
 

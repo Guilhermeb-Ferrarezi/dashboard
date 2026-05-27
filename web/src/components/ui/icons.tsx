@@ -30,6 +30,7 @@ import {
   FileText,
   FloppyDisk,
   FolderOpen,
+  GameController,
   Gear,
   GridFour,
   Heart,
@@ -67,10 +68,14 @@ import {
   Spinner,
   SquaresFour,
   Star,
+  Storefront,
+  Strategy,
   Sun,
   Square,
+  Sword,
   Package,
   ShoppingCart,
+  Trophy,
   Tag,
   Trash,
   Tray,
@@ -111,6 +116,7 @@ export const CopyIcon = Copy;
 export const CrosshairIcon = Crosshair;
 export const DownloadIcon = DownloadSimple;
 export const ExternalLinkIcon = ArrowSquareOut;
+export const GameControllerIcon = GameController;
 export const FolderSearch2Icon = FolderOpen;
 export const GroupIcon = UsersThree;
 export const HeartIcon = Heart;
@@ -159,11 +165,15 @@ export const SparklesIcon = Sparkle;
 export const SquareIcon = Square;
 export const StarIcon = Star;
 export const StickyNoteIcon = Note;
+export const StorefrontIcon = Storefront;
+export const StrategyIcon = Strategy;
 export const SunIcon = Sun;
+export const SwordIcon = Sword;
 export const TagsIcon = Tag;
 export const PackageIcon = Package;
 export const ShoppingCartIcon = ShoppingCart;
 export const Trash2Icon = Trash;
+export const TrophyIcon = Trophy;
 export const TriangleAlertIcon = WarningOctagon;
 export const AlertCircleIcon = WarningCircle;
 export const UploadIcon = Upload;
