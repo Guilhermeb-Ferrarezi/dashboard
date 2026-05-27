@@ -35,7 +35,6 @@ import type { SessionUser } from "@/lib/session";
 import { useTrackRecentlyVisited } from "@/hooks/use-recently-visited";
 import { ApiHealthIndicator } from "@/components/portal/api-health-indicator";
 import { CommandPalette } from "@/components/portal/command-palette";
-import { ConnectivityToasts } from "@/components/portal/connectivity-toasts";
 import { KeyboardShortcutsOverlay } from "@/components/portal/keyboard-shortcuts-overlay";
 import { SkipToContent } from "@/components/portal/skip-to-content";
 import { SystemBanner } from "@/components/portal/system-banner";
@@ -390,7 +389,6 @@ export function AppShell({
       <PortalQuickSearchDialog user={user} logsHref={logsHref} />
       <KeyboardShortcutsOverlay />
       <CommandPalette />
-      <ConnectivityToasts />
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-3 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
