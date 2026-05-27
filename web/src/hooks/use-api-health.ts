@@ -13,97 +13,7 @@ export type ApiHealthState = {
   checkedAt: number;
 };
 
-const POLL_INTERVAL_MS = 30_000;
 const SLOW_THRESHOLD_MS = 800;
-const TIMEOUT_MS = 5_000;
-
-async function probeHealth(): Promise<ApiHealthState> {
-  const base = getClientApiBaseUrl();
-  const url = base.endsWith("/api") ? base : `${base.replace(/\/$/u, "")}/api`;
-  const start = performance.now();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      credentials: "omit",
-      signal: controller.signal,
-    });
-    const latency = Math.round(performance.now() - start);
-    if (!response.ok) {
-      return {
-        tone: "error",
-        label: "Erro",
-        detail: `Backend respondeu ${response.status}`,
-        latencyMs: latency,
-        checkedAt: Date.now(),
-      };
-    }
-    if (latency >= SLOW_THRESHOLD_MS) {
-      return {
-        tone: "warning",
-        label: "Lento",
-        detail: `Backend respondendo em ${latency} ms`,
-        latencyMs: latency,
-        checkedAt: Date.now(),
-      };
-    }
-    return {
-      tone: "success",
-      label: "Online",
-      detail: `Backend respondendo em ${latency} ms`,
-      latencyMs: latency,
-      checkedAt: Date.now(),
-    };
-  } catch (error) {
-    return {
-      tone: "error",
-      label: "Offline",
-      detail:
-        error instanceof Error && error.name === "AbortError"
-          ? "Tempo limite excedido."
-          : "Sem resposta do backend.",
-      latencyMs: null,
-      checkedAt: Date.now(),
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-let cached: ApiHealthState | null = null;
-const listeners = new Set<(state: ApiHealthState) => void>();
-let pollingTimer: number | null = null;
-
-function emit(state: ApiHealthState) {
-  cached = state;
-  for (const listener of listeners) listener(state);
-}
-
-async function tick() {
-  const next = await probeHealth();
-  emit(next);
-}
-
-function startPollingOnce() {
-  if (pollingTimer !== null) return;
-  tick();
-  pollingTimer = window.setInterval(tick, POLL_INTERVAL_MS);
-  document.addEventListener("visibilitychange", onVisibility);
-}
-
-function stopPolling() {
-  if (pollingTimer !== null) {
-    window.clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
-  document.removeEventListener("visibilitychange", onVisibility);
-}
-
-function onVisibility() {
-  if (!document.hidden) tick();
-}
 
 const INITIAL_STATE: ApiHealthState = {
   tone: "idle",
@@ -113,16 +23,70 @@ const INITIAL_STATE: ApiHealthState = {
   checkedAt: 0,
 };
 
+let cached: ApiHealthState | null = null;
+const listeners = new Set<(state: ApiHealthState) => void>();
+let eventSource: EventSource | null = null;
+
+function emit(state: ApiHealthState) {
+  cached = state;
+  for (const listener of listeners) listener(state);
+}
+
+function stateFromServerTs(serverTs: number): ApiHealthState {
+  const latencyMs = Math.round(Date.now() - serverTs);
+  const tone: StatusTone = latencyMs >= SLOW_THRESHOLD_MS ? "warning" : "success";
+  return {
+    tone,
+    label: tone === "warning" ? "Lento" : "Online",
+    detail: `Backend respondendo em ${latencyMs} ms`,
+    latencyMs,
+    checkedAt: Date.now(),
+  };
+}
+
+function startSSEOnce() {
+  if (eventSource) return;
+  const url = `${getClientApiBaseUrl()}/health/sse`;
+  const es = new EventSource(url);
+  eventSource = es;
+
+  es.onmessage = (event) => {
+    try {
+      const { serverTs } = JSON.parse(event.data as string) as { serverTs: number };
+      emit(stateFromServerTs(serverTs));
+    } catch {
+      // ignorar eventos malformados
+    }
+  };
+
+  es.onerror = () => {
+    emit({
+      tone: "error",
+      label: "Offline",
+      detail: "Sem resposta do backend.",
+      latencyMs: null,
+      checkedAt: Date.now(),
+    });
+  };
+}
+
+function stopSSE() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  cached = null;
+}
+
 export function useApiHealth(): ApiHealthState {
-  const [state, setState] = useState<ApiHealthState>(cached ?? INITIAL_STATE);
+  const [state, setState] = useState<ApiHealthState>(() => cached ?? INITIAL_STATE);
 
   useEffect(() => {
     listeners.add(setState);
-    startPollingOnce();
-    if (cached) setState(cached);
+    startSSEOnce();
     return () => {
       listeners.delete(setState);
-      if (listeners.size === 0) stopPolling();
+      if (listeners.size === 0) stopSSE();
     };
   }, []);
 
