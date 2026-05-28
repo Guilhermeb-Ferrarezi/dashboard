@@ -769,6 +769,7 @@ async function runCodexExecSession(params: {
 }) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "santos-home-codex-"));
   const outputPath = path.join(tempDir, "last-message.txt");
+  try {
   const args = params.threadId
     ? [
         "exec",
@@ -892,6 +893,9 @@ async function runCodexExecSession(params: {
     stderr,
     ...completion,
   };
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function waitForAppServer(url: string, timeoutMs: number) {
