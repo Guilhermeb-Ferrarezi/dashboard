@@ -38,11 +38,11 @@ export async function requireSession() {
   const user = await getSessionUser();
 
   if (!user) {
-    redirect(getAuthLoginUrl());
+    redirect("/login");
   }
 
   if (user.role !== "admin") {
-    redirect("https://santos-games.com");
+    redirect("/login?denied=1");
   }
 
   return user;

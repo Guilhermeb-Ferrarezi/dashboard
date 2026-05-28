@@ -1,16 +1,20 @@
-import { redirect } from "next/navigation";
+"use client";
 
-import { getSessionUser } from "@/lib/session";
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { getAuthLoginUrl } from "@/lib/auth-api";
 
-export const dynamic = "force-dynamic";
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const denied = searchParams.get("denied");
 
-export default async function LoginPage() {
-  const user = await getSessionUser();
+  useEffect(() => {
+    if (denied) {
+      window.location.href = "https://santos-games.com";
+    } else {
+      window.location.href = getAuthLoginUrl();
+    }
+  }, [denied]);
 
-  if (user) {
-    redirect("/home");
-  }
-
-  redirect(getAuthLoginUrl());
+  return null;
 }
