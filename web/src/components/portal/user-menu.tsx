@@ -44,35 +44,31 @@ export function UserMenu({
 
   async function handleLogout() {
     const isDev = process.env.NODE_ENV !== "production";
-    try {
-      // Em dev: só chama o logout local (auth externo não responde pra localhost).
-      // Em prod: chama os dois pra limpar cookie compartilhado e local.
-      const calls: Promise<unknown>[] = [
-        clientApi<{ message: string }>("/auth/logout", { method: "POST" }),
-      ];
-      if (!isDev) {
-        calls.push(
-          fetch(`${AUTH_API_URL}/api/auth/logout`, {
-            method: "POST",
-            credentials: "include",
-          }),
-        );
-      }
-      await Promise.allSettled(calls);
 
-      // Em dev, o cookie foi setado em localhost:3001 (não na API :4000) —
-      // o clearCookie do backend não consegue limpar. Apagamos pelo browser.
-      if (isDev) {
-        document.cookie = "sga_auth=; path=/; max-age=0; samesite=lax";
-      }
-
-      router.replace("/login");
-      router.refresh();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Nao foi possivel sair.",
-      );
+    // 1) Apaga o cookie no browser ANTES de qualquer fetch — garante que
+    //    o SSR da próxima request não vai mais ver o user logado.
+    if (isDev) {
+      document.cookie = "sga_auth=; path=/; max-age=0; samesite=lax";
     }
+
+    // 2) Dispara o logout do backend em background (fire-and-forget). Em dev
+    //    o cookie já foi apagado; em prod precisa chamar pra invalidar o JWT
+    //    e limpar o cookie compartilhado em .santos-games.com.
+    void Promise.allSettled([
+      clientApi<{ message: string }>("/auth/logout", { method: "POST" }).catch(() => {}),
+      ...(isDev
+        ? []
+        : [
+            fetch(`${AUTH_API_URL}/api/auth/logout`, {
+              method: "POST",
+              credentials: "include",
+            }).catch(() => {}),
+          ]),
+    ]);
+
+    // 3) Força reload completo — router.replace + refresh do Next.js não
+    //    invalida o cache do SSR a tempo, exige múltiplos cliques.
+    window.location.href = "/login";
   }
 
   return (

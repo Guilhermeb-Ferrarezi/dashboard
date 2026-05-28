@@ -757,9 +757,12 @@ export async function preencherTime(req: Request, res: Response) {
     };
   }
 
-  await Promise.all(
-    chosen.map((p) => VctInscricao.updateOne({ _id: String(p._id) }, { time: numero })),
-  );
+  if (chosen.length > 0) {
+    await VctInscricao.updateMany(
+      { _id: { $in: chosen.map((p) => String(p._id)) } },
+      { time: numero },
+    );
+  }
 
   res.json({ ok: true, atribuidos: chosen.length });
 }
@@ -863,11 +866,16 @@ export async function atribuirTimesAutomatico(req: Request, res: Response) {
     target.eloSum += playerScore;
   }
 
-  await Promise.all(
-    assignments.map((a) =>
-      VctInscricao.updateOne({ _id: a.id }, { time: a.time }),
-    ),
-  );
+  if (assignments.length > 0) {
+    await VctInscricao.bulkWrite(
+      assignments.map((a) => ({
+        updateOne: {
+          filter: { _id: a.id },
+          update: { $set: { time: a.time } },
+        },
+      })),
+    );
+  }
 
   res.json({ ok: true, atribuidos: assignments.length });
 }

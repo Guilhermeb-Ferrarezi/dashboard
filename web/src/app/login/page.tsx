@@ -46,7 +46,7 @@ export default function LoginPage() {
       const maxAge = Number(data.maxAgeSeconds) || 7 * 24 * 60 * 60;
       const cookieName = String(data.cookieName || "sga_auth");
       document.cookie = `${cookieName}=${encodeURIComponent(data.token)}; path=/; max-age=${maxAge}; samesite=lax`;
-      window.location.href = "/home";
+      window.location.href = "/painel";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao logar.");
       setSubmitting(false);

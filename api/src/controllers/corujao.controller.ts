@@ -69,6 +69,22 @@ export function parseStatusConversa(input: unknown): ParsedStatus<StatusConversa
   return { ok: true, value: input as StatusConversa };
 }
 
+// Aceita: null/"" → null. String ISO 8601 parseable por Date → Date. Qualquer outro formato → erro.
+// Previne que new Date("string-inválida") = Invalid Date chegue ao Postgres como 500.
+export function parseISODateTime(input: unknown): { ok: true; value: Date | null } | { ok: false; error: string } {
+  if (input === null || input === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof input !== "string") {
+    return { ok: false, error: "ultimoContatoEm inválido." };
+  }
+  const d = new Date(input);
+  if (isNaN(d.getTime())) {
+    return { ok: false, error: "ultimoContatoEm inválido." };
+  }
+  return { ok: true, value: d };
+}
+
 // Aceita: undefined/null/"" → null. Valor do enum → mesmo valor.
 export function parseStatusPagamento(input: unknown): ParsedStatus<StatusPagamento> {
   if (input === undefined || input === null || input === "") {
@@ -81,6 +97,57 @@ export function parseStatusPagamento(input: unknown): ParsedStatus<StatusPagamen
     return { ok: false, error: "Status de pagamento inválido." };
   }
   return { ok: true, value: input as StatusPagamento };
+}
+
+const SERVICOS_VALIDOS = ["corujao", "campeonato", "locacao_hora"] as const;
+type Servico = (typeof SERVICOS_VALIDOS)[number];
+
+// Normaliza string de tag: trim + collapse de espaços. Mantém o case original
+// (display-friendly), mas a comparação de duplicidade ignora case.
+function normalizeTag(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ");
+}
+
+// Dedup case-insensitive preservando o primeiro case encontrado.
+function dedupTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const t of tags) {
+    const normalized = normalizeTag(t);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function parseJogos(input: unknown): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (input === undefined || input === null) return { ok: true, value: [] };
+  if (!Array.isArray(input)) return { ok: false, error: "Jogos deve ser uma lista." };
+  for (const t of input) {
+    if (typeof t !== "string") return { ok: false, error: "Cada jogo deve ser texto." };
+    if (t.length > 50) return { ok: false, error: "Nome do jogo muito longo (máx 50)." };
+  }
+  return { ok: true, value: dedupTags(input as string[]) };
+}
+
+function parseServicos(input: unknown): { ok: true; value: Servico[] } | { ok: false; error: string } {
+  if (input === undefined || input === null) return { ok: true, value: [] };
+  if (!Array.isArray(input)) return { ok: false, error: "Serviços deve ser uma lista." };
+  const valid: Servico[] = [];
+  const seen = new Set<string>();
+  for (const s of input) {
+    if (typeof s !== "string") return { ok: false, error: "Cada serviço deve ser texto." };
+    if (!SERVICOS_VALIDOS.includes(s as Servico)) {
+      return { ok: false, error: `Serviço inválido: ${s}` };
+    }
+    if (seen.has(s)) continue;
+    seen.add(s);
+    valid.push(s as Servico);
+  }
+  return { ok: true, value: valid };
 }
 
 function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
@@ -97,6 +164,8 @@ function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
     ultimoContatoEm: row.ultimoContatoEm ? row.ultimoContatoEm.toISOString() : null,
     statusConversa: row.statusConversa ?? null,
     statusPagamento: row.statusPagamento ?? null,
+    jogos: row.jogos ?? [],
+    servicos: row.servicos ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   };
@@ -144,6 +213,9 @@ export async function listContatos(req: Request, res: Response) {
     const naoRespondeu = req.query.naoRespondeu === "true";
     const chamou = req.query.chamou === "true";
     const naoChamou = req.query.naoChamou === "true";
+    const jogoFilter = typeof req.query.jogo === "string" ? req.query.jogo.trim() : "";
+    const servicoFilter = typeof req.query.servico === "string" ? req.query.servico.trim() : "";
+    const numeroInvalido = req.query.numeroInvalido === "true";
 
     const sortByRaw = String(req.query.sortBy || "prioridade");
     // "nome" mantido como alias de "alfabetico" pra compatibilidade.
@@ -190,6 +262,16 @@ export async function listContatos(req: Request, res: Response) {
     if (naoChamou) {
       conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NULL`);
     }
+    if (numeroInvalido) {
+      conditions.push(eq(schema.corujaoContatos.statusConversa, "recusou"));
+    }
+    // Filtros case-insensitive em arrays via lowercase comparison.
+    if (jogoFilter) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM unnest(${schema.corujaoContatos.jogos}) AS t WHERE LOWER(t) = LOWER(${jogoFilter}))`);
+    }
+    if (servicoFilter) {
+      conditions.push(sql`${servicoFilter} = ANY(${schema.corujaoContatos.servicos})`);
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -230,13 +312,15 @@ export async function listContatos(req: Request, res: Response) {
 
 export async function createContato(req: Request, res: Response) {
   try {
-    const { nome, telefone, email, origem, observacoes, dataNascimento } = req.body as {
+    const { nome, telefone, email, origem, observacoes, dataNascimento, jogos, servicos } = req.body as {
       nome?: string | null;
       telefone?: string;
       email?: string | null;
       origem?: string;
       observacoes?: string | null;
       dataNascimento?: string | null;
+      jogos?: string[];
+      servicos?: string[];
     };
 
     if (!telefone?.trim()) {
@@ -254,6 +338,12 @@ export async function createContato(req: Request, res: Response) {
     const birth = parseOptionalBirthDate(dataNascimento);
     if (!birth.ok) return res.status(400).json({ message: birth.error });
 
+    const parsedJogos = parseJogos(jogos);
+    if (!parsedJogos.ok) return res.status(400).json({ message: parsedJogos.error });
+
+    const parsedServicos = parseServicos(servicos);
+    if (!parsedServicos.ok) return res.status(400).json({ message: parsedServicos.error });
+
     const db = getCheckoutDb();
     const [contato] = await db
       .insert(schema.corujaoContatos)
@@ -263,7 +353,9 @@ export async function createContato(req: Request, res: Response) {
         email: email?.trim() || null,
         dataNascimento: birth.value,
         origem: origemVal,
-        observacoes: observacoes?.trim() || null
+        observacoes: observacoes?.trim() || null,
+        jogos: parsedJogos.value,
+        servicos: parsedServicos.value
       })
       .returning();
 
@@ -291,7 +383,9 @@ export async function updateContato(req: Request, res: Response) {
       dataNascimento,
       statusConversa,
       statusPagamento,
-      ultimoContatoEm
+      ultimoContatoEm,
+      jogos,
+      servicos
     } = req.body as {
       nome?: string | null;
       telefone?: string;
@@ -302,6 +396,8 @@ export async function updateContato(req: Request, res: Response) {
       statusConversa?: string | null;
       statusPagamento?: string | null;
       ultimoContatoEm?: string | null;
+      jogos?: string[];
+      servicos?: string[];
     };
 
     const updates: Partial<typeof schema.corujaoContatos.$inferInsert> = {
@@ -351,7 +447,21 @@ export async function updateContato(req: Request, res: Response) {
     }
 
     if (ultimoContatoEm !== undefined) {
-      updates.ultimoContatoEm = ultimoContatoEm === null ? null : new Date(ultimoContatoEm);
+      const parsed = parseISODateTime(ultimoContatoEm);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.ultimoContatoEm = parsed.value;
+    }
+
+    if (jogos !== undefined) {
+      const parsed = parseJogos(jogos);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.jogos = parsed.value;
+    }
+
+    if (servicos !== undefined) {
+      const parsed = parseServicos(servicos);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.servicos = parsed.value;
     }
 
     const db = getCheckoutDb();
@@ -563,6 +673,22 @@ export async function exportarContatos(_req: Request, res: Response) {
   }
 }
 
+// Retorna todos os jogos distintos cadastrados em contatos + os predefinidos
+// do frontend (consolidados aqui pra autocomplete sem duplicar lista no client).
+export async function listJogosDisponiveis(_req: Request, res: Response) {
+  try {
+    const db = getCheckoutDb();
+    const rows = await db.execute<{ jogo: string }>(
+      sql`SELECT DISTINCT unnest(jogos) AS jogo FROM corujao_contatos WHERE array_length(jogos, 1) > 0 ORDER BY jogo`
+    );
+    const jogos = (rows as unknown as { jogo: string }[]).map((r) => r.jogo).filter(Boolean);
+    return res.json({ jogos });
+  } catch (error) {
+    console.error("[corujao] listJogosDisponiveis error:", error);
+    return res.status(500).json({ message: "Erro ao listar jogos." });
+  }
+}
+
 export async function getContatosMetricas(_req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
@@ -571,8 +697,9 @@ export async function getContatosMetricas(_req: Request, res: Response) {
         total: sql<number>`COUNT(*)::int`,
         naoChamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NULL)::int`,
         chamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL)::int`,
-        respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} != 'sem_resposta')::int`,
-        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND (${schema.corujaoContatos.statusConversa} = 'sem_resposta' OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)))::int`
+        respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} NOT IN ('sem_resposta', 'recusou'))::int`,
+        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND (${schema.corujaoContatos.statusConversa} = 'sem_resposta' OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)))::int`,
+        numeroInvalido: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} = 'recusou')::int`
       })
       .from(schema.corujaoContatos);
 
@@ -581,7 +708,8 @@ export async function getContatosMetricas(_req: Request, res: Response) {
       naoChamou: row?.naoChamou ?? 0,
       chamou: row?.chamou ?? 0,
       respondeu: row?.respondeu ?? 0,
-      naoRespondeu: row?.naoRespondeu ?? 0
+      naoRespondeu: row?.naoRespondeu ?? 0,
+      numeroInvalido: row?.numeroInvalido ?? 0
     });
   } catch (error) {
     console.error("[corujao] getContatosMetricas error:", error);

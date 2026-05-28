@@ -22,12 +22,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   ArrowUpDownIcon,
   CheckIcon,
+  MessageIcon,
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
   WhatsAppIcon,
   PlusIcon,
   Trash2Icon,
+  UserRoundIcon,
   UsersIcon,
   XIcon
 } from "@/components/ui/icons";
@@ -53,6 +55,12 @@ import {
   type ProximaSessao
 } from "./corujao-proxima-sessao-card";
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
+import { CorujaoFichaClienteDialog } from "./corujao-ficha-cliente-dialog";
+import {
+  CorujaoMensagemDialog,
+  applyMensagemVariables,
+  readMensagemChamar,
+} from "./corujao-mensagem-dialog";
 
 type SessaoOption = {
   id: number;
@@ -172,6 +180,8 @@ type Contato = {
   ultimoContatoEm: string | null;
   statusConversa: StatusConversa | null;
   statusPagamento: StatusPagamento | null;
+  jogos: string[];
+  servicos: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -320,11 +330,13 @@ export function CorujaoTrabalhoTabela() {
   const [page, setPage] = useState(1);
   const [filterConversa, setFilterConversa] = useState<StatusConversa | "">("");
   const [filterPagamento, setFilterPagamento] = useState<StatusPagamento | "">("");
-  const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu">("");
+  const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu" | "numero_invalido">("");
   const [sortBy, setSortBy] = useState<"prioridade" | "recente" | "alfabetico" | "alfabetico_desc">("prioridade");
 
-  type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number };
+  type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number; numeroInvalido: number };
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [mensagemDialogOpen, setMensagemDialogOpen] = useState(false);
+  const [fichaTarget, setFichaTarget] = useState<Contato | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -371,6 +383,7 @@ export function CorujaoTrabalhoTabela() {
     if (filterChamada === "nao_respondeu") params.set("naoRespondeu", "true");
     if (filterChamada === "chamou") params.set("chamou", "true");
     if (filterChamada === "nao_chamou") params.set("naoChamou", "true");
+    if (filterChamada === "numero_invalido") params.set("numeroInvalido", "true");
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
         `/corujao/contatos?${params.toString()}`
@@ -550,7 +563,12 @@ export function CorujaoTrabalhoTabela() {
       toast.error("Telefone inválido para WhatsApp.");
       return;
     }
-    window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+    const mensagemTemplate = readMensagemChamar();
+    const mensagem = mensagemTemplate ? applyMensagemVariables(mensagemTemplate, contato) : "";
+    const url = mensagem
+      ? `https://wa.me/${normalized}?text=${encodeURIComponent(mensagem)}`
+      : `https://wa.me/${normalized}`;
+    window.open(url, "_blank", "noopener,noreferrer");
 
     setRowBusy(contato.id);
     try {
@@ -819,6 +837,10 @@ export function CorujaoTrabalhoTabela() {
                 <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-red-400">{metricas.naoRespondeu}</span>
                 <p className="text-xs text-muted-foreground">Não respondeu</p>
               </button>
+              <button type="button" onClick={() => { setFilterChamada(filterChamada === "numero_invalido" ? "" : "numero_invalido"); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "numero_invalido" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-amber-400">{metricas.numeroInvalido}</span>
+                <p className="text-xs text-muted-foreground">Número inválido</p>
+              </button>
             </div>
           </div>
         )}
@@ -868,6 +890,7 @@ export function CorujaoTrabalhoTabela() {
               { value: "nao_chamou", label: `Não chamou${metricas ? ` (${metricas.naoChamou})` : ""}` },
               { value: "chamou", label: `Chamou${metricas ? ` (${metricas.chamou})` : ""}` },
               { value: "nao_respondeu", label: `Não respondeu${metricas ? ` (${metricas.naoRespondeu})` : ""}` },
+              { value: "numero_invalido", label: `Número inválido${metricas ? ` (${metricas.numeroInvalido})` : ""}` },
             ]}
             className="w-52"
           />
@@ -890,10 +913,21 @@ export function CorujaoTrabalhoTabela() {
             </Button>
           )}
         </div>
-        <Button onClick={openCreate} className="gap-1.5">
-          <PlusIcon className="h-4 w-4" />
-          Novo contato
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMensagemDialogOpen(true)}
+            title="Mensagem padrão pro WhatsApp"
+            className="h-9 w-9"
+          >
+            <MessageIcon className="h-4 w-4" />
+          </Button>
+          <Button onClick={openCreate} className="gap-1.5">
+            <PlusIcon className="h-4 w-4" />
+            Novo contato
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
@@ -956,7 +990,17 @@ export function CorujaoTrabalhoTabela() {
                     return (
                       <TableRow key={contato.id}>
                         <TableCell className="font-medium">
-                          {contato.nome ?? <span className="text-muted-foreground">—</span>}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFichaTarget(contato)}
+                              title="Abrir ficha do cliente"
+                              className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+                            >
+                              <UserRoundIcon className="h-4 w-4" />
+                            </button>
+                            <span>{contato.nome ?? <span className="text-muted-foreground">—</span>}</span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground tabular-nums">
                           {contato.telefone ?? "—"}
@@ -1499,6 +1543,19 @@ export function CorujaoTrabalhoTabela() {
           setContatos((cur) => cur.filter((c) => c.id !== id));
           setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
           setDeleteTarget(null);
+        }}
+      />
+
+      <CorujaoMensagemDialog
+        open={mensagemDialogOpen}
+        onOpenChange={setMensagemDialogOpen}
+      />
+
+      <CorujaoFichaClienteDialog
+        contato={fichaTarget}
+        onClose={() => setFichaTarget(null)}
+        onUpdated={(updated) => {
+          setContatos((cur) => cur.map((c) => (c.id === updated.id ? { ...c, ...updated } as Contato : c)));
         }}
       />
     </div>

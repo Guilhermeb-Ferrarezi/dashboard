@@ -1,10 +1,10 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
 import type { Request, Response } from "express";
 
+import { aggregateRealtimeRows, SALES_PAGES } from "../lib/analytics";
+
 const PROPERTY_ID = process.env.GA4_PROPERTY_ID;
 const CREDENTIALS_JSON = process.env.GA4_CREDENTIALS_JSON;
-
-const SALES_PAGES = ["/play/corujao", "/play/mix"];
 
 function getClient() {
   if (!PROPERTY_ID || !CREDENTIALS_JSON) return null;
@@ -21,13 +21,6 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
   if (!ga4) {
     return res.status(503).json({ message: "GA4 não configurado." });
   }
-
-  // Substrings únicas para identificar cada página via unifiedScreenName do GA4
-  // Títulos reais: "Corujão — Santos Games Arena" | "Mix — SGA Gaming"
-  const PAGE_TITLES: Record<string, string> = {
-    "/play/corujao": "coruj",
-    "/play/mix": "mix",
-  };
 
   try {
     // Realtime API só aceita unifiedScreenName (título da página), não pagePath
@@ -46,24 +39,8 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
       }),
     ]);
 
-    function aggregateRows(rows: typeof rt30[0]["rows"]) {
-      const pages: Record<string, number> = {};
-      for (const page of SALES_PAGES) pages[page] = 0;
-      let total = 0;
-
-      for (const row of rows ?? []) {
-        const screenName = (row.dimensionValues?.[0]?.value ?? "").toLowerCase();
-        const users = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
-        total += users;
-        for (const [path, title] of Object.entries(PAGE_TITLES)) {
-          if (screenName.includes(title)) pages[path] = (pages[path] ?? 0) + users;
-        }
-      }
-      return { pages, total };
-    }
-
-    const w30 = aggregateRows(rt30[0].rows);
-    const w5 = aggregateRows(rt5[0].rows);
+    const w30 = aggregateRealtimeRows(rt30[0].rows);
+    const w5 = aggregateRealtimeRows(rt5[0].rows);
 
     return res.json({
       pages: w30.pages,
@@ -91,71 +68,72 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
 
   const analyticsClient = ga4.client;
 
-  try {
-    const [sessionReport] = await analyticsClient.runReport({
-      property: `properties/${ga4.propertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "pagePath" }, { name: "sessionDefaultChannelGrouping" }],
-      metrics: [
-        { name: "sessions" },
-        { name: "activeUsers" },
-        { name: "averageSessionDuration" },
-      ],
-      dimensionFilter: {
-        filter: {
-          fieldName: "pagePath",
-          inListFilter: { values: SALES_PAGES },
-        },
-      },
-    });
+  type PageMetrics = {
+    path: string;
+    sessions: number;
+    activeUsers: number;
+    avgSessionDuration: number;
+    topChannels: { channel: string; sessions: number }[];
+    conversions: { checkoutClicks: number; whatsappClicks: number; ctaVisible: number };
+  };
 
-    const [eventsReport] = await analyticsClient.runReport({
-      property: `properties/${ga4.propertyId}`,
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [{ name: "pagePath" }, { name: "eventName" }],
-      metrics: [{ name: "eventCount" }],
-      dimensionFilter: {
-        andGroup: {
-          expressions: [
-            {
-              filter: {
-                fieldName: "pagePath",
-                inListFilter: { values: SALES_PAGES },
-              },
-            },
-            {
-              filter: {
-                fieldName: "eventName",
-                inListFilter: { values: ["checkout_click", "whatsapp_click", "cta_visible"] },
-              },
-            },
-          ],
-        },
-      },
-    });
-
-    type PageMetrics = {
-      path: string;
-      sessions: number;
-      activeUsers: number;
-      avgSessionDuration: number;
-      topChannels: { channel: string; sessions: number }[];
-      conversions: { checkoutClicks: number; whatsappClicks: number; ctaVisible: number };
+  const pageMap: Record<string, PageMetrics> = {};
+  for (const page of SALES_PAGES) {
+    pageMap[page] = {
+      path: page,
+      sessions: 0,
+      activeUsers: 0,
+      avgSessionDuration: 0,
+      topChannels: [],
+      conversions: { checkoutClicks: 0, whatsappClicks: 0, ctaVisible: 0 },
     };
+  }
 
-    const pageMap: Record<string, PageMetrics> = {};
-    for (const page of SALES_PAGES) {
-      pageMap[page] = {
-        path: page,
-        sessions: 0,
-        activeUsers: 0,
-        avgSessionDuration: 0,
-        topChannels: [],
-        conversions: { checkoutClicks: 0, whatsappClicks: 0, ctaVisible: 0 },
-      };
-    }
+  const channelMap: Record<string, Record<string, number>> = {};
 
-    const channelMap: Record<string, Record<string, number>> = {};
+  try {
+    const [[sessionReport], [eventsReport]] = await Promise.all([
+      analyticsClient.runReport({
+        property: `properties/${ga4.propertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "pagePath" }, { name: "sessionDefaultChannelGrouping" }],
+        metrics: [
+          { name: "sessions" },
+          { name: "activeUsers" },
+          { name: "averageSessionDuration" },
+        ],
+        dimensionFilter: {
+          filter: {
+            fieldName: "pagePath",
+            inListFilter: { values: [...SALES_PAGES] },
+          },
+        },
+      }),
+      analyticsClient.runReport({
+        property: `properties/${ga4.propertyId}`,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "pagePath" }, { name: "eventName" }],
+        metrics: [{ name: "eventCount" }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              {
+                filter: {
+                  fieldName: "pagePath",
+                  inListFilter: { values: [...SALES_PAGES] },
+                },
+              },
+              {
+                filter: {
+                  fieldName: "eventName",
+                  inListFilter: { values: ["checkout_click", "whatsapp_click", "cta_visible"] },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    ]);
 
     for (const row of sessionReport.rows ?? []) {
       const path = row.dimensionValues?.[0]?.value ?? "";

@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { sendEmail } from "../lib/resend";
+import { escapeHtml } from "../lib/normalize";
 
 export async function sendCustomEmail(req: Request, res: Response) {
   try {
@@ -33,8 +34,8 @@ export async function sendCustomEmail(req: Request, res: Response) {
       </h1>
     </div>
     <div style="background:#111;border:1px solid #222;padding:32px 24px">
-      <h2 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 16px">${subject.trim()}</h2>
-      <div style="color:#ccc;font-size:14px;line-height:1.7">${body.trim().replace(/\n/g, "<br>")}</div>
+      <h2 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 16px">${escapeHtml(subject.trim())}</h2>
+      <div style="color:#ccc;font-size:14px;line-height:1.7">${escapeHtml(body.trim()).replace(/\n/g, "<br>")}</div>
     </div>
     <p style="color:#666;font-size:12px;text-align:center;margin-top:24px">
       Santos Games Arena · Este email foi enviado pelo painel administrativo.
