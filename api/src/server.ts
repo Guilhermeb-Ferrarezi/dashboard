@@ -263,8 +263,11 @@ async function start() {
     codexWsUpgrade,
   );
 
+  const hostname = process.env.HOST || "localhost";
+
   serverRef = Bun.serve({
     port,
+    hostname,
     fetch: app.fetch,
     websocket: {
       open: codexWsOpen,
@@ -273,7 +276,7 @@ async function start() {
     },
   });
 
-  console.log(`Backend rodando: http://localhost:${port}`);
+  console.log(`Backend rodando: http://${hostname}:${port}`);
   startPortalRecentsFlushLoop();
   startHealthBroadcast();
 
