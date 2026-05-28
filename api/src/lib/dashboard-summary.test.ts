@@ -81,5 +81,31 @@ describe("dashboard-summary", () => {
     expect(summary.recentLogs[0]?.id).toBe("l-1");
     expect(summary.slowRequests[0]?.id).toBe("l-1");
     expect(summary.projects[0]?.id).toBe("alpha_logs");
+
+    // latestAt, latestEndpoint e latestStatus derivam do mesmo log mais recente por projeto
+    const alpha = summary.projects.find((p) => p.id === "alpha_logs");
+    expect(alpha?.latestAt).toBe("2026-05-16T11:20:00.000Z");
+    expect(alpha?.latestEndpoint).toBe("/api/a");
+    expect(alpha?.latestStatus).toBe(500);
+
+    const beta = summary.projects.find((p) => p.id === "beta_logs");
+    expect(beta?.latestAt).toBe("2026-05-06T08:00:00.000Z");
+    expect(beta?.latestEndpoint).toBe("/api/c");
+    expect(beta?.latestStatus).toBe(503);
+  });
+
+  test("projeto sem logs retorna latestAt/latestEndpoint/latestStatus nulos", () => {
+    const now = Date.parse("2026-05-16T12:00:00.000Z");
+    const summary = buildDashboardSummary({
+      now,
+      projects: [{ id: "vazio_logs", name: "Vazio" }],
+      registrations: [],
+      logs: [],
+    });
+
+    const project = summary.projects[0];
+    expect(project?.latestAt).toBeNull();
+    expect(project?.latestEndpoint).toBeNull();
+    expect(project?.latestStatus).toBeNull();
   });
 });

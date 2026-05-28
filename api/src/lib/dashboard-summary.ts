@@ -226,28 +226,22 @@ export function buildDashboardSummary(
   const projects = input.projects.map((project) => {
     const projectLogs = logEntries.filter((log) => log.projectId === project.id);
 
+    let latestLog: (typeof projectLogs)[number] | null = null;
+    for (const log of projectLogs) {
+      if (!latestLog || log.occurredAt > latestLog.occurredAt) {
+        latestLog = log;
+      }
+    }
+
     return {
       id: project.id,
       name: project.name,
       totalLogs: projectLogs.length,
       errorLogs: projectLogs.filter((log) => log.isError).length,
       avgDurationMs: mean(projectLogs.map((log) => log.durationMs)),
-      latestAt:
-        projectLogs.length > 0
-          ? new Date(
-              Math.max(...projectLogs.map((log) => log.occurredAt)),
-            ).toISOString()
-          : null,
-      latestEndpoint:
-        projectLogs.length > 0
-          ? [...projectLogs].sort((left, right) => right.occurredAt - left.occurredAt)[0]
-              ?.endpoint ?? null
-          : null,
-      latestStatus:
-        projectLogs.length > 0
-          ? [...projectLogs].sort((left, right) => right.occurredAt - left.occurredAt)[0]
-              ?.status ?? null
-          : null,
+      latestAt: latestLog ? new Date(latestLog.occurredAt).toISOString() : null,
+      latestEndpoint: latestLog?.endpoint ?? null,
+      latestStatus: latestLog?.status ?? null,
     };
   }).sort((left, right) => right.totalLogs - left.totalLogs);
 
