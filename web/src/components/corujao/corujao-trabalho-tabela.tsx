@@ -29,6 +29,7 @@ import {
   WhatsAppIcon,
   PlusIcon,
   Trash2Icon,
+  UserRoundIcon,
   UsersIcon,
   XIcon
 } from "@/components/ui/icons";
@@ -54,6 +55,7 @@ import {
   type ProximaSessao
 } from "./corujao-proxima-sessao-card";
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
+import { CorujaoFichaClienteDialog } from "./corujao-ficha-cliente-dialog";
 import {
   CorujaoMensagemDialog,
   applyMensagemVariables,
@@ -178,6 +180,8 @@ type Contato = {
   ultimoContatoEm: string | null;
   statusConversa: StatusConversa | null;
   statusPagamento: StatusPagamento | null;
+  jogos: string[];
+  servicos: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -332,6 +336,7 @@ export function CorujaoTrabalhoTabela() {
   type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number; numeroInvalido: number };
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [mensagemDialogOpen, setMensagemDialogOpen] = useState(false);
+  const [fichaTarget, setFichaTarget] = useState<Contato | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -985,7 +990,17 @@ export function CorujaoTrabalhoTabela() {
                     return (
                       <TableRow key={contato.id}>
                         <TableCell className="font-medium">
-                          {contato.nome ?? <span className="text-muted-foreground">—</span>}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFichaTarget(contato)}
+                              title="Abrir ficha do cliente"
+                              className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+                            >
+                              <UserRoundIcon className="h-4 w-4" />
+                            </button>
+                            <span>{contato.nome ?? <span className="text-muted-foreground">—</span>}</span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground tabular-nums">
                           {contato.telefone ?? "—"}
@@ -1534,6 +1549,14 @@ export function CorujaoTrabalhoTabela() {
       <CorujaoMensagemDialog
         open={mensagemDialogOpen}
         onOpenChange={setMensagemDialogOpen}
+      />
+
+      <CorujaoFichaClienteDialog
+        contato={fichaTarget}
+        onClose={() => setFichaTarget(null)}
+        onUpdated={(updated) => {
+          setContatos((cur) => cur.map((c) => (c.id === updated.id ? { ...c, ...updated } as Contato : c)));
+        }}
       />
     </div>
   );

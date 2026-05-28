@@ -7,6 +7,7 @@ import {
   getContatosMetricas,
   importarContatos,
   listContatos,
+  listJogosDisponiveis,
   marcarContato,
   updateContato
 } from "../controllers/corujao.controller";
@@ -43,6 +44,7 @@ router.post("/contatos", createContato);
 router.post("/contatos/importar", importarContatos);
 router.get("/contatos/exportar", exportarContatos);
 router.get("/contatos/metricas", getContatosMetricas);
+router.get("/contatos/jogos", listJogosDisponiveis);
 router.patch("/contatos/:id", updateContato);
 router.post("/contatos/:id/marcar-contato", marcarContato);
 router.delete("/contatos/:id", deleteContato);

@@ -28,6 +28,7 @@ import {
   PlusIcon,
   Trash2Icon,
   UploadIcon,
+  UserRoundIcon,
   UsersIcon
 } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import { clientApi, getClientApiBaseUrl } from "@/lib/api";
 import { formatDateShort } from "@/lib/format";
 
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
+import { CorujaoFichaClienteDialog } from "./corujao-ficha-cliente-dialog";
 
 const PAGE_SIZE = 50;
 
@@ -70,6 +72,8 @@ type Contato = {
   jaParticipou: boolean;
   checkoutUserId: number | null;
   observacoes: string | null;
+  jogos: string[];
+  servicos: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -228,6 +232,7 @@ export function CorujaoContatosLista() {
   const [form, setForm] = useState<FormValues>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
+  const [fichaTarget, setFichaTarget] = useState<Contato | null>(null);
 
   const [sortByNome, setSortByNome] = useState(false);
 
@@ -507,7 +512,17 @@ export function CorujaoContatosLista() {
                 : contatos.map((contato) => (
                     <TableRow key={contato.id}>
                       <TableCell className="font-medium">
-                        {contato.nome ?? <span className="text-muted-foreground">—</span>}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFichaTarget(contato)}
+                            title="Abrir ficha do cliente"
+                            className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+                          >
+                            <UserRoundIcon className="h-4 w-4" />
+                          </button>
+                          <span>{contato.nome ?? <span className="text-muted-foreground">—</span>}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{contato.telefone ?? "—"}</TableCell>
                       <TableCell>
@@ -653,6 +668,14 @@ export function CorujaoContatosLista() {
           setContatos((cur) => cur.filter((c) => c.id !== id));
           setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
           setDeleteTarget(null);
+        }}
+      />
+
+      <CorujaoFichaClienteDialog
+        contato={fichaTarget}
+        onClose={() => setFichaTarget(null)}
+        onUpdated={(updated) => {
+          setContatos((cur) => cur.map((c) => (c.id === updated.id ? { ...c, ...updated } as Contato : c)));
         }}
       />
 

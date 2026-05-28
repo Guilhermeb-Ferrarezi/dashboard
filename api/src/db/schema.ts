@@ -144,6 +144,8 @@ export const corujaoContatos = pgTable("corujao_contatos", {
   statusPagamento: text("status_pagamento", {
     enum: ["pendente", "confirmou_pagou", "confirmou_nao_pagou", "paga_na_hora"]
   }),
+  jogos: text("jogos").array().notNull().default([]),
+  servicos: text("servicos").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 }, (t) => [unique().on(t.telefone), unique().on(t.email)]);
