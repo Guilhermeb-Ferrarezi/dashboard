@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 
@@ -35,7 +36,7 @@ function sevenDaysAgoISO(): string {
 // branch separado nas queries.
 const EPOCH_DATE = "1970-01-01";
 
-export function parsePeriodo(query: Request["query"]): Parsed<Periodo> {
+export function parsePeriodo(query: Record<string, string | undefined>): Parsed<Periodo> {
   const periodo = String(query.periodo ?? "mes");
 
   if (periodo === "mes") {
@@ -75,11 +76,16 @@ export function parsePeriodo(query: Request["query"]): Parsed<Periodo> {
   return { ok: false, error: "Período inválido. Use mes, semana, todos ou custom." };
 }
 
-export async function getPainel(req: Request, res: Response) {
+export async function getPainel(c: Context<AppEnv>): Promise<Response> {
   try {
-    const periodoParsed = parsePeriodo(req.query);
+    const query: Record<string, string | undefined> = {
+      periodo: c.req.query("periodo"),
+      from: c.req.query("from"),
+      to: c.req.query("to"),
+    };
+    const periodoParsed = parsePeriodo(query);
     if (!periodoParsed.ok) {
-      return res.status(400).json({ message: periodoParsed.error });
+      return c.json({ message: periodoParsed.error }, 400);
     }
     const { from, to, label } = periodoParsed.value;
 
@@ -213,7 +219,7 @@ export async function getPainel(req: Request, res: Response) {
       observacoes: s.observacoes ?? null
     }));
 
-    return res.json({
+    return c.json({
       periodo: { from, to, label },
       totais: {
         vendasCount,
@@ -229,7 +235,6 @@ export async function getPainel(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[corujao] getPainel error:", error);
-    return res.status(500).json({ message: "Erro ao montar painel." });
+    return c.json({ message: "Erro ao montar painel." }, 500);
   }
 }
-

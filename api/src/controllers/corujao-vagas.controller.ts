@@ -1,37 +1,49 @@
 import { and, asc, count, eq, gte, inArray } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import { streamSSE } from "hono/streaming";
+import type { AppEnv } from "../types/hono";
 import { getCheckoutDb, schema } from "../db/index";
-import { addClient, broadcast, getVagasPayload } from "../lib/vagas-sse";
+import { addSseClient, broadcast, getVagasPayload } from "../lib/vagas-sse";
 
-export async function getVagas(_req: Request, res: Response) {
+export async function getVagas(c: Context<AppEnv>): Promise<Response> {
   try {
     const data = await getVagasPayload();
-    return res.json(data);
+    return c.json(data);
   } catch (error) {
     console.error("[corujao] getVagas error:", error);
-    return res.status(500).json({ message: "Erro ao buscar vagas." });
+    return c.json({ message: "Erro ao buscar vagas." }, 500);
   }
 }
 
-export function streamVagas(_req: Request, res: Response) {
-  addClient(res);
+export function streamVagas(c: Context<AppEnv>): Response {
+  return streamSSE(c, async (stream) => {
+    addSseClient(
+      {
+        write: (data: string) => stream.write(data),
+      },
+      (fn) => stream.onAbort(fn),
+    );
+    // Keep the stream open — it closes when the client disconnects (onAbort).
+    await new Promise<void>((resolve) => stream.onAbort(resolve));
+  });
 }
 
-export async function descontarVaga(req: Request, res: Response) {
+export async function descontarVaga(c: Context<AppEnv>): Promise<Response> {
   try {
-    const secret = req.headers["x-internal-secret"];
+    const secret = c.req.header("x-internal-secret");
     if (!secret || secret !== process.env.CORUJAO_INTERNAL_SECRET) {
-      return res.status(401).json({ message: "Unauthorized." });
+      return c.json({ message: "Unauthorized." }, 401);
     }
 
-    const { orderId, userId, amountCents } = req.body as {
+    const body = await c.req.json();
+    const { orderId, userId, amountCents } = body as {
       orderId?: number;
       userId?: number;
       amountCents?: number;
     };
 
     if (!orderId || !userId) {
-      return res.status(400).json({ message: "orderId e userId obrigatórios." });
+      return c.json({ message: "orderId e userId obrigatórios." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -45,7 +57,7 @@ export async function descontarVaga(req: Request, res: Response) {
       .limit(1);
 
     if (existing) {
-      return res.json({ message: "Vaga já descontada.", visitaId: existing.id });
+      return c.json({ message: "Vaga já descontada.", visitaId: existing.id });
     }
 
     // Busca sessões futuras ordenadas por data
@@ -61,7 +73,7 @@ export async function descontarVaga(req: Request, res: Response) {
       .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id));
 
     if (sessoes.length === 0) {
-      return res.status(404).json({ message: "Nenhuma sessão disponível." });
+      return c.json({ message: "Nenhuma sessão disponível." }, 404);
     }
 
     // Conta visitas de cada sessão pra achar a primeira com vaga
@@ -83,7 +95,7 @@ export async function descontarVaga(req: Request, res: Response) {
     });
 
     if (!sessao) {
-      return res.status(409).json({ message: "Todas as sessões estão lotadas." });
+      return c.json({ message: "Todas as sessões estão lotadas." }, 409);
     }
 
     // Busca ou cria contato pelo checkout_user_id
@@ -126,23 +138,24 @@ export async function descontarVaga(req: Request, res: Response) {
 
     await broadcast();
 
-    return res.json({ message: "Vaga descontada.", visitaId: visita!.id, sessaoId: sessao.id });
+    return c.json({ message: "Vaga descontada.", visitaId: visita!.id, sessaoId: sessao.id });
   } catch (error) {
     console.error("[corujao] descontarVaga error:", error);
-    return res.status(500).json({ message: "Erro ao descontar vaga." });
+    return c.json({ message: "Erro ao descontar vaga." }, 500);
   }
 }
 
-export async function ajustarVagas(req: Request, res: Response) {
+export async function ajustarVagas(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { sessaoId, delta, motivo } = req.body as {
+    const body = await c.req.json();
+    const { sessaoId, delta, motivo } = body as {
       sessaoId?: number;
       delta?: number;
       motivo?: string;
     };
 
     if (!sessaoId || !delta || !Number.isInteger(delta)) {
-      return res.status(400).json({ message: "sessaoId e delta obrigatórios." });
+      return c.json({ message: "sessaoId e delta obrigatórios." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -154,12 +167,12 @@ export async function ajustarVagas(req: Request, res: Response) {
       .limit(1);
 
     if (!sessao) {
-      return res.status(404).json({ message: "Sessão não encontrada." });
+      return c.json({ message: "Sessão não encontrada." }, 404);
     }
 
     const novoTotal = sessao.totalVagas + delta;
     if (novoTotal < 0) {
-      return res.status(400).json({ message: "Total de vagas não pode ser negativo." });
+      return c.json({ message: "Total de vagas não pode ser negativo." }, 400);
     }
 
     await db
@@ -173,9 +186,9 @@ export async function ajustarVagas(req: Request, res: Response) {
 
     await broadcast();
 
-    return res.json({ message: "Vagas ajustadas.", totalVagas: novoTotal });
+    return c.json({ message: "Vagas ajustadas.", totalVagas: novoTotal });
   } catch (error) {
     console.error("[corujao] ajustarVagas error:", error);
-    return res.status(500).json({ message: "Erro ao ajustar vagas." });
+    return c.json({ message: "Erro ao ajustar vagas." }, 500);
   }
 }
