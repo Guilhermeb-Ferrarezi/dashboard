@@ -163,13 +163,13 @@ describe("atualizarInscricao", () => {
 describe("status de participacao no campeonato", () => {
   const originalFind = VctInscricao.find;
   const originalUpdateMany = VctInscricao.updateMany;
-  const originalUpdateOne = VctInscricao.updateOne;
+  const originalBulkWrite = VctInscricao.bulkWrite;
   const originalTimeFind = VctTime.find;
 
   afterEach(() => {
     VctInscricao.find = originalFind;
     VctInscricao.updateMany = originalUpdateMany;
-    VctInscricao.updateOne = originalUpdateOne;
+    VctInscricao.bulkWrite = originalBulkWrite;
     VctTime.find = originalTimeFind;
   });
 
@@ -202,7 +202,8 @@ describe("status de participacao no campeonato", () => {
   });
 
   test("preencher time ignora inscricoes fora do campeonato", async () => {
-    const updates: Array<{ id: string; time: number }> = [];
+    let updateManyFilter: unknown = null;
+    let updateManyUpdate: unknown = null;
     VctInscricao.find = mock(() => ({
       lean: async () => [
         {
@@ -219,21 +220,23 @@ describe("status de participacao no campeonato", () => {
         },
       ],
     })) as typeof VctInscricao.find;
-    VctInscricao.updateOne = mock((filter: { _id: string }, update: { time: number }) => {
-      updates.push({ id: filter._id, time: update.time });
-      return Promise.resolve({});
-    }) as typeof VctInscricao.updateOne;
+    VctInscricao.updateMany = mock((filter: unknown, update: unknown) => {
+      updateManyFilter = filter;
+      updateManyUpdate = update;
+      return Promise.resolve({ modifiedCount: 1 });
+    }) as typeof VctInscricao.updateMany;
 
     const req = { params: { numero: "1" }, body: {} } as unknown as Request;
     const res = makeResponse();
 
     await preencherTime(req, res as Response);
 
-    expect(updates).toEqual([{ id: "ativo", time: 1 }]);
+    expect(updateManyFilter).toEqual({ _id: { $in: ["ativo"] } });
+    expect(updateManyUpdate).toEqual({ time: 1 });
   });
 
   test("formacao automatica ignora inscricoes fora do campeonato", async () => {
-    const updates: Array<{ id: string; time: number }> = [];
+    let bulkWriteOps: unknown[] | null = null;
     VctInscricao.find = mock(() => ({
       lean: async () => [
         {
@@ -250,10 +253,10 @@ describe("status de participacao no campeonato", () => {
         },
       ],
     })) as typeof VctInscricao.find;
-    VctInscricao.updateOne = mock((filter: { _id: string }, update: { time: number }) => {
-      updates.push({ id: filter._id, time: update.time });
-      return Promise.resolve({});
-    }) as typeof VctInscricao.updateOne;
+    VctInscricao.bulkWrite = mock((ops: unknown[]) => {
+      bulkWriteOps = ops;
+      return Promise.resolve({ ok: 1 });
+    }) as typeof VctInscricao.bulkWrite;
     VctTime.find = mock(() => ({
       select: () => ({
         lean: async () => [{ numero: 1 }],
@@ -265,17 +268,19 @@ describe("status de participacao no campeonato", () => {
 
     await atribuirTimesAutomatico(req, res as Response);
 
-    expect(updates).toEqual([{ id: "ativo", time: 1 }]);
+    expect(bulkWriteOps).toEqual([
+      { updateOne: { filter: { _id: "ativo" }, update: { $set: { time: 1 } } } },
+    ]);
   });
 });
 
 describe("modalidades de inscricao", () => {
   const originalFind = VctInscricao.find;
-  const originalUpdateOne = VctInscricao.updateOne;
+  const originalUpdateMany = VctInscricao.updateMany;
 
   afterEach(() => {
     VctInscricao.find = originalFind;
-    VctInscricao.updateOne = originalUpdateOne;
+    VctInscricao.updateMany = originalUpdateMany;
   });
 
   test("listar inscricoes filtra pela modalidade solicitada", async () => {
@@ -331,7 +336,8 @@ describe("modalidades de inscricao", () => {
 
   test("preencher time usa apenas jogadores da modalidade solicitada", async () => {
     let filterUsed: unknown = null;
-    const updates: Array<{ id: string; time: number }> = [];
+    let updateManyFilter: unknown = null;
+    let updateManyUpdate: unknown = null;
     VctInscricao.find = mock((filter: unknown) => {
       filterUsed = filter;
       return {
@@ -346,10 +352,11 @@ describe("modalidades de inscricao", () => {
         ],
       };
     }) as typeof VctInscricao.find;
-    VctInscricao.updateOne = mock((filter: { _id: string }, update: { time: number }) => {
-      updates.push({ id: filter._id, time: update.time });
-      return Promise.resolve({});
-    }) as typeof VctInscricao.updateOne;
+    VctInscricao.updateMany = mock((filter: unknown, update: unknown) => {
+      updateManyFilter = filter;
+      updateManyUpdate = update;
+      return Promise.resolve({ modifiedCount: 1 });
+    }) as typeof VctInscricao.updateMany;
 
     const req = {
       params: { numero: "1" },
@@ -361,7 +368,8 @@ describe("modalidades de inscricao", () => {
     await preencherTime(req, res as Response);
 
     expect(filterUsed).toEqual({ modalidade: "counter-strike" });
-    expect(updates).toEqual([{ id: "cs-ativo", time: 1 }]);
+    expect(updateManyFilter).toEqual({ _id: { $in: ["cs-ativo"] } });
+    expect(updateManyUpdate).toEqual({ time: 1 });
   });
 });
 
