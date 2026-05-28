@@ -17,12 +17,12 @@ export default async function AdminPublicadorPage() {
   }
 
   if (user.role !== "admin") {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    return <ClientRedirect to="/painel" label="dashboard" />;
   }
 
   const cookieHeader = (await cookies()).toString();
   const response = await serverApi<{ sites: PublishedSiteSummary[] }>(
-    "/admin/publicador/sites",
+    "/painel/admin/publicador/sites",
     { cookieHeader },
   );
 

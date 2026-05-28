@@ -17,7 +17,7 @@ export default async function CheckoutClienteDetalhePage({
   const user = await getSessionUser();
 
   if (!user) return <ClientRedirect to="/login" label="login" />;
-  if (user.role !== "admin") return <ClientRedirect to="/home" label="dashboard" />;
+  if (user.role !== "admin") return <ClientRedirect to="/painel" label="dashboard" />;
 
   const { id } = await params;
   const cookieHeader = (await cookies()).toString();

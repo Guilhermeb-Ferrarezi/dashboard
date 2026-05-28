@@ -32,11 +32,11 @@ export default function NotFound() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <Button render={<Link href="/home" />}>
+            <Button render={<Link href="/painel" />}>
               <ArrowLeftIcon className="size-4" />
               Voltar para o início
             </Button>
-            <Button variant="outline" render={<Link href="/home" aria-label="Abrir busca" />}>
+            <Button variant="outline" render={<Link href="/painel" aria-label="Abrir busca" />}>
               <SearchIcon className="size-4" />
               Buscar conteúdo
             </Button>

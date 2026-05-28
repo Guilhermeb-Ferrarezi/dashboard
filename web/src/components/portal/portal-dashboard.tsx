@@ -909,7 +909,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
         <div className="min-w-0 space-y-1.5">
           <Breadcrumb
             items={[
-              { label: "Início", href: "/home", icon: LayoutDashboardIcon },
+              { label: "Início", href: "/painel", icon: LayoutDashboardIcon },
               { label: "Dashboard" },
             ]}
           />
@@ -1604,7 +1604,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
           <span className="opacity-40">·</span>
           <Link href="/logs" className="transition-colors hover:text-foreground">Logs</Link>
           <span className="opacity-40">·</span>
-          <Link href="/admin/users" className="transition-colors hover:text-foreground">Admin</Link>
+          <Link href="/painel/admin/users" className="transition-colors hover:text-foreground">Admin</Link>
         </nav>
       </footer>
     </div>

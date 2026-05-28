@@ -16,7 +16,7 @@ export default async function ProjectLogsPage({
   }
 
   if (user.role !== "admin") {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    return <ClientRedirect to="/painel" label="dashboard" />;
   }
 
   const { projectId } = await params;

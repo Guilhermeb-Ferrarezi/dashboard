@@ -13,7 +13,7 @@ export default async function AdminR2Page() {
   }
 
   if (user.role !== "admin") {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    return <ClientRedirect to="/painel" label="dashboard" />;
   }
 
   return (

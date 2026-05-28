@@ -228,7 +228,7 @@ function buildActionResults(
       breadcrumb: "Abrir home",
       kind: "action",
       iconKey: "home",
-      action: () => router.push("/home"),
+      action: () => router.push("/painel"),
     },
     {
       id: "copy-link",
@@ -329,7 +329,7 @@ function mapPortalUsers(users: PortalUserSummary[]): SearchResult[] {
     breadcrumb: user.username,
     kind: "resource",
     iconKey: "users",
-    href: "/admin/users",
+    href: "/painel/admin/users",
   }));
 }
 
@@ -529,7 +529,7 @@ export function PortalQuickSearchDialog({
         const [projectResponse, usersResponse, logsResponse] = await Promise.all([
           clientApi<{ projects: PortalProject[] }>("/projects"),
           user.role === "admin"
-            ? clientApi<{ users: PortalUserSummary[] }>("/admin/users")
+            ? clientApi<{ users: PortalUserSummary[] }>("/painel/admin/users")
             : Promise.resolve(null),
           user.role === "admin"
             ? clientApi<{ projects: LogsProject[] }>("/logs/projects")
@@ -698,7 +698,7 @@ export function PortalQuickSearchDialog({
                           value={item.value}
                           onSelect={() => {
                             setOpen(false);
-                            const href = item.href ?? "/home";
+                            const href = item.href ?? "/painel";
                             startTransition(() => {
                               router.push(href);
                             });

@@ -31,24 +31,26 @@ export async function getCurrentUser(req: Request, res: Response) {
   const authUserId = Number(req.user?.id);
 
   if (!req.user?.id || Number.isNaN(authUserId)) {
+    console.warn("[user/me] Missing or invalid req.user.id:", req.user);
     return res.status(401).json({ message: "Missing token" });
   }
 
-  let user = await User.findOne({ authUserId }).lean();
+  try {
+    let user = await User.findOne({ authUserId }).lean();
 
-  if (!user) {
-    const legacy = await User.findOne({
-      $or: [
-        { email: req.user!.email },
-        { username: req.user!.username },
-      ],
-      authUserId: { $exists: false },
-    });
+    if (!user) {
+      const legacy = await User.findOne({
+        $or: [
+          { email: req.user!.email },
+          { username: req.user!.username },
+        ],
+        authUserId: { $exists: false },
+      });
 
-    if (legacy) {
-      legacy.authUserId = authUserId;
-      legacy.role = req.user!.role;
-      await legacy.save();
+      if (legacy) {
+        legacy.authUserId = authUserId;
+        legacy.role = req.user!.role;
+        await legacy.save();
       const oldId = String(legacy._id);
       const newId = String(authUserId);
       await Promise.all([
@@ -76,9 +78,13 @@ export async function getCurrentUser(req: Request, res: Response) {
       await newUser.save();
       user = newUser.toObject();
     }
-  }
+    }
 
-  return res.json({ ok: true, user: serializeUser(user) });
+    return res.json({ ok: true, user: serializeUser(user) });
+  } catch (err) {
+    console.error("[user/me] Failed:", err);
+    return res.status(500).json({ message: "Erro ao carregar usuario." });
+  }
 }
 
 export async function updateCurrentUserPreferences(req: Request, res: Response) {

@@ -228,7 +228,7 @@ export function AppShell({
 
   // Quick switch: ⌘1..⌘9 navega para o N-ésimo item primário visível
   const quickSwitchHrefs = useMemo(() => {
-    const hrefs: string[] = ["/home"];
+    const hrefs: string[] = ["/painel"];
     for (const group of visibleSidebarGroups) {
       for (const item of group.items) {
         if (item.href && !hrefs.includes(item.href)) hrefs.push(item.href);
@@ -373,7 +373,7 @@ export function AppShell({
 
   const primaryNavigation = [
     {
-      href: "/home",
+      href: "/painel",
       label: "Dashboard",
       icon: LayoutDashboardIcon,
     },
@@ -425,8 +425,8 @@ export function AppShell({
 
           <div className="px-2 py-2">
             <SidebarMenuButton
-              render={<Link href="/home" />}
-              isActive={pathname === "/home"}
+              render={<Link href="/painel" />}
+              isActive={pathname === "/painel"}
               tooltip="Home"
               className="w-full h-10 !py-0 !pl-2 !pr-2 !flex items-center gap-2"
             >

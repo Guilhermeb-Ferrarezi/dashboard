@@ -136,7 +136,7 @@ export function CommandPalette() {
       label: "Ir para o Dashboard",
       icon: SettingsIcon,
       group: "Navegação",
-      run: runThenClose(() => router.push("/home")),
+      run: runThenClose(() => router.push("/painel")),
     },
     {
       id: "copy-url",

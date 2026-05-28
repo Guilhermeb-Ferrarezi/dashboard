@@ -9,7 +9,7 @@ export default async function CorujaoContatosPage() {
   const user = await getSessionUser();
 
   if (!user) return <ClientRedirect to="/login" label="login" />;
-  if (user.role !== "admin") return <ClientRedirect to="/home" label="dashboard" />;
+  if (user.role !== "admin") return <ClientRedirect to="/painel" label="dashboard" />;
 
   return (
     <AppShell

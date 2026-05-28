@@ -13,7 +13,7 @@ export default async function CheckoutProdutosPage() {
   const user = await getSessionUser();
 
   if (!user) return <ClientRedirect to="/login" label="login" />;
-  if (user.role !== "admin") return <ClientRedirect to="/home" label="dashboard" />;
+  if (user.role !== "admin") return <ClientRedirect to="/painel" label="dashboard" />;
 
   const cookieHeader = (await cookies()).toString();
   const { produtos } = await serverApi<{ produtos: CheckoutProductSummary[] }>("/checkout/produtos", { cookieHeader });

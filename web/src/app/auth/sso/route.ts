@@ -30,9 +30,9 @@ export async function GET(request: Request) {
     process.env.SSO_SHARED_SECRET?.trim() ||
     process.env.ADMIN_PORTAL_SSO_SECRET?.trim();
   const successPathForAdmin =
-    process.env.SSO_SUCCESS_PATH_ADMIN?.trim() || "/admin/users";
+    process.env.SSO_SUCCESS_PATH_ADMIN?.trim() || "/painel/admin/users";
   const successPathForUser =
-    process.env.SSO_SUCCESS_PATH_USER?.trim() || "/home";
+    process.env.SSO_SUCCESS_PATH_USER?.trim() || "/painel";
 
   if (!code) {
     return NextResponse.redirect(
