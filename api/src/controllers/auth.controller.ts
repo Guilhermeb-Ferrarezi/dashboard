@@ -15,5 +15,5 @@ export async function logout(c: Context<AppEnv>): Promise<Response> {
     domain: isProd ? process.env.COOKIE_DOMAIN || undefined : undefined,
     path: "/",
   });
-  return c.text("", 204);
+  return c.body(null, 204);
 }

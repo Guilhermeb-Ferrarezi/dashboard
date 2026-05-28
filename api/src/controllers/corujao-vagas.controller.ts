@@ -19,7 +19,7 @@ export function streamVagas(c: Context<AppEnv>): Response {
   return streamSSE(c, async (stream) => {
     addSseClient(
       {
-        write: (data: string) => stream.write(data),
+        write: (data: string) => void stream.write(data),
       },
       (fn) => stream.onAbort(fn),
     );
