@@ -139,11 +139,11 @@ const TOOL_DEFINITIONS: CodexRuntimeTool[] = [
 ];
 
 const DASHBOARD_PAGES = [
-  { title: "Home", path: "/home", keywords: ["home", "inicio", "portal"] },
+  { title: "Home", path: "/painel", keywords: ["home", "inicio", "portal", "painel"] },
   { title: "Logs", path: "/logs", keywords: ["logs", "erros", "diagnostico"] },
-  { title: "Admin", path: "/admin", keywords: ["admin", "painel", "usuarios"] },
-  { title: "Tokens Codex", path: "/admin/users", keywords: ["token", "codex", "acesso"] },
-  { title: "VCT Inscrições", path: "/admin/vct-inscricoes", keywords: ["vct", "inscricoes", "times"] },
+  { title: "Admin", path: "/painel/admin", keywords: ["admin", "usuarios"] },
+  { title: "Tokens Codex", path: "/painel/admin/users", keywords: ["token", "codex", "acesso"] },
+  { title: "VCT Inscrições", path: "/painel/admin/vct-inscricoes", keywords: ["vct", "inscricoes", "times"] },
   { title: "VCT Formações", path: "/vct/formacoes", keywords: ["formacoes", "roster", "times"] },
 ];
 
