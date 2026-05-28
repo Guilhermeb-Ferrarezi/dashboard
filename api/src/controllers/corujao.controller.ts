@@ -144,6 +144,7 @@ export async function listContatos(req: Request, res: Response) {
     const naoRespondeu = req.query.naoRespondeu === "true";
     const chamou = req.query.chamou === "true";
     const naoChamou = req.query.naoChamou === "true";
+    const numeroInvalido = req.query.numeroInvalido === "true";
 
     const sortByRaw = String(req.query.sortBy || "prioridade");
     // "nome" mantido como alias de "alfabetico" pra compatibilidade.
@@ -189,6 +190,9 @@ export async function listContatos(req: Request, res: Response) {
     }
     if (naoChamou) {
       conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NULL`);
+    }
+    if (numeroInvalido) {
+      conditions.push(eq(schema.corujaoContatos.statusConversa, "recusou"));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -571,8 +575,9 @@ export async function getContatosMetricas(_req: Request, res: Response) {
         total: sql<number>`COUNT(*)::int`,
         naoChamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NULL)::int`,
         chamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL)::int`,
-        respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} != 'sem_resposta')::int`,
-        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND (${schema.corujaoContatos.statusConversa} = 'sem_resposta' OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)))::int`
+        respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} NOT IN ('sem_resposta', 'recusou'))::int`,
+        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND (${schema.corujaoContatos.statusConversa} = 'sem_resposta' OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)))::int`,
+        numeroInvalido: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} = 'recusou')::int`
       })
       .from(schema.corujaoContatos);
 
@@ -581,7 +586,8 @@ export async function getContatosMetricas(_req: Request, res: Response) {
       naoChamou: row?.naoChamou ?? 0,
       chamou: row?.chamou ?? 0,
       respondeu: row?.respondeu ?? 0,
-      naoRespondeu: row?.naoRespondeu ?? 0
+      naoRespondeu: row?.naoRespondeu ?? 0,
+      numeroInvalido: row?.numeroInvalido ?? 0
     });
   } catch (error) {
     console.error("[corujao] getContatosMetricas error:", error);

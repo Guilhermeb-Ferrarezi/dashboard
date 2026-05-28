@@ -320,10 +320,10 @@ export function CorujaoTrabalhoTabela() {
   const [page, setPage] = useState(1);
   const [filterConversa, setFilterConversa] = useState<StatusConversa | "">("");
   const [filterPagamento, setFilterPagamento] = useState<StatusPagamento | "">("");
-  const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu">("");
+  const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu" | "numero_invalido">("");
   const [sortBy, setSortBy] = useState<"prioridade" | "recente" | "alfabetico" | "alfabetico_desc">("prioridade");
 
-  type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number };
+  type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number; numeroInvalido: number };
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -371,6 +371,7 @@ export function CorujaoTrabalhoTabela() {
     if (filterChamada === "nao_respondeu") params.set("naoRespondeu", "true");
     if (filterChamada === "chamou") params.set("chamou", "true");
     if (filterChamada === "nao_chamou") params.set("naoChamou", "true");
+    if (filterChamada === "numero_invalido") params.set("numeroInvalido", "true");
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
         `/corujao/contatos?${params.toString()}`
@@ -819,6 +820,10 @@ export function CorujaoTrabalhoTabela() {
                 <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-red-400">{metricas.naoRespondeu}</span>
                 <p className="text-xs text-muted-foreground">Não respondeu</p>
               </button>
+              <button type="button" onClick={() => { setFilterChamada(filterChamada === "numero_invalido" ? "" : "numero_invalido"); setPage(1); }} className={`text-left transition-opacity ${filterChamada === "numero_invalido" ? "" : "opacity-50 hover:opacity-80"}`}>
+                <span className="font-heading text-2xl font-semibold tracking-tight tabular-nums text-amber-400">{metricas.numeroInvalido}</span>
+                <p className="text-xs text-muted-foreground">Número inválido</p>
+              </button>
             </div>
           </div>
         )}
@@ -868,6 +873,7 @@ export function CorujaoTrabalhoTabela() {
               { value: "nao_chamou", label: `Não chamou${metricas ? ` (${metricas.naoChamou})` : ""}` },
               { value: "chamou", label: `Chamou${metricas ? ` (${metricas.chamou})` : ""}` },
               { value: "nao_respondeu", label: `Não respondeu${metricas ? ` (${metricas.naoRespondeu})` : ""}` },
+              { value: "numero_invalido", label: `Número inválido${metricas ? ` (${metricas.numeroInvalido})` : ""}` },
             ]}
             className="w-52"
           />
