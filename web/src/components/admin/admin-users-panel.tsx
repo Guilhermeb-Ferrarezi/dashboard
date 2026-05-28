@@ -93,7 +93,7 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
     setCreatePending(true);
     try {
       const response = await clientApi<{ user: PortalUserSummary; message: string }>(
-        "/painel/admin/users",
+        "/admin/users",
         { method: "POST", body: JSON.stringify(createForm) },
       );
       setUsers((cur) => [response.user, ...cur]);

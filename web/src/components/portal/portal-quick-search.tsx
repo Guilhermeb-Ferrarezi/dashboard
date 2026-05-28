@@ -529,7 +529,7 @@ export function PortalQuickSearchDialog({
         const [projectResponse, usersResponse, logsResponse] = await Promise.all([
           clientApi<{ projects: PortalProject[] }>("/projects"),
           user.role === "admin"
-            ? clientApi<{ users: PortalUserSummary[] }>("/painel/admin/users")
+            ? clientApi<{ users: PortalUserSummary[] }>("/admin/users")
             : Promise.resolve(null),
           user.role === "admin"
             ? clientApi<{ projects: LogsProject[] }>("/logs/projects")

@@ -22,7 +22,7 @@ export default async function AdminPublicadorPage() {
 
   const cookieHeader = (await cookies()).toString();
   const response = await serverApi<{ sites: PublishedSiteSummary[] }>(
-    "/painel/admin/publicador/sites",
+    "/admin/publicador/sites",
     { cookieHeader },
   );
 

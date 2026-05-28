@@ -22,7 +22,7 @@ export default async function AdminUsersPage() {
 
   const cookieHeader = (await cookies()).toString();
   const response = await serverApi<{ users: PortalUserSummary[] }>(
-    "/painel/admin/users",
+    "/admin/users",
     { cookieHeader },
   );
 
