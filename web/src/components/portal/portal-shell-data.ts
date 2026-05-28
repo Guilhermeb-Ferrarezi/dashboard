@@ -304,7 +304,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           keywords: ["logs", "observabilidade", "eventos"],
         }),
         portalItem({
-          href: "/home/ops",
+          href: "/painel/ops",
           label: "Dashboard Ops",
           description: "Métricas de infraestrutura e tráfego da API",
           icon: LayoutDashboardIcon,

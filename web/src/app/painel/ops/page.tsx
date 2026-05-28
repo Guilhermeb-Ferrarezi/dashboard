@@ -47,7 +47,7 @@ export default async function DashboardOpsPage() {
   return (
     <AppShell
       user={user}
-      breadcrumb={[{ label: "Plataforma", href: "/home/ops" }]}
+      breadcrumb={[{ label: "Plataforma", href: "/painel/ops" }]}
       title="Dashboard Ops"
       description="Métricas de infraestrutura e tráfego da API."
     >
