@@ -15,7 +15,7 @@ builder.objectType(HealthPingRef, {
 
 export function healthPingGenerator(): Repeater<HealthPingShape> {
   return new Repeater<HealthPingShape>(async (push, stop) => {
-    await push({ serverTs: Date.now() });
+    void push({ serverTs: Date.now() });
     const interval = setInterval(() => void push({ serverTs: Date.now() }), 30_000);
     await stop;
     clearInterval(interval);
