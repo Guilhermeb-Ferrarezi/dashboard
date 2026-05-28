@@ -7,10 +7,12 @@ const clients = new Set<Response>();
 export function addHealthClient(res: Response) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
   });
-  res.write("\n");
+  res.flushHeaders?.();
+  res.write(":ok\n\n");
   clients.add(res);
   res.on("close", () => clients.delete(res));
   res.write(`data: ${JSON.stringify({ serverTs: Date.now() })}\n\n`);
