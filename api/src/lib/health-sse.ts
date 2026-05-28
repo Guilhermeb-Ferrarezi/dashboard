@@ -18,11 +18,15 @@ export function addHealthClient(res: Response) {
   res.write(`data: ${JSON.stringify({ serverTs: Date.now() })}\n\n`);
 }
 
-function broadcast() {
+export function broadcast() {
   if (clients.size === 0) return;
   const message = `data: ${JSON.stringify({ serverTs: Date.now() })}\n\n`;
   for (const client of clients) {
-    client.write(message);
+    try {
+      client.write(message);
+    } catch {
+      clients.delete(client);
+    }
   }
 }
 
