@@ -21,16 +21,11 @@ export async function getSessionUser() {
   const cookieHeader = cookieStore.toString();
 
   if (!cookieHeader) {
-    console.warn("[getSessionUser] no cookie header");
     return null;
   }
 
-  const hasAuthCookie = cookieHeader.includes("sga_auth=");
-  console.log(`[getSessionUser] cookies len=${cookieHeader.length} hasAuth=${hasAuthCookie}`);
-
   try {
     const data = await serverApi<MeResponse>("/user/me", { cookieHeader });
-    console.log(`[getSessionUser] OK userId=${data.user?.id}`);
     return data.user;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
