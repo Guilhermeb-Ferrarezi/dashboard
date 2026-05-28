@@ -26,7 +26,10 @@ builder.queryField("logs", (t) =>
       limit: t.arg.int({ defaultValue: 50 }),
     },
     resolve: async (_root, args, ctx) => {
-      if (!ctx.user) throw new Error("Não autenticado");
+      if (!ctx.user || ctx.user.role !== "admin") throw new Error("Acesso negado");
+      if (!portalProjects.some((p) => p.id === args.projectId)) {
+        throw new Error("Projeto inválido");
+      }
       const page = args.page ?? 1;
       const limit = args.limit ?? 50;
       const db = getLogsDb();

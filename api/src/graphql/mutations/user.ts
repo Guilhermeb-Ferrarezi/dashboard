@@ -1,6 +1,7 @@
 import { builder } from "../builder";
 import { UserAccessTokenRef } from "../types/user";
 import { UserAccessToken } from "../../models/UserAccessToken";
+import { ALL_SCOPES } from "../../lib/token-permissions";
 
 const CreateTokenInput = builder.inputType("CreateTokenInput", {
   fields: (t) => ({
@@ -16,6 +17,10 @@ builder.mutationField("createUserToken", (t) =>
     args: { input: t.arg({ type: CreateTokenInput, required: true }) },
     resolve: async (_root, { input }, ctx) => {
       if (!ctx.user) throw new Error("Não autenticado");
+      const allowedScopes = new Set<string>(ALL_SCOPES);
+      for (const p of input.permissions) {
+        if (!allowedScopes.has(p)) throw new Error(`Permissão inválida: ${p}`);
+      }
       const expiresAt = input.expiresInDays
         ? new Date(Date.now() + input.expiresInDays * 86400000)
         : null;
