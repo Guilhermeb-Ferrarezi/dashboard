@@ -218,7 +218,7 @@ export function AppShell({
           return true;
         }
 
-        return group.label === "Operacao" || group.label === "Jogos";
+        return group.label === "Negocio" || group.label === "Jogos";
       }),
     [sidebarGroups, user.role],
   );

@@ -7,17 +7,17 @@ describe("portal-shell-data", () => {
     const groups = buildPortalSidebarGroups("/logs");
 
     expect(groups.map((group) => group.label)).toEqual([
-      "Operacao",
+      "Negocio",
       "Jogos",
-      "Administracao",
+      "Plataforma",
     ]);
 
     expect(groups.every((group) => group.iconKey in portalIconMap)).toBe(true);
     expect(groups.some((group) => group.label === "Entrada")).toBe(false);
     expect(
       groups
-        .find((group) => group.label === "Administracao")
+        .find((group) => group.label === "Plataforma")
         ?.items.map((item) => item.label),
-    ).toEqual(["Usuarios", "R2", "Publicador"]);
+    ).toEqual(["Usuarios", "Publicador", "R2", "Logs", "Dashboard Ops"]);
   });
 });
