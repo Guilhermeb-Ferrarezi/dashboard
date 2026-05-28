@@ -12,16 +12,24 @@ builder.objectType(HealthPingRef, {
   }),
 });
 
+export async function* healthPingGenerator() {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    while (true) {
+      yield { serverTs: Date.now() };
+      await new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, 30_000);
+      });
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 builder.subscriptionField("healthPing", (t) =>
   t.field({
     type: HealthPingRef,
-    subscribe: () =>
-      (async function* () {
-        while (true) {
-          yield { serverTs: Date.now() };
-          await new Promise<void>((resolve) => setTimeout(resolve, 30_000));
-        }
-      })(),
+    subscribe: () => healthPingGenerator(),
     resolve: (payload: HealthPingShape) => payload,
   }),
 );
