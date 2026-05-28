@@ -909,7 +909,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
         <div className="min-w-0 space-y-1.5">
           <Breadcrumb
             items={[
-              { label: "Início", href: "/home", icon: LayoutDashboardIcon },
+              { label: "Início", href: "/painel", icon: LayoutDashboardIcon },
               { label: "Dashboard" },
             ]}
           />

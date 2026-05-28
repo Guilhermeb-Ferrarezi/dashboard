@@ -228,7 +228,7 @@ function buildActionResults(
       breadcrumb: "Abrir home",
       kind: "action",
       iconKey: "home",
-      action: () => router.push("/home"),
+      action: () => router.push("/painel"),
     },
     {
       id: "copy-link",
@@ -698,7 +698,7 @@ export function PortalQuickSearchDialog({
                           value={item.value}
                           onSelect={() => {
                             setOpen(false);
-                            const href = item.href ?? "/home";
+                            const href = item.href ?? "/painel";
                             startTransition(() => {
                               router.push(href);
                             });

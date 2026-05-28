@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const successPathForAdmin =
     process.env.SSO_SUCCESS_PATH_ADMIN?.trim() || "/admin/users";
   const successPathForUser =
-    process.env.SSO_SUCCESS_PATH_USER?.trim() || "/home";
+    process.env.SSO_SUCCESS_PATH_USER?.trim() || "/painel";
 
   if (!code) {
     return NextResponse.redirect(

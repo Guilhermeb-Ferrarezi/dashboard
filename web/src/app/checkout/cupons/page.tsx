@@ -13,7 +13,7 @@ export default async function CheckoutCuponsPage() {
   const user = await getSessionUser();
 
   if (!user) return <ClientRedirect to="/login" label="login" />;
-  if (user.role !== "admin") return <ClientRedirect to="/home" label="dashboard" />;
+  if (user.role !== "admin") return <ClientRedirect to="/painel" label="dashboard" />;
 
   const cookieHeader = (await cookies()).toString();
   const data = await serverApi<{ cupons: CheckoutCupomSummary[] }>("/checkout/cupons", { cookieHeader });

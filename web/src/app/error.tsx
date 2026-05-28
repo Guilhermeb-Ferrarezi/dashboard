@@ -54,7 +54,7 @@ export default function GlobalError({
               <RefreshCwIcon className="size-4" />
               Tentar de novo
             </Button>
-            <Button variant="outline" render={<Link href="/home" />}>
+            <Button variant="outline" render={<Link href="/painel" />}>
               <ArrowLeftIcon className="size-4" />
               Voltar para o início
             </Button>

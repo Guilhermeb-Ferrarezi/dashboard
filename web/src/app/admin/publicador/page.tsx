@@ -17,7 +17,7 @@ export default async function AdminPublicadorPage() {
   }
 
   if (user.role !== "admin") {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    return <ClientRedirect to="/painel" label="dashboard" />;
   }
 
   const cookieHeader = (await cookies()).toString();

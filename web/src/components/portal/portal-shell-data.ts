@@ -347,7 +347,7 @@ export function resolvePortalRecentItem(
   logsHref: string,
   logsProjectName?: string | null,
 ): Omit<PortalRecentItem, "pinned" | "updatedAt"> | null {
-  if (pathname === "/home") {
+  if (pathname === "/painel") {
     return null;
   }
 
