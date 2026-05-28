@@ -7,6 +7,7 @@ import express from "express";
 import mongoose from "mongoose";
 
 import authRoutes from "./routes/auth.routes";
+import devLoginRoutes from "./routes/dev-login.routes";
 import adminRoutes from "./routes/admin.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import projectRoutes from "./routes/projects.routes";
@@ -207,6 +208,14 @@ app.use(express.json());
 app.use(requestLogsMiddleware);
 
 app.use("/api/auth", authRoutes);
+
+// DEV LOGIN BYPASS — só monta em non-production. Permite login local sem
+// passar pelo auth externo. Remover quando auth.santos-games.com aceitar localhost.
+if (process.env.NODE_ENV !== "production") {
+  app.use("/api/dev", devLoginRoutes);
+  console.log("⚠️  Dev login bypass habilitado em POST /api/dev/login");
+}
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectRoutes);

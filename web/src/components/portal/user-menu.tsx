@@ -43,14 +43,29 @@ export function UserMenu({
   const router = useRouter();
 
   async function handleLogout() {
+    const isDev = process.env.NODE_ENV !== "production";
     try {
-      await Promise.allSettled([
-        fetch(`${AUTH_API_URL}/api/auth/logout`, {
-          method: "POST",
-          credentials: "include",
-        }),
+      // Em dev: só chama o logout local (auth externo não responde pra localhost).
+      // Em prod: chama os dois pra limpar cookie compartilhado e local.
+      const calls: Promise<unknown>[] = [
         clientApi<{ message: string }>("/auth/logout", { method: "POST" }),
-      ]);
+      ];
+      if (!isDev) {
+        calls.push(
+          fetch(`${AUTH_API_URL}/api/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+          }),
+        );
+      }
+      await Promise.allSettled(calls);
+
+      // Em dev, o cookie foi setado em localhost:3001 (não na API :4000) —
+      // o clearCookie do backend não consegue limpar. Apagamos pelo browser.
+      if (isDev) {
+        document.cookie = "sga_auth=; path=/; max-age=0; samesite=lax";
+      }
+
       router.replace("/login");
       router.refresh();
     } catch (error) {

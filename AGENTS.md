@@ -69,6 +69,26 @@ bun run start        # vinext start
 bun run lint         # eslint
 ```
 
+### Login local (dev login bypass)
+
+O auth de produção é delegado a `auth.santos-games.com`. Esse fluxo **não funciona em localhost** porque o auth externo não conhece `localhost` como client autorizado, e cookies setados em `.santos-games.com` não chegam pro browser local.
+
+Em desenvolvimento (`NODE_ENV !== "production"`), existe um **dev login bypass**:
+
+- Endpoint: `POST /api/dev/login` (montado só fora de produção em `server.ts`)
+- Recebe `{ username }`, busca o user no Mongo, gera JWT válido com `JWT_SECRET` e retorna o token
+- O frontend (`/login` em dev) seta o cookie `sga_auth` no domínio do próprio Next.js (`localhost:3001`) via `document.cookie` — backend NÃO seta porque cookies não cruzam portas (`:4000` ↔ `:3001`)
+- Logout em dev apaga o cookie do `:3001` via `document.cookie` também
+
+**Arquivos:**
+- `api/src/controllers/dev-login.controller.ts`
+- `api/src/routes/dev-login.routes.ts`
+- `api/src/server.ts` (monta rota só em non-prod)
+- `web/src/app/login/page.tsx` (form de login em dev)
+- `web/src/components/portal/user-menu.tsx` (logout em dev)
+
+**Remover quando:** o auth externo aceitar `localhost` como callback válido OU vocês adotarem mock/stub do auth externo. É só apagar os dois arquivos `dev-login.*` e o `if (NODE_ENV !== "production")` no `server.ts`. O resto continua funcionando em prod normalmente.
+
 ### Stack completa (Docker)
 
 ```bash
