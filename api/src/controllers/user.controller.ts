@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { normalizeEmail } from "../lib/normalize";
 import { User } from "../models/User";
@@ -27,12 +28,13 @@ function serializeUser(user: {
   };
 }
 
-export async function getCurrentUser(req: Request, res: Response) {
-  const authUserId = Number(req.user?.id);
+export async function getCurrentUser(c: Context<AppEnv>): Promise<Response> {
+  const reqUser = c.get("user");
+  const authUserId = Number(reqUser?.id);
 
-  if (!req.user?.id || Number.isNaN(authUserId)) {
-    console.warn("[user/me] Missing or invalid req.user.id:", req.user);
-    return res.status(401).json({ message: "Missing token" });
+  if (!reqUser?.id || Number.isNaN(authUserId)) {
+    console.warn("[user/me] Missing or invalid req.user.id:", reqUser);
+    return c.json({ message: "Missing token" }, 401);
   }
 
   try {
@@ -41,15 +43,15 @@ export async function getCurrentUser(req: Request, res: Response) {
     if (!user) {
       const legacy = await User.findOne({
         $or: [
-          { email: req.user!.email },
-          { username: req.user!.username },
+          { email: reqUser!.email },
+          { username: reqUser!.username },
         ],
         authUserId: { $exists: false },
       });
 
       if (legacy) {
         legacy.authUserId = authUserId;
-        legacy.role = req.user!.role;
+        legacy.role = reqUser!.role;
         await legacy.save();
       const oldId = String(legacy._id);
       const newId = String(authUserId);
@@ -71,28 +73,30 @@ export async function getCurrentUser(req: Request, res: Response) {
     } else {
       const newUser = new User({
         authUserId,
-        username: req.user!.username,
-        email: req.user!.email,
-        role: req.user!.role,
+        username: reqUser!.username,
+        email: reqUser!.email,
+        role: reqUser!.role,
       });
       await newUser.save();
       user = newUser.toObject();
     }
     }
 
-    return res.json({ ok: true, user: serializeUser(user) });
+    return c.json({ ok: true, user: serializeUser(user) });
   } catch (err) {
     console.error("[user/me] Failed:", err);
-    return res.status(500).json({ message: "Erro ao carregar usuario." });
+    return c.json({ message: "Erro ao carregar usuario." }, 500);
   }
 }
 
-export async function updateCurrentUserPreferences(req: Request, res: Response) {
-  const authUserId = Number(req.user?.id);
-  const payload = req.body?.preferences ?? req.body;
+export async function updateCurrentUserPreferences(c: Context<AppEnv>): Promise<Response> {
+  const reqUser = c.get("user");
+  const authUserId = Number(reqUser?.id);
+  const body = await c.req.json();
+  const payload = body?.preferences ?? body;
 
-  if (!req.user?.id || Number.isNaN(authUserId)) {
-    return res.status(401).json({ message: "Missing token" });
+  if (!reqUser?.id || Number.isNaN(authUserId)) {
+    return c.json({ message: "Missing token" }, 401);
   }
 
   let user = await User.findOne({ authUserId });
@@ -100,16 +104,16 @@ export async function updateCurrentUserPreferences(req: Request, res: Response) 
   if (!user) {
     user = new User({
       authUserId,
-      username: req.user!.username,
-      email: req.user!.email,
-      role: req.user!.role,
+      username: reqUser!.username,
+      email: reqUser!.email,
+      role: reqUser!.role,
     });
   }
 
   user.preferences = normalizeThemePreferences(payload);
   await user.save();
 
-  return res.json({
+  return c.json({
     ok: true,
     message: "Preferencias atualizadas com sucesso.",
     preferences: serializePreferences(user.preferences),
@@ -117,21 +121,23 @@ export async function updateCurrentUserPreferences(req: Request, res: Response) 
   });
 }
 
-export async function updateCurrentUserProfile(req: Request, res: Response) {
-  const authUserId = Number(req.user?.id);
-  const username = typeof req.body?.username === "string" ? req.body.username.trim() : "";
-  const email = normalizeEmail(req.body?.email);
+export async function updateCurrentUserProfile(c: Context<AppEnv>): Promise<Response> {
+  const reqUser = c.get("user");
+  const authUserId = Number(reqUser?.id);
+  const body = await c.req.json();
+  const username = typeof body?.username === "string" ? body.username.trim() : "";
+  const email = normalizeEmail(body?.email);
 
-  if (!req.user?.id || Number.isNaN(authUserId)) {
-    return res.status(401).json({ message: "Missing token" });
+  if (!reqUser?.id || Number.isNaN(authUserId)) {
+    return c.json({ message: "Missing token" }, 401);
   }
 
   if (!username || username.length < 3) {
-    return res.status(400).json({ message: "Informe um nome com pelo menos 3 caracteres." });
+    return c.json({ message: "Informe um nome com pelo menos 3 caracteres." }, 400);
   }
 
   if (email && !email.includes("@")) {
-    return res.status(400).json({ message: "Informe um email valido." });
+    return c.json({ message: "Informe um email valido." }, 400);
   }
 
   const existingUser = await User.findOne({
@@ -140,7 +146,7 @@ export async function updateCurrentUserProfile(req: Request, res: Response) {
   });
 
   if (existingUser) {
-    return res.status(409).json({ message: "Nome ou email ja esta em uso." });
+    return c.json({ message: "Nome ou email ja esta em uso." }, 409);
   }
 
   let user = await User.findOne({ authUserId });
@@ -148,9 +154,9 @@ export async function updateCurrentUserProfile(req: Request, res: Response) {
   if (!user) {
     user = new User({
       authUserId,
-      username: req.user!.username,
-      email: req.user!.email,
-      role: req.user!.role,
+      username: reqUser!.username,
+      email: reqUser!.email,
+      role: reqUser!.role,
     });
   }
 
@@ -158,7 +164,7 @@ export async function updateCurrentUserProfile(req: Request, res: Response) {
   user.email = email;
   await user.save();
 
-  return res.json({
+  return c.json({
     ok: true,
     message: "Conta atualizada com sucesso.",
     user: serializeUser(user),
