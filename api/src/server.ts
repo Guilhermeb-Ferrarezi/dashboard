@@ -11,6 +11,10 @@ import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
 import { requireRole } from "./middlewares/role";
 
+import { createYoga } from "graphql-yoga";
+import { schema } from "./graphql/schema";
+import { createGraphQLContext } from "./graphql/context";
+
 import authRoutes from "./routes/auth.routes";
 import devLoginRoutes from "./routes/dev-login.routes";
 import adminRoutes from "./routes/admin.routes";
@@ -159,6 +163,14 @@ app.get(
   requireRole("user"),
   (c) => c.json({ message: "Area do usuario liberada." }),
 );
+
+const yoga = createYoga({
+  schema,
+  graphqlEndpoint: "/graphql",
+  context: createGraphQLContext,
+  graphiql: !isProduction,
+});
+app.on(["GET", "POST"], "/graphql", (c) => yoga.fetch(c.req.raw, c.env));
 
 app.onError(errorHandler);
 

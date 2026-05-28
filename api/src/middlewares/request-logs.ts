@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 const LOGS_DB_NAME = process.env.LOGS_MONGO_DB_NAME?.trim() || "logs";
 const LOGS_HTTP_COLLECTION = process.env.LOGS_HTTP_COLLECTION?.trim() || "santos_tech_home_logs";
 const LOGS_ROUTE_BLACKLIST = new Set(
-  (process.env.LOGS_ROUTE_BLACKLIST?.split(",") || ["/api/logs", "/api/portal/recents"])
+  (process.env.LOGS_ROUTE_BLACKLIST?.split(",") || ["/api/logs", "/api/portal/recents", "/graphql"])
     .map((r) => r.trim()).filter(Boolean),
 );
 const LOGS_GET_ROUTE_BLACKLIST = new Set(
