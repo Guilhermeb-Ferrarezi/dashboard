@@ -1,3 +1,4 @@
+import { Repeater } from "@repeaterjs/repeater";
 import { builder } from "../builder";
 
 interface HealthPingShape {
@@ -8,22 +9,17 @@ const HealthPingRef = builder.objectRef<HealthPingShape>("HealthPing");
 
 builder.objectType(HealthPingRef, {
   fields: (t) => ({
-    serverTs: t.exposeFloat("serverTs"),
+    serverTs: t.exposeInt("serverTs"),
   }),
 });
 
-export async function* healthPingGenerator() {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  try {
-    while (true) {
-      yield { serverTs: Date.now() };
-      await new Promise<void>((resolve) => {
-        timeoutId = setTimeout(resolve, 30_000);
-      });
-    }
-  } finally {
-    clearTimeout(timeoutId);
-  }
+export function healthPingGenerator(): Repeater<HealthPingShape> {
+  return new Repeater<HealthPingShape>(async (push, stop) => {
+    await push({ serverTs: Date.now() });
+    const interval = setInterval(() => void push({ serverTs: Date.now() }), 30_000);
+    await stop;
+    clearInterval(interval);
+  });
 }
 
 builder.subscriptionField("healthPing", (t) =>
