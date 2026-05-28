@@ -3,7 +3,8 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 export function createDb(postgresUrl: string) {
-  const client = postgres(postgresUrl, { max: 10 });
+  const poolSize = Number(process.env.DB_POOL_SIZE) || 10;
+  const client = postgres(postgresUrl, { max: poolSize });
   return drizzle(client, { schema });
 }
 

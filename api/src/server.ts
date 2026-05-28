@@ -1,4 +1,5 @@
 import dns from "node:dns/promises";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,7 +11,7 @@ import adminRoutes from "./routes/admin.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import projectRoutes from "./routes/projects.routes";
 import logsRoutes from "./routes/logs.routes";
-import ssoRoutes from "./routes/sso.routes";
+
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
 import codexRoutes from "./routes/codex.routes";
@@ -37,9 +38,12 @@ import {
 import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
 import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { requireRole } from "./middlewares/role";
+import { errorHandler } from "./middlewares/error-handler";
 import { attachCodexGateway } from "./lib/codex";
+import { validateEnv } from "./config/env";
 
 dotenv.config();
+validateEnv();
 
 process.on("uncaughtException", (error) => {
   console.error("[process] uncaughtException:", error);
@@ -182,10 +186,11 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-sso-shared-secret"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
+app.use(compression({ threshold: 1024 }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(requestLogsMiddleware);
@@ -195,7 +200,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/logs", logsRoutes);
-app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 app.use("/api/codex", codexRoutes);
@@ -225,6 +229,8 @@ app.get("/api/admin", verifyJWTOrCodexServiceToken, requireRole("admin"), (_req,
 });
 
 app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
+
+app.use(errorHandler);
 
 async function start() {
   const mongoUri = process.env.MONGO_URI?.trim();

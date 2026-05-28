@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { serverApi } from "@/lib/api-server";
+import { getAuthLoginUrl } from "@/lib/auth-api";
 import type { ThemePreferences } from "@/lib/theme-preferences";
 
 export interface SessionUser {
@@ -37,17 +38,11 @@ export async function requireSession() {
   const user = await getSessionUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(getAuthLoginUrl());
   }
 
-  return user;
-}
-
-export async function requireAdminSession() {
-  const user = await requireSession();
-
   if (user.role !== "admin") {
-    redirect("/home");
+    redirect("https://santos-games.com");
   }
 
   return user;

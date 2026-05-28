@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { clientApi } from "@/lib/api";
+import { formatDate as formatDateLib } from "@/lib/format";
 import type { CheckoutCupomSummary } from "@/types/portal";
 
 type CupomFormValues = {
@@ -35,9 +36,7 @@ function formFromCupom(c: CheckoutCupomSummary): CupomFormValues {
   };
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR");
-}
+const formatDate = formatDateLib;
 
 export function CheckoutCuponsPanel({ initialCupons }: { initialCupons: CheckoutCupomSummary[] }) {
   const [cupons, setCupons] = useState<CheckoutCupomSummary[]>(initialCupons);

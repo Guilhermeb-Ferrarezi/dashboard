@@ -33,19 +33,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { clientApi, getClientApiBaseUrl } from "@/lib/api";
+import { formatCurrency, formatDate } from "@/lib/format";
 import type { CheckoutProductSummary } from "@/types/portal";
-
-function formatCurrency(cents: number) {
-  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-}
 
 type ProductFormValues = {
   name: string;
@@ -217,7 +206,7 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel, onPreview }: 
           {form.imageUrl && (
             <div className="relative size-16 shrink-0 overflow-hidden rounded-md border border-border/60">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.imageUrl} alt="" className="size-full object-cover" />
+              <img src={form.imageUrl} alt="" className="size-full object-cover" loading="lazy" />
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, imageKey: null, imageUrl: null }))}
@@ -296,9 +285,7 @@ function ProductForm({ form, setForm, pending, onSubmit, onCancel, onPreview }: 
   );
 }
 
-function formatCurrencyPreview(cents: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-}
+const formatCurrencyPreview = formatCurrency;
 
 function ProductPreviewModal({
   produto,
@@ -341,7 +328,7 @@ function ProductPreviewModal({
 
           {produto.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={produto.imageUrl} alt={produto.name} className="w-full h-36 object-cover rounded-md" />
+            <img src={produto.imageUrl} alt={produto.name} className="w-full h-36 object-cover rounded-md" loading="lazy" />
           )}
 
           <div className="border-t border-white/10 pt-3 flex flex-col gap-1.5 text-sm text-zinc-400">
@@ -761,7 +748,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                       <TableCell>
                         {produto.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={produto.imageUrl} alt="" className="size-9 rounded object-cover border border-border/40" />
+                          <img src={produto.imageUrl} alt="" className="size-9 rounded object-cover border border-border/40" loading="lazy" />
                         ) : (
                           <div className="flex size-9 items-center justify-center rounded border border-border/30 bg-muted/30 text-muted-foreground/40">
                             <PackageIcon className="size-4" />

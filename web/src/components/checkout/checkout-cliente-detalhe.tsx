@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { clientApi, getClientApiBaseUrl } from "@/lib/api";
+import { formatCurrency, formatDateShort, formatDateTimeShort } from "@/lib/format";
 import type {
   CheckoutClienteAssinatura,
   CheckoutClientePedido,
@@ -48,30 +49,8 @@ const PEDIDOS_PAGE_SIZE = 15;
 
 type PedidosPagination = { page: number; limit: number; total: number; pages: number };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function formatDateShort(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
-
-function formatBRL(cents: number) {
-  return (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
-}
+const formatDate = formatDateTimeShort;
+const formatBRL = formatCurrency;
 
 function getStatusConfig(status: string): { label: string; className: string } {
   switch (status) {

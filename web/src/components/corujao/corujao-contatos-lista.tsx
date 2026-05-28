@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi, getClientApiBaseUrl } from "@/lib/api";
+import { formatDateShort } from "@/lib/format";
 
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
 
@@ -139,13 +140,7 @@ function formFromContato(c: Contato): FormValues {
   };
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
+const formatDate = formatDateShort;
 
 function origemLabel(value: Origem) {
   return ORIGEM_OPTIONS.find((o) => o.value === value)?.label ?? value;

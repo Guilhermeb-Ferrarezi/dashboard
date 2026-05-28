@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
 import { createDotfyProduct, deleteDotfyProduct, updateDotfyProduct } from "../lib/dotfy-products";
+import { parsePagination } from "../lib/pagination";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
   return {
@@ -191,9 +192,7 @@ export async function getDashboard(_req: Request, res: Response) {
 export async function listClientes(req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Number(req.query.limit) || 20);
-    const offset = (page - 1) * limit;
+    const { page, limit, skip: offset } = parsePagination(req, 20);
     const q = String(req.query.q || "").trim();
 
     const searchFilter = q
@@ -342,9 +341,7 @@ export async function listClientePedidos(req: Request, res: Response) {
     if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
 
     const db = getCheckoutDb();
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Number(req.query.limit) || 15);
-    const offset = (page - 1) * limit;
+    const { page, limit, skip: offset } = parsePagination(req, 15);
     const descriptionFilter = String(req.query.description || "").trim();
 
     const baseFilter = descriptionFilter

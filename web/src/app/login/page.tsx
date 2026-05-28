@@ -1,23 +1,16 @@
-import { ClientRedirect } from "@/components/navigation/client-redirect";
-import { LoginForm } from "@/components/auth/login-form";
+import { redirect } from "next/navigation";
+
 import { getSessionUser } from "@/lib/session";
+import { getAuthLoginUrl } from "@/lib/auth-api";
 
 export const dynamic = "force-dynamic";
 
-interface LoginPageProps {
-  searchParams?: Promise<{
-    error?: string;
-  }>;
-}
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function LoginPage() {
   const user = await getSessionUser();
 
   if (user) {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    redirect("/home");
   }
 
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-
-  return <LoginForm error={resolvedSearchParams?.error} />;
+  redirect(getAuthLoginUrl());
 }

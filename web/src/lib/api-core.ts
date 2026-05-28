@@ -17,6 +17,12 @@ export async function parseApiResponse<T>(response: Response): Promise<T> {
   const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      const { getAuthLoginUrl } = await import("@/lib/auth-api");
+      window.location.href = getAuthLoginUrl();
+      throw new ApiError("Sessão expirada", 401);
+    }
+
     const message =
       typeof payload === "string"
         ? payload

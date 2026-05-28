@@ -7,9 +7,10 @@ import {
 } from "../lib/theme-preferences";
 
 export interface IUser extends Document {
+  authUserId?: number;
   username: string;
   email?: string | null;
-  password: string;
+  password?: string;
   role: "user" | "admin";
   preferences?: ThemePreferences;
   createdAt?: Date;
@@ -18,6 +19,7 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>(
   {
+    authUserId: { type: Number, unique: true, sparse: true },
     username: { type: String, required: true, unique: true },
     email: {
       type: String,
@@ -26,7 +28,7 @@ const UserSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
-    password: { type: String, required: true },
+    password: { type: String },
     role: { type: String, enum: ["user", "admin"], default: "user" },
     preferences: {
       mode: {

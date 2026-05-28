@@ -57,6 +57,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { clientApi } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import type { PortalUserSummary } from "@/types/portal";
 
 interface AdminUsersPanelProps {
@@ -376,7 +377,7 @@ export function AdminUsersPanel({ initialUsers }: AdminUsersPanelProps) {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {user.createdAt
-                        ? new Date(user.createdAt).toLocaleDateString("pt-BR")
+                        ? formatDate(user.createdAt)
                         : "-"}
                     </TableCell>
                     <TableCell>

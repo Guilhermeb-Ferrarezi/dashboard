@@ -8,6 +8,8 @@ export interface AuthUserPayload {
   role: "user" | "admin";
   exp?: number;
   iat?: number;
+  authType?: "session" | "token" | "service";
+  tokenPermissions?: string[];
 }
 
 declare module "express-serve-static-core" {

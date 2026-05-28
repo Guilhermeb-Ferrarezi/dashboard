@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { clientApi } from "@/lib/api";
+import { AUTH_API_URL } from "@/lib/auth-api";
 
 interface LoginFormProps {
   error?: string;
@@ -51,10 +51,20 @@ export function LoginForm({ error }: LoginFormProps) {
     setFormError(null);
 
     try {
-      await clientApi("/auth/login", {
+      const response = await fetch(`${AUTH_API_URL}/api/auth/login`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
+        credentials: "include",
       });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          data?.message ?? data?.error ?? "Credenciais inválidas.",
+        );
+      }
+
       startTransition(() => {
         router.replace("/home");
         router.refresh();
@@ -129,7 +139,7 @@ export function LoginForm({ error }: LoginFormProps) {
                 <User2Icon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-9"
-                  placeholder="voce@santos-tech.com"
+                  placeholder="voce@santos-games.com"
                   value={identifier}
                   onChange={(event) => {
                     setIdentifier(event.target.value);

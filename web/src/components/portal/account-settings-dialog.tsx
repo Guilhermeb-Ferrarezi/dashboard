@@ -229,7 +229,7 @@ export function AccountSettingsDialog({
                         type="email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
-                        placeholder="voce@santos-tech.com"
+                        placeholder="voce@santos-games.com"
                         className="h-9"
                       />
                     </label>
@@ -274,7 +274,7 @@ export function AccountSettingsDialog({
                     <div className="grid gap-2 px-4 py-3 md:grid-cols-[160px_1fr] md:items-center md:gap-4">
                       <span className="text-sm text-muted-foreground">E-mail</span>
                       <span className="text-sm text-foreground">
-                        {user.email ?? "sem-email@santos-tech.com"}
+                        {user.email ?? "sem-email@santos-games.com"}
                       </span>
                     </div>
                     <div className="grid gap-2 px-4 py-3 md:grid-cols-[160px_1fr] md:items-center md:gap-4">

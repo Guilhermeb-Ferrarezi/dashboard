@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2Icon } from "@/components/ui/icons";
 import { clientApi } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 
 type ContatoMin = {
   id: number;
@@ -34,13 +35,7 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function formatBRL(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-  });
-}
+const formatBRL = formatCurrency;
 
 type Stats = { visitasCount: number; receitaCents: number };
 

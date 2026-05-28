@@ -1,0 +1,129 @@
+export type SessionTokenPayload = {
+  userId: number;
+  email: string;
+  login: string;
+  role: number;
+  sessionId: string | null;
+  expiresAt: number;
+};
+
+const encoder = new TextEncoder();
+const keyCache = new Map<string, Promise<CryptoKey>>();
+
+function getHmacKey(secret: string): Promise<CryptoKey> {
+  let promise = keyCache.get(secret);
+  if (!promise) {
+    promise = crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    keyCache.set(secret, promise);
+  }
+  return promise;
+}
+
+export async function verifySessionToken(
+  token: string,
+  jwtSecret: string,
+): Promise<SessionTokenPayload | null> {
+  const [encodedHeader, encodedPayload, signature] = token.split(".");
+
+  if (!encodedHeader || !encodedPayload || !signature) {
+    return null;
+  }
+
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+  const expectedSignature = await sign(unsignedToken, jwtSecret);
+
+  if (!timingSafeEqual(signature, expectedSignature)) {
+    return null;
+  }
+
+  const payload = parsePayload(encodedPayload);
+  if (!payload) {
+    return null;
+  }
+
+  if (payload.exp <= Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+
+  return {
+    userId: payload.userId,
+    email: payload.email,
+    login: payload.login,
+    role: payload.role,
+    sessionId: typeof payload.sessionId === "string" ? payload.sessionId : null,
+    expiresAt: payload.exp,
+  };
+}
+
+type RawPayload = {
+  userId: number;
+  email: string;
+  login: string;
+  role: number;
+  sessionId?: string;
+  exp: number;
+};
+
+function parsePayload(encodedPayload: string): RawPayload | null {
+  try {
+    const decoded = JSON.parse(base64UrlDecode(encodedPayload)) as Partial<RawPayload>;
+
+    if (
+      typeof decoded.userId !== "number" ||
+      typeof decoded.email !== "string" ||
+      typeof decoded.login !== "string" ||
+      typeof decoded.role !== "number" ||
+      typeof decoded.exp !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      userId: decoded.userId,
+      email: decoded.email,
+      login: decoded.login,
+      role: decoded.role,
+      sessionId: typeof decoded.sessionId === "string" ? decoded.sessionId : undefined,
+      exp: decoded.exp,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function sign(value: string, secret: string): Promise<string> {
+  const key = await getHmacKey(secret);
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
+  return base64UrlEncodeBytes(new Uint8Array(signature));
+}
+
+function base64UrlEncodeBytes(value: Uint8Array): string {
+  return Buffer.from(value)
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+function base64UrlDecode(value: string): string {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Buffer.from(`${normalized}${padding}`, "base64").toString("utf8");
+}
+
+function timingSafeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  let result = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    result |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return result === 0;
+}

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/icons";
 import { useRecentlyVisited } from "@/hooks/use-recently-visited";
 import { clientApi } from "@/lib/api";
+import { AUTH_API_URL } from "@/lib/auth-api";
 import { openPortalQuickSearch } from "@/components/portal/portal-quick-search";
 
 type Action = {
@@ -76,7 +77,13 @@ export function CommandPalette() {
 
   async function handleLogout() {
     try {
-      await clientApi<{ message: string }>("/auth/logout", { method: "POST" });
+      await Promise.allSettled([
+        fetch(`${AUTH_API_URL}/api/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+        }),
+        clientApi<{ message: string }>("/auth/logout", { method: "POST" }),
+      ]);
       router.replace("/login");
       router.refresh();
     } catch (error) {

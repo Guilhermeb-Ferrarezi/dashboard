@@ -32,6 +32,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { clientApi } from "@/lib/api";
+import { formatDateShort } from "@/lib/format";
 
 export type Colaborador = {
   id: number;
@@ -56,13 +57,7 @@ function extractErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
+const formatDate = formatDateShort;
 
 function ListSkeleton() {
   return (
