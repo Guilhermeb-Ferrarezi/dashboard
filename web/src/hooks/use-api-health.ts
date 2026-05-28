@@ -61,6 +61,7 @@ function startSSEOnce() {
 
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) {
+      eventSource = null;
       emit({
         tone: "error",
         label: "Offline",
