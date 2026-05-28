@@ -1,8 +1,6 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { serverApi } from "@/lib/api-server";
-import { getAuthLoginUrl } from "@/lib/auth-api";
 import type { ThemePreferences } from "@/lib/theme-preferences";
 
 export interface SessionUser {
@@ -34,7 +32,8 @@ export async function getSessionUser() {
   }
 }
 
-export async function requireSession() {
+export async function requireSession(): Promise<SessionUser> {
+  const { redirect } = await import("next/navigation");
   const user = await getSessionUser();
 
   if (!user) {

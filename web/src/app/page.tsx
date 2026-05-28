@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-
+import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -7,9 +6,9 @@ export const dynamic = "force-dynamic";
 export default async function IndexPage() {
   const user = await getSessionUser();
 
-  if (user) {
-    redirect("/home");
+  if (user && user.role === "admin") {
+    return <ClientRedirect to="/home" label="dashboard" />;
   }
 
-  redirect("/login");
+  return <ClientRedirect to="/login" label="login" />;
 }
