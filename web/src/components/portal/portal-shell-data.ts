@@ -187,7 +187,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           ],
         }),
         portalItem({
-          href: "/admin/analytics",
+          href: "/painel/admin/analytics",
           label: "Analytics",
           description: "Métricas das páginas de venda — Corujão e Mix",
           icon: ActivityIcon,
@@ -272,7 +272,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
       iconKey: "admin",
       items: [
         portalItem({
-          href: "/admin/users",
+          href: "/painel/admin/users",
           label: "Usuarios",
           description: "Base de usuarios e perfis de acesso",
           icon: ShieldIcon,
@@ -280,7 +280,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           keywords: ["usuarios", "admin", "acesso", "perfis"],
         }),
         portalItem({
-          href: "/admin/publicador",
+          href: "/painel/admin/publicador",
           label: "Publicador",
           description: "Envio de ZIPs estaticos para o volume de sites",
           icon: LayoutGridIcon,
@@ -288,7 +288,7 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
           keywords: ["publicador", "zip", "site", "rotas", "volume"],
         }),
         portalItem({
-          href: "/admin/r2",
+          href: "/painel/admin/r2",
           label: "R2",
           description: "Envio de imagens para o bucket",
           icon: ImageIcon,

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     if (cookieHeader) {
       const response = await serverApi<{ ok: true; tokens: AdminAccessTokenSummary[] }>(
-        "/admin/tokens",
+        "/painel/admin/tokens",
         {
           cookieHeader,
         },
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         token: string;
         type: string;
         label: string;
-      }>("/admin/tokens", {
+      }>("/painel/admin/tokens", {
         method: "POST",
         body,
         cookieHeader,

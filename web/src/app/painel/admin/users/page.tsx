@@ -1,15 +1,15 @@
 import { cookies } from "next/headers";
 
-import { AdminPublicadorPanel } from "@/components/admin/admin-publicador-panel";
+import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { ClientRedirect } from "@/components/navigation/client-redirect";
 import { AppShell } from "@/components/portal/app-shell";
 import { serverApi } from "@/lib/api-server";
 import { getSessionUser } from "@/lib/session";
-import type { PublishedSiteSummary } from "@/components/admin/admin-publicador-panel";
+import type { PortalUserSummary } from "@/types/portal";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPublicadorPage() {
+export default async function AdminUsersPage() {
   const user = await getSessionUser();
 
   if (!user) {
@@ -21,19 +21,19 @@ export default async function AdminPublicadorPage() {
   }
 
   const cookieHeader = (await cookies()).toString();
-  const response = await serverApi<{ sites: PublishedSiteSummary[] }>(
-    "/admin/publicador/sites",
+  const response = await serverApi<{ users: PortalUserSummary[] }>(
+    "/painel/admin/users",
     { cookieHeader },
   );
 
   return (
     <AppShell
       user={user}
-      eyebrow="Administração"
-      title="Publicador de sites"
-      description="Publique ZIPs estáticos em rotas públicas servidas pelo container compartilhado."
+      eyebrow="Administracao"
+      title="Usuarios do home"
+      description="Gerencie as contas internas do portal universal."
     >
-      <AdminPublicadorPanel initialSites={response.sites} />
+      <AdminUsersPanel initialUsers={response.users} />
     </AppShell>
   );
 }

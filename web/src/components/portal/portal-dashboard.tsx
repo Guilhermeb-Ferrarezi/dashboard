@@ -1604,7 +1604,7 @@ export function PortalDashboard({ user, projects, summary }: PortalDashboardProp
           <span className="opacity-40">·</span>
           <Link href="/logs" className="transition-colors hover:text-foreground">Logs</Link>
           <span className="opacity-40">·</span>
-          <Link href="/admin/users" className="transition-colors hover:text-foreground">Admin</Link>
+          <Link href="/painel/admin/users" className="transition-colors hover:text-foreground">Admin</Link>
         </nav>
       </footer>
     </div>

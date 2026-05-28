@@ -329,7 +329,7 @@ function mapPortalUsers(users: PortalUserSummary[]): SearchResult[] {
     breadcrumb: user.username,
     kind: "resource",
     iconKey: "users",
-    href: "/admin/users",
+    href: "/painel/admin/users",
   }));
 }
 
@@ -529,7 +529,7 @@ export function PortalQuickSearchDialog({
         const [projectResponse, usersResponse, logsResponse] = await Promise.all([
           clientApi<{ projects: PortalProject[] }>("/projects"),
           user.role === "admin"
-            ? clientApi<{ users: PortalUserSummary[] }>("/admin/users")
+            ? clientApi<{ users: PortalUserSummary[] }>("/painel/admin/users")
             : Promise.resolve(null),
           user.role === "admin"
             ? clientApi<{ projects: LogsProject[] }>("/logs/projects")
