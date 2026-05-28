@@ -1,17 +1,11 @@
-import type { NextFunction, Request, Response } from "express";
-
+import type { Context, Next } from "hono";
+import type { AppEnv } from "../types/hono";
 import { resolveCodexServiceToken } from "../lib/codex-service-token";
 
-export function requireCodexAccessToken(req: Request, res: Response, next: NextFunction) {
-  if (!req.user?.id) {
-    return res.status(401).json({ message: "Missing token" });
-  }
-
+export async function requireCodexAccessToken(c: Context<AppEnv>, next: Next) {
+  if (!c.get("user")?.id) return c.json({ message: "Missing token" }, 401);
   if (!resolveCodexServiceToken()) {
-    return res.status(503).json({
-      message: "Codex sem credencial delegada ativa no servidor.",
-    });
+    return c.json({ message: "Codex sem credencial delegada ativa no servidor." }, 503);
   }
-
-  next();
+  await next();
 }
