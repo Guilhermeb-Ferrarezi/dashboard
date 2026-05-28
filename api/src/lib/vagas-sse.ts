@@ -34,7 +34,11 @@ export async function broadcast() {
   const data = await getVagasPayload();
   const message = `event: vagas-update\ndata: ${JSON.stringify(data)}\n\n`;
   for (const client of clients) {
-    client.write(message);
+    try {
+      client.write(message);
+    } catch {
+      clients.delete(client);
+    }
   }
 }
 
