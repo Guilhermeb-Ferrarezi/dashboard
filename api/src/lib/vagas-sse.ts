@@ -1,4 +1,3 @@
-import type { Response } from "express";
 import { count, and, asc, gte, inArray } from "drizzle-orm";
 import { getCheckoutDb, schema } from "../db/index";
 
@@ -10,22 +9,18 @@ type VagasPayload = {
   vagasRestantes: number;
 } | null;
 
-const clients = new Set<Response>();
+type SseWriter = {
+  write: (data: string) => void | Promise<void>;
+};
 
-export function addClient(res: Response) {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*"
-  });
-  res.write("\n");
+const clients = new Set<SseWriter>();
 
-  clients.add(res);
-  res.on("close", () => clients.delete(res));
+export function addSseClient(writer: SseWriter, onClose: (fn: () => void) => void) {
+  clients.add(writer);
+  onClose(() => clients.delete(writer));
 
   getVagasPayload().then((data) => {
-    res.write(`event: vagas-update\ndata: ${JSON.stringify(data)}\n\n`);
+    writer.write(`event: vagas-update\ndata: ${JSON.stringify(data)}\n\n`);
   });
 }
 

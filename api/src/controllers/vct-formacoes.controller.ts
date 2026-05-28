@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { Request, Response } from "express";
-import multer from "multer";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { VctFormacaoJogador } from "../models/VctFormacaoJogador";
 import { VctFormacaoTime } from "../models/VctFormacaoTime";
@@ -45,22 +45,6 @@ type NormalizedFormacaoMember = FormacaoPlayerPayload & {
   ordem: number;
   papel: "capitao" | "jogador";
 };
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: MAX_LOGO_SIZE_BYTES,
-    files: 1,
-  },
-  fileFilter(_req, file, callback) {
-    if (!file.mimetype.startsWith("image/")) {
-      callback(new Error("A logo precisa ser uma imagem."));
-      return;
-    }
-
-    callback(null, true);
-  },
-});
 
 function sanitizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -126,19 +110,6 @@ function getEloOrder() {
 function getEloScore(value: string) {
   const order = getEloOrder();
   return Object.fromEntries(order.map((item, index) => [item, index]))[value] ?? -1;
-}
-
-function parseMultipartRequest(req: Request, res: Response) {
-  return new Promise<void>((resolve, reject) => {
-    upload.single("logo")(req, res, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
 }
 
 function parsePayload(value: unknown): FormacaoPayload | null {
@@ -252,58 +223,38 @@ function validatePlayer(player: FormacaoPlayerPayload, label: string) {
   return null;
 }
 
-function normalizePlayer(player: FormacaoPlayerPayload, ordem: number, papel: "capitao" | "jogador", modalidade = "valorant") {
-  return {
-    modalidade,
-    ordem,
-    papel,
-    nome: sanitizeText(player.nome),
-    email: sanitizeText(player.email).toLowerCase(),
-    instagram: sanitizeText(player.instagram),
-    whatsapp: sanitizeWhatsApp(player.whatsapp),
-    nick: sanitizeText(player.nick),
-    eloAtual: sanitizeText(player.eloAtual),
-    peakRanking: sanitizeText(player.peakRanking),
-  };
-}
-
-function isImageFile(file?: Express.Multer.File) {
-  return Boolean(file && file.mimetype.startsWith("image/"));
-}
-
-export async function criarFormacao(req: Request, res: Response) {
+export async function criarFormacao(c: Context<AppEnv>): Promise<Response> {
+  let body: Record<string, unknown>;
   try {
-    await parseMultipartRequest(req, res);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao processar o upload.";
-
-    if (message.includes("File too large")) {
-      res.status(400).json({ ok: false, message: "A logo precisa ter no máximo 5 MB." });
-      return;
-    }
-
-    res.status(400).json({ ok: false, message });
-    return;
+    body = await c.req.parseBody();
+  } catch {
+    return c.json({ ok: false, message: "Falha ao processar o upload." }, 400);
   }
 
-  const modalidade = normalizeModalidade(req.body.modalidade);
-  const payload = parsePayload(req.body.payload);
-  const logo = req.file;
+  const logoFile = body["logo"];
+
+  if (!(logoFile instanceof File)) {
+    return c.json({ ok: false, message: "Envie um logo em imagem." }, 400);
+  }
+
+  if (!logoFile.type.startsWith("image/")) {
+    return c.json({ ok: false, message: "A logo precisa ser uma imagem." }, 400);
+  }
+
+  if (logoFile.size > MAX_LOGO_SIZE_BYTES) {
+    return c.json({ ok: false, message: "A logo precisa ter no máximo 5 MB." }, 400);
+  }
+
+  const modalidade = normalizeModalidade(body["modalidade"]);
+  const payload = parsePayload(body["payload"]);
 
   if (!payload) {
-    res.status(400).json({ ok: false, message: "Payload da formação inválido." });
-    return;
-  }
-
-  if (!logo || !isImageFile(logo)) {
-    res.status(400).json({ ok: false, message: "Envie um logo em imagem." });
-    return;
+    return c.json({ ok: false, message: "Payload da formação inválido." }, 400);
   }
 
   const validationError = validateFormacaoPayload(payload);
   if (validationError) {
-    res.status(400).json({ ok: false, message: validationError });
-    return;
+    return c.json({ ok: false, message: validationError }, 400);
   }
 
   const teamName = sanitizeText(payload.time?.nome);
@@ -315,10 +266,11 @@ export async function criarFormacao(req: Request, res: Response) {
   let createdTimeId: string | null = null;
 
   try {
+    const logoBuffer = Buffer.from(await logoFile.arrayBuffer());
     uploadedLogo = await uploadVctFormationLogo({
-      buffer: logo.buffer,
-      mimeType: logo.mimetype,
-      fileName: logo.originalname,
+      buffer: logoBuffer,
+      mimeType: logoFile.type,
+      fileName: logoFile.name,
       formacaoId: uploadGroupId,
     });
 
@@ -339,13 +291,13 @@ export async function criarFormacao(req: Request, res: Response) {
       })),
     );
 
-    res.status(201).json({
+    return c.json({
       ok: true,
       formacao: {
         ...time.toObject(),
         membros: jogadores,
       },
-    });
+    }, 201);
   } catch (error) {
     if (createdTimeId) {
       await VctFormacaoJogador.deleteMany({ formacaoTimeId: createdTimeId }).catch(() => null);
@@ -357,50 +309,40 @@ export async function criarFormacao(req: Request, res: Response) {
     }
 
     const message = error instanceof Error ? error.message : "Falha ao salvar a formação.";
-    res.status(500).json({ ok: false, message });
+    return c.json({ ok: false, message }, 500);
   }
 }
 
-export async function atualizarFormacao(req: Request, res: Response) {
+export async function atualizarFormacao(c: Context<AppEnv>): Promise<Response> {
+  let body: Record<string, unknown>;
   try {
-    await parseMultipartRequest(req, res);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao processar o upload.";
-
-    if (message.includes("File too large")) {
-      res.status(400).json({ ok: false, message: "A logo precisa ter no máximo 5 MB." });
-      return;
-    }
-
-    res.status(400).json({ ok: false, message });
-    return;
+    body = await c.req.parseBody();
+  } catch {
+    return c.json({ ok: false, message: "Falha ao processar o upload." }, 400);
   }
 
-  const modalidade = normalizeModalidade(req.body.modalidade);
-  const payload = parsePayload(req.body.payload);
-  const logo = req.file;
-  const formacaoId = sanitizeText(req.params.id);
+  const logoFile = body["logo"];
+  const formacaoId = sanitizeText(c.req.param("id"));
 
   if (!formacaoId) {
-    res.status(400).json({ ok: false, message: "Formação inválida." });
-    return;
+    return c.json({ ok: false, message: "Formação inválida." }, 400);
   }
 
+  const modalidade = normalizeModalidade(body["modalidade"]);
+  const payload = parsePayload(body["payload"]);
+
   if (!payload) {
-    res.status(400).json({ ok: false, message: "Payload da formação inválido." });
-    return;
+    return c.json({ ok: false, message: "Payload da formação inválido." }, 400);
   }
 
   const validationError = validateFormacaoPayload(payload);
   if (validationError) {
-    res.status(400).json({ ok: false, message: validationError });
-    return;
+    return c.json({ ok: false, message: validationError }, 400);
   }
 
   const existing = await VctFormacaoTime.findOne({ _id: formacaoId, modalidade }).lean();
   if (!existing) {
-    res.status(404).json({ ok: false, message: "Formação não encontrada." });
-    return;
+    return c.json({ ok: false, message: "Formação não encontrada." }, 404);
   }
 
   let uploadedLogo: Awaited<ReturnType<typeof uploadVctFormationLogo>> | null = null;
@@ -408,11 +350,12 @@ export async function atualizarFormacao(req: Request, res: Response) {
   const nextLogoUrl = existing.logoUrl;
 
   try {
-    if (logo && isImageFile(logo)) {
+    if (logoFile instanceof File && logoFile.type.startsWith("image/")) {
+      const logoBuffer = Buffer.from(await logoFile.arrayBuffer());
       uploadedLogo = await uploadVctFormationLogo({
-        buffer: logo.buffer,
-        mimeType: logo.mimetype,
-        fileName: logo.originalname,
+        buffer: logoBuffer,
+        mimeType: logoFile.type,
+        fileName: logoFile.name,
         formacaoId,
       });
     }
@@ -446,7 +389,7 @@ export async function atualizarFormacao(req: Request, res: Response) {
       await deleteVctFormationLogo(nextLogoKey).catch(() => null);
     }
 
-    res.json({
+    return c.json({
       ok: true,
       formacao: {
         ...time,
@@ -459,31 +402,29 @@ export async function atualizarFormacao(req: Request, res: Response) {
     }
 
     const message = error instanceof Error ? error.message : "Falha ao atualizar a formação.";
-    res.status(500).json({ ok: false, message });
+    return c.json({ ok: false, message }, 500);
   }
 }
 
-export async function removerFormacao(req: Request, res: Response) {
-  const modalidade = normalizeModalidade(req.query?.modalidade);
-  const formacaoId = sanitizeText(req.params.id);
+export async function removerFormacao(c: Context<AppEnv>): Promise<Response> {
+  const modalidade = normalizeModalidade(c.req.query("modalidade"));
+  const formacaoId = sanitizeText(c.req.param("id"));
 
   if (!formacaoId) {
-    res.status(400).json({ ok: false, message: "Formação inválida." });
-    return;
+    return c.json({ ok: false, message: "Formação inválida." }, 400);
   }
 
   const existing = await VctFormacaoTime.findOne({ _id: formacaoId, modalidade }).lean();
   if (!existing) {
-    res.status(404).json({ ok: false, message: "Formação não encontrada." });
-    return;
+    return c.json({ ok: false, message: "Formação não encontrada." }, 404);
   }
 
   await removeFormationDocuments(formacaoId, existing.logoKey);
-  res.json({ ok: true, removida: formacaoId });
+  return c.json({ ok: true, removida: formacaoId });
 }
 
-export async function listarFormacoes(req: Request, res: Response) {
-  const modalidade = normalizeModalidade(req.query?.modalidade);
+export async function listarFormacoes(c: Context<AppEnv>): Promise<Response> {
+  const modalidade = normalizeModalidade(c.req.query("modalidade"));
   const filter = { modalidade };
 
   const formacoes = await VctFormacaoTime.find(filter).sort({ createdAt: -1 }).lean();
@@ -497,7 +438,7 @@ export async function listarFormacoes(req: Request, res: Response) {
     membrosPorFormacao.set(key, current);
   }
 
-  res.json({
+  return c.json({
     ok: true,
     formacoes: formacoes.map((formacao) => ({
       ...formacao,
