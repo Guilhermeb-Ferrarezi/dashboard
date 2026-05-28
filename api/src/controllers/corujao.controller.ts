@@ -69,6 +69,22 @@ export function parseStatusConversa(input: unknown): ParsedStatus<StatusConversa
   return { ok: true, value: input as StatusConversa };
 }
 
+// Aceita: null/"" → null. String ISO 8601 parseable por Date → Date. Qualquer outro formato → erro.
+// Previne que new Date("string-inválida") = Invalid Date chegue ao Postgres como 500.
+export function parseISODateTime(input: unknown): { ok: true; value: Date | null } | { ok: false; error: string } {
+  if (input === null || input === "") {
+    return { ok: true, value: null };
+  }
+  if (typeof input !== "string") {
+    return { ok: false, error: "ultimoContatoEm inválido." };
+  }
+  const d = new Date(input);
+  if (isNaN(d.getTime())) {
+    return { ok: false, error: "ultimoContatoEm inválido." };
+  }
+  return { ok: true, value: d };
+}
+
 // Aceita: undefined/null/"" → null. Valor do enum → mesmo valor.
 export function parseStatusPagamento(input: unknown): ParsedStatus<StatusPagamento> {
   if (input === undefined || input === null || input === "") {
@@ -355,7 +371,9 @@ export async function updateContato(req: Request, res: Response) {
     }
 
     if (ultimoContatoEm !== undefined) {
-      updates.ultimoContatoEm = ultimoContatoEm === null ? null : new Date(ultimoContatoEm);
+      const parsed = parseISODateTime(ultimoContatoEm);
+      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      updates.ultimoContatoEm = parsed.value;
     }
 
     const db = getCheckoutDb();
