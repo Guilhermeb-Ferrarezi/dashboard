@@ -29,6 +29,17 @@ let redisUnavailableLogged = false;
 const memoryRecents = new Map<string, PortalRecentItemPayload[]>();
 const memoryDirty = new Set<string>();
 
+const MAX_MEMORY_USERS = 500;
+
+function pruneMemoryUsers() {
+  while (memoryRecents.size >= MAX_MEMORY_USERS) {
+    const oldest = memoryRecents.keys().next().value as string | undefined;
+    if (!oldest) break;
+    memoryRecents.delete(oldest);
+    memoryDirty.delete(oldest);
+  }
+}
+
 async function createRedisClient(url: string) {
   try {
     const redisModule = (await new Function("return import('redis')")()) as {
@@ -177,6 +188,7 @@ async function readFromRedis(userId: string): Promise<PortalRecentItemPayload[] 
 async function writeToRedis(userId: string, items: PortalRecentItemPayload[]) {
   const client = await getRedisClient();
   if (!client) {
+    pruneMemoryUsers();
     memoryRecents.set(userId, items);
     memoryDirty.add(userId);
     return;
@@ -212,6 +224,7 @@ export async function getPortalRecents(userId: string) {
         PX: REDIS_TTL_MS,
       });
     } else {
+      pruneMemoryUsers();
       memoryRecents.set(userId, fromMongo);
     }
   }
