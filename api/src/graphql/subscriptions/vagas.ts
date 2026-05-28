@@ -5,9 +5,13 @@ import { getVagasPayload } from "../../lib/vagas-sse";
 
 export function vagasUpdateGenerator(): Repeater<VagasPayloadShape | null> {
   return new Repeater<VagasPayloadShape | null>(async (push, stop) => {
-    void push(await getVagasPayload());
-    const interval = setInterval(async () => {
-      void push(await getVagasPayload());
+    getVagasPayload()
+      .then((payload) => push(payload))
+      .catch((err) => stop(err instanceof Error ? err : new Error(String(err))));
+    const interval = setInterval(() => {
+      getVagasPayload()
+        .then((payload) => push(payload))
+        .catch((err) => stop(err instanceof Error ? err : new Error(String(err))));
     }, 5_000);
     await stop;
     clearInterval(interval);
