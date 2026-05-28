@@ -3,7 +3,8 @@
 // do auth pra serviço externo (auth.santos-games.com). Remover quando o
 // auth externo suportar localhost como client.
 import crypto from "crypto";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { User } from "../models/User";
 
@@ -24,27 +25,28 @@ function signJwt(payload: Record<string, unknown>, secret: string): string {
   return `${unsigned}.${signature}`;
 }
 
-export async function devLogin(req: Request, res: Response) {
+export async function devLogin(c: Context<AppEnv>): Promise<Response> {
   if (process.env.NODE_ENV === "production") {
-    return res.status(404).json({ message: "Not found" });
+    return c.json({ message: "Not found" }, 404);
   }
 
-  const username = typeof req.body?.username === "string" ? req.body.username.trim() : "";
+  const body = await c.req.json();
+  const username = typeof body?.username === "string" ? body.username.trim() : "";
   if (!username) {
-    return res.status(400).json({ message: "username obrigatório" });
+    return c.json({ message: "username obrigatório" }, 400);
   }
 
   const user = await User.findOne({ username });
   if (!user) {
-    return res.status(404).json({ message: `Usuário "${username}" não encontrado no Mongo.` });
+    return c.json({ message: `Usuário "${username}" não encontrado no Mongo.` }, 404);
   }
   if (!user.authUserId) {
-    return res.status(400).json({ message: `Usuário "${username}" não tem authUserId. Faça login em produção primeiro pra migrar.` });
+    return c.json({ message: `Usuário "${username}" não tem authUserId. Faça login em produção primeiro pra migrar.` }, 400);
   }
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    return res.status(500).json({ message: "JWT_SECRET não configurado" });
+    return c.json({ message: "JWT_SECRET não configurado" }, 500);
   }
 
   const payload = {
@@ -62,7 +64,7 @@ export async function devLogin(req: Request, res: Response) {
   // portas, então o backend NÃO seta o cookie aqui — retorna o token pra o
   // browser setar via document.cookie no domínio :3001 (que é onde o SSR do
   // Next.js consegue ler depois).
-  return res.json({
+  return c.json({
     ok: true,
     token,
     cookieName: AUTH_COOKIE_NAME,

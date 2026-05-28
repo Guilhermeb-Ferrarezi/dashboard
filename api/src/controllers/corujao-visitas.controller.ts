@@ -1,5 +1,6 @@
 import { count, desc, eq, inArray } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 import { broadcast } from "../lib/vagas-sse";
@@ -100,8 +101,9 @@ function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
   };
 }
 
-export async function createVisita(req: Request, res: Response) {
+export async function createVisita(c: Context<AppEnv>): Promise<Response> {
   try {
+    const body = await c.req.json();
     const {
       contatoId: rawContatoId,
       sessaoId: rawSessaoId,
@@ -110,7 +112,7 @@ export async function createVisita(req: Request, res: Response) {
       amountCents: rawAmountCents,
       formaPagamento: rawFormaPagamento,
       observacoes
-    } = req.body as {
+    } = body as {
       contatoId?: unknown;
       sessaoId?: unknown;
       colaboradorId?: unknown;
@@ -122,7 +124,7 @@ export async function createVisita(req: Request, res: Response) {
 
     const contatoId = Number(rawContatoId);
     if (!Number.isInteger(contatoId) || contatoId <= 0) {
-      return res.status(400).json({ message: "contatoId inválido." });
+      return c.json({ message: "contatoId inválido." }, 400);
     }
 
     // sessaoId é opcional. Se vier, precisa ser inteiro positivo — a FK
@@ -131,7 +133,7 @@ export async function createVisita(req: Request, res: Response) {
     if (rawSessaoId !== undefined && rawSessaoId !== null && rawSessaoId !== "") {
       const parsed = Number(rawSessaoId);
       if (!Number.isInteger(parsed) || parsed <= 0) {
-        return res.status(400).json({ message: "sessaoId inválido." });
+        return c.json({ message: "sessaoId inválido." }, 400);
       }
       sessaoId = parsed;
     }
@@ -140,19 +142,19 @@ export async function createVisita(req: Request, res: Response) {
     if (rawColaboradorId !== undefined && rawColaboradorId !== null && rawColaboradorId !== "") {
       const parsed = Number(rawColaboradorId);
       if (!Number.isInteger(parsed) || parsed <= 0) {
-        return res.status(400).json({ message: "colaboradorId inválido." });
+        return c.json({ message: "colaboradorId inválido." }, 400);
       }
       colaboradorId = parsed;
     }
 
     const dataParsed = parseVisitaDate(rawDataVisita);
-    if (!dataParsed.ok) return res.status(400).json({ message: dataParsed.error });
+    if (!dataParsed.ok) return c.json({ message: dataParsed.error }, 400);
 
     const formaParsed = parseFormaPagamento(rawFormaPagamento);
-    if (!formaParsed.ok) return res.status(400).json({ message: formaParsed.error });
+    if (!formaParsed.ok) return c.json({ message: formaParsed.error }, 400);
 
     const amountParsed = parseVisitaAmount(rawAmountCents, formaParsed.value);
-    if (!amountParsed.ok) return res.status(400).json({ message: amountParsed.error });
+    if (!amountParsed.ok) return c.json({ message: amountParsed.error }, 400);
 
     const observacoesValue =
       typeof observacoes === "string" && observacoes.trim().length > 0
@@ -191,39 +193,40 @@ export async function createVisita(req: Request, res: Response) {
       // contato_id em corujao_visitas tem onDelete:cascade, mas inserir
       // contra contatoId inexistente já dispara 23503 no INSERT. Este
       // branch é defesa em profundidade caso a transação seja alterada.
-      return res.status(404).json({ message: "Contato não encontrado." });
+      return c.json({ message: "Contato não encontrado." }, 404);
     }
 
     broadcast().catch(() => {});
 
-    return res.status(201).json({
+    return c.json({
       visita: serializeVisita(result.visita!),
       contato: serializeContato(result.contato)
-    });
+    }, 201);
   } catch (error: unknown) {
     const pgError = error as { code?: string; constraint_name?: string };
     if (pgError.code === "23503") {
       const constraint = pgError.constraint_name ?? "";
       if (constraint.includes("sessao")) {
-        return res.status(404).json({ message: "Sessão não encontrada." });
+        return c.json({ message: "Sessão não encontrada." }, 404);
       }
       if (constraint.includes("colaborador")) {
-        return res.status(404).json({ message: "Colaborador não encontrado." });
+        return c.json({ message: "Colaborador não encontrado." }, 404);
       }
-      return res.status(404).json({ message: "Contato não encontrado." });
+      return c.json({ message: "Contato não encontrado." }, 404);
     }
     console.error("[corujao] createVisita error:", error);
-    return res.status(500).json({ message: "Erro ao registrar visita." });
+    return c.json({ message: "Erro ao registrar visita." }, 500);
   }
 }
 
-export async function updateVisita(req: Request, res: Response) {
+export async function updateVisita(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
+    const body = await c.req.json();
     const {
       sessaoId: rawSessaoId,
       colaboradorId: rawColaboradorId,
@@ -231,7 +234,7 @@ export async function updateVisita(req: Request, res: Response) {
       amountCents: rawAmountCents,
       formaPagamento: rawFormaPagamento,
       observacoes
-    } = req.body as {
+    } = body as {
       sessaoId?: unknown;
       colaboradorId?: unknown;
       dataVisita?: unknown;
@@ -250,7 +253,7 @@ export async function updateVisita(req: Request, res: Response) {
       } else {
         const parsed = Number(rawSessaoId);
         if (!Number.isInteger(parsed) || parsed <= 0) {
-          return res.status(400).json({ message: "sessaoId inválido." });
+          return c.json({ message: "sessaoId inválido." }, 400);
         }
         updates.sessaoId = parsed;
       }
@@ -262,7 +265,7 @@ export async function updateVisita(req: Request, res: Response) {
       } else {
         const parsed = Number(rawColaboradorId);
         if (!Number.isInteger(parsed) || parsed <= 0) {
-          return res.status(400).json({ message: "colaboradorId inválido." });
+          return c.json({ message: "colaboradorId inválido." }, 400);
         }
         updates.colaboradorId = parsed;
       }
@@ -270,13 +273,13 @@ export async function updateVisita(req: Request, res: Response) {
 
     if (rawDataVisita !== undefined) {
       const parsed = parseVisitaDate(rawDataVisita);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.dataVisita = parsed.value;
     }
 
     if (rawFormaPagamento !== undefined) {
       const parsed = parseFormaPagamento(rawFormaPagamento);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.formaPagamento = parsed.value;
     }
 
@@ -290,7 +293,7 @@ export async function updateVisita(req: Request, res: Response) {
         rawAmountCents,
         formaFinal ?? "pix" // fallback inócuo: se for 0+forma!=cortesia, rejeita.
       );
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.amountCents = parsed.value;
     }
 
@@ -308,30 +311,30 @@ export async function updateVisita(req: Request, res: Response) {
       .where(eq(schema.corujaoVisitas.id, id))
       .returning();
 
-    if (!visita) return res.status(404).json({ message: "Visita não encontrada." });
+    if (!visita) return c.json({ message: "Visita não encontrada." }, 404);
 
-    return res.json({ visita: serializeVisita(visita) });
+    return c.json({ visita: serializeVisita(visita) });
   } catch (error: unknown) {
     const pgError = error as { code?: string; constraint_name?: string };
     if (pgError.code === "23503") {
       const constraint = pgError.constraint_name ?? "";
       if (constraint.includes("sessao")) {
-        return res.status(404).json({ message: "Sessão não encontrada." });
+        return c.json({ message: "Sessão não encontrada." }, 404);
       }
       if (constraint.includes("colaborador")) {
-        return res.status(404).json({ message: "Colaborador não encontrado." });
+        return c.json({ message: "Colaborador não encontrado." }, 404);
       }
     }
     console.error("[corujao] updateVisita error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar visita." });
+    return c.json({ message: "Erro ao atualizar visita." }, 500);
   }
 }
 
-export async function listVisitasBySessao(req: Request, res: Response) {
+export async function listVisitasBySessao(c: Context<AppEnv>): Promise<Response> {
   try {
-    const sessaoId = Number(req.params.id);
+    const sessaoId = Number(c.req.param("id"));
     if (!Number.isInteger(sessaoId) || sessaoId <= 0) {
-      return res.status(400).json({ message: "sessaoId inválido." });
+      return c.json({ message: "sessaoId inválido." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -368,18 +371,18 @@ export async function listVisitasBySessao(req: Request, res: Response) {
       };
     });
 
-    return res.json({ visitas: result });
+    return c.json({ visitas: result });
   } catch (error) {
     console.error("[corujao] listVisitasBySessao error:", error);
-    return res.status(500).json({ message: "Erro ao listar visitas da sessão." });
+    return c.json({ message: "Erro ao listar visitas da sessão." }, 500);
   }
 }
 
-export async function listVisitasByContato(req: Request, res: Response) {
+export async function listVisitasByContato(c: Context<AppEnv>): Promise<Response> {
   try {
-    const contatoId = Number(req.params.id);
+    const contatoId = Number(c.req.param("id"));
     if (!Number.isInteger(contatoId) || contatoId <= 0) {
-      return res.status(400).json({ message: "contatoId inválido." });
+      return c.json({ message: "contatoId inválido." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -389,18 +392,18 @@ export async function listVisitasByContato(req: Request, res: Response) {
       .where(eq(schema.corujaoVisitas.contatoId, contatoId))
       .orderBy(desc(schema.corujaoVisitas.dataVisita), desc(schema.corujaoVisitas.id));
 
-    return res.json({ visitas: rows.map(serializeVisita) });
+    return c.json({ visitas: rows.map(serializeVisita) });
   } catch (error) {
     console.error("[corujao] listVisitasByContato error:", error);
-    return res.status(500).json({ message: "Erro ao listar visitas." });
+    return c.json({ message: "Erro ao listar visitas." }, 500);
   }
 }
 
-export async function deleteVisita(req: Request, res: Response) {
+export async function deleteVisita(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -442,23 +445,23 @@ export async function deleteVisita(req: Request, res: Response) {
     });
 
     if (!result.ok) {
-      return res.status(result.status).json({ message: result.message });
+      return c.json({ message: result.message }, result.status);
     }
 
     if (!result.contato) {
       // Contato sumiu entre o SELECT da visita e o UPDATE — caso degenerado.
-      return res.json({ contato: null, sessaoId: result.sessaoId, visitaDeletadaId: result.visitaDeletadaId });
+      return c.json({ contato: null, sessaoId: result.sessaoId, visitaDeletadaId: result.visitaDeletadaId });
     }
 
     broadcast().catch(() => {});
 
-    return res.json({
+    return c.json({
       contato: serializeContato(result.contato),
       sessaoId: result.sessaoId,
       visitaDeletadaId: result.visitaDeletadaId
     });
   } catch (error) {
     console.error("[corujao] deleteVisita error:", error);
-    return res.status(500).json({ message: "Erro ao cancelar visita." });
+    return c.json({ message: "Erro ao cancelar visita." }, 500);
   }
 }

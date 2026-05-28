@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import { VctInscricao } from "../models/VctInscricao";
 import { VctTime } from "../models/VctTime";
 import {
@@ -40,13 +41,13 @@ function getSingleTextValue(value: unknown): string {
   return "";
 }
 
-function getModalidadeFromRequest(req: Request) {
-  return normalizeModalidade(getSingleTextValue(req.query?.modalidade ?? req.body?.modalidade));
+function getModalidadeFromContext(c: Context<AppEnv>, body?: Record<string, unknown>) {
+  return normalizeModalidade(
+    getSingleTextValue(c.req.query("modalidade") ?? body?.modalidade)
+  );
 }
 
-function getModalidadeFilter(req: Request) {
-  const modalidade = getModalidadeFromRequest(req);
-
+function getModalidadeFilter(modalidade: Modalidade) {
   if (modalidade === "valorant") {
     return {
       $or: [
@@ -368,8 +369,9 @@ async function fetchWithNodeFallback(endpoint: string, apiKey: string | undefine
   }
 }
 
-export async function criarInscricao(req: Request, res: Response) {
-  const modalidade = getModalidadeFromRequest(req);
+export async function criarInscricao(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
+  const modalidade = getModalidadeFromContext(c, body);
   const {
     nome,
     nick,
@@ -401,24 +403,21 @@ export async function criarInscricao(req: Request, res: Response) {
     valorantCardWide,
     valorantCurrentRank,
     valorantPeakRank,
-  } = req.body;
+  } = body;
 
   for (const field of CREATE_REQUIRED_INSCRICAO_FIELDS) {
-    const value = req.body[field];
+    const value = body[field];
     if (typeof value !== "string" || value.trim() === "") {
-      res.status(400).json({ ok: false, message: "Todos os campos são obrigatórios." });
-      return;
+      return c.json({ ok: false, message: "Todos os campos são obrigatórios." }, 400);
     }
   }
 
   if (getEloScore(elo.trim(), modalidade) < 0 || getEloScore(pico.trim(), modalidade) < 0) {
-    res.status(400).json({ ok: false, message: "Elo inválido." });
-    return;
+    return c.json({ ok: false, message: "Elo inválido." }, 400);
   }
 
   if (isPicoBelowElo(elo.trim(), pico.trim(), modalidade)) {
-    res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
-    return;
+    return c.json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." }, 400);
   }
 
   try {
@@ -457,29 +456,29 @@ export async function criarInscricao(req: Request, res: Response) {
       status: VCT_INSCRICAO_STATUS.ACTIVE,
     });
     await inscricao.save();
-    res.status(201).json({ ok: true, message: "Inscrição realizada com sucesso.", id: inscricao._id });
+    return c.json({ ok: true, message: "Inscrição realizada com sucesso.", id: inscricao._id }, 201);
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error && (error as { code: number }).code === 11000) {
       const key = Object.keys((error as { keyPattern?: Record<string, unknown> }).keyPattern ?? {})[0];
       const label = key ? CAMPO_LABEL[key] ?? key : "Campo";
-      res.status(409).json({ ok: false, message: `${label} já cadastrado.` });
-      return;
+      return c.json({ ok: false, message: `${label} já cadastrado.` }, 409);
     }
     throw error;
   }
 }
 
-export async function listarInscricoes(req: Request, res: Response) {
-  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).sort({ createdAt: -1 }).lean();
-  res.json({ ok: true, inscricoes });
+export async function listarInscricoes(c: Context<AppEnv>): Promise<Response> {
+  const modalidade = getModalidadeFromContext(c);
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(modalidade)).sort({ createdAt: -1 }).lean();
+  return c.json({ ok: true, inscricoes });
 }
 
-export async function buscarContaValorant(req: Request, res: Response) {
-  const riotId = parseRiotId(req.body.riotId);
+export async function buscarContaValorant(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
+  const riotId = parseRiotId(body.riotId);
 
   if (!riotId) {
-    res.status(400).json({ ok: false, message: "Informe o Riot ID no formato Nome#TAG." });
-    return;
+    return c.json({ ok: false, message: "Informe o Riot ID no formato Nome#TAG." }, 400);
   }
 
   const endpoint = `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(riotId.name)}/${encodeURIComponent(riotId.tag)}`;
@@ -493,11 +492,10 @@ export async function buscarContaValorant(req: Request, res: Response) {
     henrikResponse = await fetchWithNodeFallback(endpoint, apiKey);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida.";
-    res.status(502).json({
+    return c.json({
       ok: false,
       message: `Nao foi possivel conectar na HenrikDev agora. ${message}`,
-    });
-    return;
+    }, 502);
   }
 
   if (!henrikResponse.ok || !henrikResponse.payload?.data) {
@@ -506,13 +504,12 @@ export async function buscarContaValorant(req: Request, res: Response) {
       (henrikResponse.status >= 500
         ? "HenrikDev indisponivel no momento."
         : "Nao foi possivel encontrar essa conta na HenrikDev.");
-    res.status(henrikResponse.ok ? 404 : henrikResponse.status).json({ ok: false, message });
-    return;
+    return c.json({ ok: false, message }, henrikResponse.ok ? 404 : henrikResponse.status as any);
   }
 
   const account = henrikResponse.payload.data;
 
-  res.json({
+  return c.json({
     ok: true,
     account: {
       riotName: account.name || riotId.name,
@@ -525,25 +522,25 @@ export async function buscarContaValorant(req: Request, res: Response) {
   });
 }
 
-export async function atualizarInscricao(req: Request, res: Response) {
-  const { id } = req.params;
-  const modalidade = getModalidadeFromRequest(req);
+export async function atualizarInscricao(c: Context<AppEnv>): Promise<Response> {
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const modalidade = getModalidadeFromContext(c, body);
   const update: Record<string, unknown> = {};
 
   for (const field of REQUIRED_EDIT_INSCRICAO_FIELDS) {
-    const value = req.body[field];
+    const value = body[field];
     if (typeof value !== "string" || value.trim() === "") {
-      res.status(400).json({ ok: false, message: "Todos os campos principais sao obrigatorios." });
-      return;
+      return c.json({ ok: false, message: "Todos os campos principais sao obrigatorios." }, 400);
     }
     update[field] = value.trim();
   }
 
   update.email = String(update.email).toLowerCase();
   update.modalidade = modalidade;
-  if (typeof req.body.instagram === "string") update.instagram = req.body.instagram.trim();
+  if (typeof body.instagram === "string") update.instagram = body.instagram.trim();
   for (const field of OPTIONAL_INSCRICAO_FIELDS) {
-    const value = req.body[field];
+    const value = body[field];
     if (field === "cidade") {
       if (typeof value === "string") update[field] = value.trim();
       continue;
@@ -564,19 +561,17 @@ export async function atualizarInscricao(req: Request, res: Response) {
       update[field] = value.trim();
     }
   }
-  update.tags = normalizeTags(req.body.tags);
-  update.observacoes = typeof req.body.observacoes === "string" ? req.body.observacoes.trim() : "";
-  update.highlightColor = typeof req.body.highlightColor === "string" ? req.body.highlightColor.trim() : "";
-  update.status = normalizeStatusField(getSingleTextValue(req.body.status));
+  update.tags = normalizeTags(body.tags);
+  update.observacoes = typeof body.observacoes === "string" ? body.observacoes.trim() : "";
+  update.highlightColor = typeof body.highlightColor === "string" ? body.highlightColor.trim() : "";
+  update.status = normalizeStatusField(getSingleTextValue(body.status));
 
   if (getEloScore(String(update.elo), modalidade) < 0 || getEloScore(String(update.pico), modalidade) < 0) {
-    res.status(400).json({ ok: false, message: "Elo inválido." });
-    return;
+    return c.json({ ok: false, message: "Elo inválido." }, 400);
   }
 
   if (isPicoBelowElo(String(update.elo), String(update.pico), modalidade)) {
-    res.status(400).json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." });
-    return;
+    return c.json({ ok: false, message: "O pico de elo não pode ser menor que o elo atual." }, 400);
   }
 
   try {
@@ -585,52 +580,48 @@ export async function atualizarInscricao(req: Request, res: Response) {
     }).lean();
 
     if (!inscricao) {
-      res.status(404).json({ ok: false, message: "Inscricao nao encontrada." });
-      return;
+      return c.json({ ok: false, message: "Inscricao nao encontrada." }, 404);
     }
 
-    res.json({ ok: true, inscricao });
+    return c.json({ ok: true, inscricao });
   } catch (error: unknown) {
     const duplicateMessage = duplicateFieldMessage(error);
     if (duplicateMessage) {
-      res.status(409).json({ ok: false, message: duplicateMessage });
-      return;
+      return c.json({ ok: false, message: duplicateMessage }, 409);
     }
     throw error;
   }
 }
 
-export async function removerInscricao(req: Request, res: Response) {
-  const { id } = req.params;
+export async function removerInscricao(c: Context<AppEnv>): Promise<Response> {
+  const id = c.req.param("id");
   const inscricao = await VctInscricao.findByIdAndDelete(id).lean();
 
   if (!inscricao) {
-    res.status(404).json({ ok: false, message: "Inscricao nao encontrada." });
-    return;
+    return c.json({ ok: false, message: "Inscricao nao encontrada." }, 404);
   }
 
-  res.json({ ok: true, removida: id });
+  return c.json({ ok: true, removida: id });
 }
 
-export async function atualizarTime(req: Request, res: Response) {
-  const { id } = req.params;
-  const { time } = req.body;
+export async function atualizarTime(c: Context<AppEnv>): Promise<Response> {
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { time } = body;
 
   if (time !== null && (typeof time !== "number" || !isValidTeamNumber(time))) {
-    res.status(400).json({
+    return c.json({
       ok: false,
       message: "Time inválido. Use um número inteiro positivo ou null.",
-    });
-    return;
+    }, 400);
   }
 
   const inscricao = await VctInscricao.findByIdAndUpdate(id, { time }, { new: true }).lean();
   if (!inscricao) {
-    res.status(404).json({ ok: false, message: "Inscrição não encontrada." });
-    return;
+    return c.json({ ok: false, message: "Inscrição não encontrada." }, 404);
   }
 
-  res.json({ ok: true, inscricao });
+  return c.json({ ok: true, inscricao });
 }
 
 function normalizeIdList(value: unknown) {
@@ -650,20 +641,20 @@ async function atualizarStatusInterno(ids: string[], status: VctInscricaoStatus)
   return VctInscricao.updateMany({ _id: { $in: ids } }, update);
 }
 
-export async function atualizarStatusInscricao(req: Request, res: Response) {
-  const id = getSingleTextValue(req.params.id);
+export async function atualizarStatusInscricao(c: Context<AppEnv>): Promise<Response> {
+  const id = getSingleTextValue(c.req.param("id"));
   if (!id) {
-    res.status(400).json({ ok: false, message: "Inscricao invalida." });
-    return;
+    return c.json({ ok: false, message: "Inscricao invalida." }, 400);
   }
-  const rawStatus = req.body.status;
+  const body = await c.req.json();
+  const rawStatus = body.status;
   const result = await atualizarStatusInterno(
     [id],
     rawStatus === VCT_INSCRICAO_STATUS.INACTIVE
       ? VCT_INSCRICAO_STATUS.INACTIVE
       : VCT_INSCRICAO_STATUS.ACTIVE,
   );
-  res.json({
+  return c.json({
     ok: true,
     atualizados: result.modifiedCount ?? 0,
     status:
@@ -673,39 +664,39 @@ export async function atualizarStatusInscricao(req: Request, res: Response) {
   });
 }
 
-export async function atualizarStatusInscricoes(req: Request, res: Response) {
-  const ids = normalizeIdList(req.body.ids);
+export async function atualizarStatusInscricoes(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
+  const ids = normalizeIdList(body.ids);
   if (ids.length === 0) {
-    res.status(400).json({ ok: false, message: "Selecione pelo menos uma inscrição." });
-    return;
+    return c.json({ ok: false, message: "Selecione pelo menos uma inscrição." }, 400);
   }
 
-  const rawStatus = req.body.status;
+  const rawStatus = body.status;
   const status =
     rawStatus === VCT_INSCRICAO_STATUS.INACTIVE
       ? VCT_INSCRICAO_STATUS.INACTIVE
       : VCT_INSCRICAO_STATUS.ACTIVE;
   const result = await atualizarStatusInterno(ids, status);
-  res.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
+  return c.json({ ok: true, atualizados: result.modifiedCount ?? 0, status });
 }
 
-export async function listarTimes(req: Request, res: Response) {
-  const times = await VctTime.find(getModalidadeFilter(req)).sort({ numero: 1 }).lean();
-  res.json({ ok: true, times });
+export async function listarTimes(c: Context<AppEnv>): Promise<Response> {
+  const modalidade = getModalidadeFromContext(c);
+  const times = await VctTime.find(getModalidadeFilter(modalidade)).sort({ numero: 1 }).lean();
+  return c.json({ ok: true, times });
 }
 
-export async function atualizarNomeTime(req: Request, res: Response) {
-  const modalidade = getModalidadeFromRequest(req);
-  const numero = Number(req.params.numero);
-  const { nome } = req.body;
+export async function atualizarNomeTime(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
+  const modalidade = getModalidadeFromContext(c, body);
+  const numero = Number(c.req.param("numero"));
+  const { nome } = body;
 
   if (!isValidTeamNumber(numero)) {
-    res.status(400).json({ ok: false, message: "Número do time inválido." });
-    return;
+    return c.json({ ok: false, message: "Número do time inválido." }, 400);
   }
   if (typeof nome !== "string") {
-    res.status(400).json({ ok: false, message: "Nome inválido." });
-    return;
+    return c.json({ ok: false, message: "Nome inválido." }, 400);
   }
 
   const time = await VctTime.findOneAndUpdate(
@@ -714,27 +705,27 @@ export async function atualizarNomeTime(req: Request, res: Response) {
     { new: true, upsert: true, setDefaultsOnInsert: true },
   ).lean();
 
-  res.json({ ok: true, time });
+  return c.json({ ok: true, time });
 }
 
-export async function preencherTime(req: Request, res: Response) {
+export async function preencherTime(c: Context<AppEnv>): Promise<Response> {
   const TIME_CAP = 5;
 
-  const numero = Number(req.params.numero);
+  const numero = Number(c.req.param("numero"));
   if (!isValidTeamNumber(numero)) {
-    res.status(400).json({ ok: false, message: "Número do time inválido." });
-    return;
+    return c.json({ ok: false, message: "Número do time inválido." }, 400);
   }
 
-  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).lean();
+  const body = await c.req.json().catch(() => ({}));
+  const modalidade = getModalidadeFromContext(c, body);
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(modalidade)).lean();
   const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
-  const filters = getFormationFiltersFromBody(req.body) as VctFormationFilters;
+  const filters = getFormationFiltersFromBody(body) as VctFormationFilters;
   const team = buildTeamState(jogadores, numero);
   const { vacancies } = team;
 
   if (vacancies <= 0) {
-    res.json({ ok: true, atribuidos: 0, message: "Time já está cheio." });
-    return;
+    return c.json({ ok: true, atribuidos: 0, message: "Time já está cheio." });
   }
 
   const unassigned = jogadores.filter((i) => i.time === null || i.time === undefined);
@@ -764,54 +755,54 @@ export async function preencherTime(req: Request, res: Response) {
     );
   }
 
-  res.json({ ok: true, atribuidos: chosen.length });
+  return c.json({ ok: true, atribuidos: chosen.length });
 }
 
-export async function limparTime(req: Request, res: Response) {
-  const modalidade = getModalidadeFromRequest(req);
-  const numero = Number(req.params.numero);
+export async function limparTime(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json().catch(() => ({}));
+  const modalidade = getModalidadeFromContext(c, body);
+  const numero = Number(c.req.param("numero"));
   if (!isValidTeamNumber(numero)) {
-    res.status(400).json({ ok: false, message: "Número do time inválido." });
-    return;
+    return c.json({ ok: false, message: "Número do time inválido." }, 400);
   }
 
   const result = await VctInscricao.updateMany({ modalidade, time: numero }, { time: null });
-  res.json({ ok: true, removidos: result.modifiedCount });
+  return c.json({ ok: true, removidos: result.modifiedCount });
 }
 
-export async function removerTime(req: Request, res: Response) {
-  const modalidade = getModalidadeFromRequest(req);
-  const numero = Number(req.params.numero);
+export async function removerTime(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json().catch(() => ({}));
+  const modalidade = getModalidadeFromContext(c, body);
+  const numero = Number(c.req.param("numero"));
 
   if (!isValidTeamNumber(numero)) {
-    res.status(400).json({ ok: false, message: "Número do time inválido." });
-    return;
+    return c.json({ ok: false, message: "Número do time inválido." }, 400);
   }
 
   const occupied = await VctInscricao.exists({ modalidade, time: numero });
   if (occupied) {
-    res.status(409).json({
+    return c.json({
       ok: false,
       message: "Limpe o time antes de removê-lo.",
-    });
-    return;
+    }, 409);
   }
 
   const result = await VctTime.findOneAndDelete({ modalidade, numero }).lean();
 
   if (!result) {
-    res.status(404).json({ ok: false, message: "Time não encontrado." });
-    return;
+    return c.json({ ok: false, message: "Time não encontrado." }, 404);
   }
 
-  res.json({ ok: true, removido: numero });
+  return c.json({ ok: true, removido: numero });
 }
 
-export async function atribuirTimesAutomatico(req: Request, res: Response) {
+export async function atribuirTimesAutomatico(c: Context<AppEnv>): Promise<Response> {
   const TIME_CAP = 5;
-  const teamFilters = getFormationFiltersByTeamFromBody(req.body);
+  const body = await c.req.json().catch(() => ({}));
+  const teamFilters = getFormationFiltersByTeamFromBody(body);
+  const modalidade = getModalidadeFromContext(c, body);
 
-  const inscricoes = await VctInscricao.find(getModalidadeFilter(req)).lean();
+  const inscricoes = await VctInscricao.find(getModalidadeFilter(modalidade)).lean();
   const jogadores = (inscricoes as unknown as Array<VctInscricaoLike & { status?: unknown }>).filter(isActiveInscricao);
   const hasSoftFilters = Object.values(teamFilters).some(
     (filters) => filters.sameTrainingDays || filters.sameAvailability,
@@ -832,7 +823,7 @@ export async function atribuirTimesAutomatico(req: Request, res: Response) {
       knownTimes.add(player.time);
     }
   }
-  for (const time of await VctTime.find(getModalidadeFilter(req)).select("numero").lean()) {
+  for (const time of await VctTime.find(getModalidadeFilter(modalidade)).select("numero").lean()) {
     if (isValidTeamNumber(time.numero)) {
       knownTimes.add(time.numero);
     }
@@ -877,5 +868,5 @@ export async function atribuirTimesAutomatico(req: Request, res: Response) {
     );
   }
 
-  res.json({ ok: true, atribuidos: assignments.length });
+  return c.json({ ok: true, atribuidos: assignments.length });
 }

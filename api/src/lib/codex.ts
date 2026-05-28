@@ -6,10 +6,10 @@ import { spawn } from "node:child_process";
 import readline from "node:readline";
 import type { IncomingMessage } from "node:http";
 import type { AddressInfo, Server as HttpServer } from "node:net";
-import { verifySessionToken } from "./session-token";
+import type { ServerWebSocket } from "bun";
 import WebSocket, { WebSocketServer } from "ws";
 
-import type { AuthUserPayload } from "../types/express";
+import type { AuthUserPayload } from "../types/hono";
 import { type ICodexThreadSession, CodexThreadSession } from "../models/CodexThreadSession";
 import {
   buildCodexAgentRuntimeState,
@@ -1554,6 +1554,603 @@ function createSystemTimelineEntry(
     turnId,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Bun native WebSocket transport
+// ---------------------------------------------------------------------------
+
+export type CodexWsData = {
+  userId: string;
+  username: string;
+  email: string | null;
+  role: "user" | "admin";
+};
+
+/**
+ * Envia um evento JSON para um ServerWebSocket do Bun.
+ */
+function sendBunWsEvent(ws: ServerWebSocket<CodexWsData>, payload: Record<string, unknown>) {
+  try {
+    ws.send(JSON.stringify(payload));
+  } catch {
+    // socket pode ter fechado
+  }
+}
+
+/**
+ * Chamado pelo Bun.serve() websocket.open.
+ * Equivalente ao wss.on('connection', ...) da implementação anterior.
+ */
+export async function codexWsOpen(ws: ServerWebSocket<CodexWsData>): Promise<void> {
+  const user: AuthUserPayload = {
+    id: ws.data.userId,
+    username: ws.data.username,
+    email: ws.data.email,
+    role: ws.data.role,
+  };
+
+  if (isCodexExecWorkflowEnabled()) {
+    // --- Exec workflow ---
+    let socketClosed = false;
+    const pendingConfirmations = new Map<
+      string,
+      { threadId: string | null; prompt: string; context?: { pathname?: string | null } }
+    >();
+
+    // Armazena estado por ws usando uma WeakMap
+    execWsState.set(ws, { user, currentThreadId: null, socketClosed, pendingConfirmations });
+
+    ws.subscribe("close");
+
+    void (async () => {
+      const accessState = await resolveCodexAccessState(user.id);
+
+      if (!accessState.codexAccessTokenActive) {
+        sendBunWsEvent(ws, {
+          type: "error",
+          message:
+            accessState.codexAccessBlockedReason ??
+            "Crie um token de acesso do Codex nas configuracoes do admin.",
+        });
+        ws.close();
+        return;
+      }
+
+      const account = await getCodexAccountStatus();
+
+      const state = execWsState.get(ws);
+      if (!state || state.socketClosed) return;
+
+      sendBunWsEvent(ws, {
+        type: "ready",
+        ...buildCodexAgentRuntimeState(resolveWorkspaceRoot(), "exec"),
+      });
+
+      sendBunWsEvent(ws, {
+        type: "accountUpdated",
+        account: { ...account, ...accessState },
+      });
+    })().catch((error) => {
+      sendBunWsEvent(ws, {
+        type: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel conectar ao Codex.",
+      });
+      ws.close();
+    });
+  } else {
+    // --- App-server workflow ---
+    const codexClient = new CodexAppServerClient();
+    let currentThreadId: string | null = null;
+    let currentTurnId: string | null = null;
+    let fallbackTurnId = createCodexFallbackTurnId("app-turn");
+    let socketClosed = false;
+    const pendingConfirmations = new Map<
+      string,
+      { threadId: string | null; prompt: string; context?: { pathname?: string | null } }
+    >();
+
+    appWsState.set(ws, {
+      user,
+      codexClient,
+      currentThreadId,
+      currentTurnId,
+      fallbackTurnId,
+      socketClosed,
+      pendingConfirmations,
+    });
+
+    console.info("[codex-gateway] browser socket connected", { userId: user.id, role: user.role });
+
+    void (async () => {
+      console.info("[codex-gateway] resolving access state", { userId: user.id });
+      const accessState = await resolveCodexAccessState(user.id);
+
+      if (!accessState.codexAccessTokenActive) {
+        console.info("[codex-gateway] access blocked", {
+          userId: user.id,
+          reason: accessState.codexAccessBlockedReason ?? null,
+        });
+        sendBunWsEvent(ws, {
+          type: "error",
+          message:
+            accessState.codexAccessBlockedReason ??
+            "Crie um token de acesso do Codex nas configuracoes do admin.",
+        });
+        ws.close();
+        return;
+      }
+
+      console.info("[codex-gateway] connecting codex client", { userId: user.id });
+      await codexClient.connect();
+
+      const state = appWsState.get(ws);
+      if (!state || state.socketClosed) {
+        console.info("[codex-gateway] browser socket already closed after codex connect", { userId: user.id });
+        codexClient.close();
+        return;
+      }
+
+      sendBunWsEvent(ws, {
+        type: "ready",
+        ...buildCodexAgentRuntimeState(resolveWorkspaceRoot(), "workspace-write"),
+      });
+
+      codexClient.onNotification(async ({ method, params }) => {
+        try {
+          const st = appWsState.get(ws);
+          if (!st) return;
+          console.info("[codex-gateway] codex notification", { userId: user.id, method });
+          switch (method) {
+            case "account/login/completed": {
+              sendBunWsEvent(ws, {
+                type: "deviceLoginCompleted",
+                loginId: params.loginId ?? null,
+                success: Boolean(params.success),
+                error: params.error ?? null,
+              });
+              break;
+            }
+            case "account/updated": {
+              const status = await getCodexAccountStatus();
+              const nextAccessState = await resolveCodexAccessState(user.id);
+              sendBunWsEvent(ws, {
+                type: "accountUpdated",
+                account: { ...status, ...nextAccessState },
+              });
+              break;
+            }
+            case "thread/started": {
+              const thread = params.thread as CodexThread | undefined;
+              if (thread) {
+                await syncThreadOwnership(user.id, thread);
+                st.currentThreadId = thread.id;
+                sendBunWsEvent(ws, { type: "threadCreated", thread: summarizeThread(thread) });
+              }
+              break;
+            }
+            case "turn/started": {
+              const turn = params.turn as CodexTurn | undefined;
+              st.currentThreadId = typeof params.threadId === "string" ? params.threadId : st.currentThreadId;
+              st.fallbackTurnId = createCodexFallbackTurnId("app-turn");
+              st.currentTurnId = turn?.id ?? st.fallbackTurnId;
+              sendBunWsEvent(ws, { type: "turnStarted", threadId: params.threadId ?? null, turnId: st.currentTurnId });
+              break;
+            }
+            case "turn/completed": {
+              const turn = params.turn as CodexTurn | undefined;
+              const completedTurnId = turn?.id ?? st.currentTurnId ?? st.fallbackTurnId;
+              sendBunWsEvent(ws, {
+                type: "turnCompleted",
+                threadId: params.threadId ?? null,
+                turnId: completedTurnId,
+                status: turn?.status ?? "completed",
+              });
+              st.currentTurnId = null;
+              break;
+            }
+            case "item/autoApprovalReview/completed": {
+              const threadId = typeof params.threadId === "string" ? params.threadId : st.currentThreadId;
+              const turnId = resolveCodexTurnId(params.turnId, st.currentTurnId, st.fallbackTurnId);
+              const status = typeof params.status === "string" ? params.status : "completed";
+              sendBunWsEvent(ws, {
+                type: "autoApproval",
+                threadId,
+                entry: createSystemTimelineEntry(`auto-approval:${turnId}:${Date.now()}`, turnId, "Autoaprovacao concluida para a etapa atual.", status),
+              });
+              break;
+            }
+            case "serverRequest/resolved": {
+              const threadId = typeof params.threadId === "string" ? params.threadId : st.currentThreadId;
+              const requestId =
+                typeof params.requestId === "string" || typeof params.requestId === "number"
+                  ? String(params.requestId)
+                  : `request-${Date.now()}`;
+              sendBunWsEvent(ws, {
+                type: "autoApproval",
+                threadId,
+                entry: createSystemTimelineEntry(`approval-request:${requestId}`, "approvals", "Aprovacao automatica respondida pelo gateway do Codex.", "completed"),
+              });
+              break;
+            }
+            case "item/agentMessage/delta": {
+              const turnId = resolveCodexTurnId(params.turnId, st.currentTurnId, st.fallbackTurnId);
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
+              sendBunWsEvent(ws, {
+                type: "assistantDelta",
+                threadId: params.threadId ?? st.currentThreadId,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
+                delta: params.delta ?? "",
+              });
+              break;
+            }
+            case "item/commandExecution/outputDelta": {
+              const turnId = resolveCodexTurnId(params.turnId, st.currentTurnId, st.fallbackTurnId);
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
+              sendBunWsEvent(ws, {
+                type: "commandOutputDelta",
+                threadId: params.threadId ?? st.currentThreadId,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
+                delta: params.delta ?? "",
+              });
+              break;
+            }
+            case "item/fileChange/patchUpdated": {
+              const turnId = resolveCodexTurnId(params.turnId, st.currentTurnId, st.fallbackTurnId);
+              const itemId = typeof params.itemId === "string" ? params.itemId : null;
+              sendBunWsEvent(ws, {
+                type: "filePatchUpdated",
+                threadId: params.threadId ?? st.currentThreadId,
+                turnId,
+                itemId: itemId ? buildCodexTimelineEntryId(turnId, itemId) : null,
+                changes: params.changes ?? [],
+              });
+              break;
+            }
+            case "item/completed": {
+              const threadId = typeof params.threadId === "string" ? params.threadId : st.currentThreadId;
+              const turnId = resolveCodexTurnId(params.turnId, st.currentTurnId, st.fallbackTurnId);
+              const item = params.item as CodexThreadItem | undefined;
+              if (!item) break;
+              const entry =
+                serializeTimelineItem(turnId, item) ??
+                createSystemTimelineEntry(item.id, turnId, `Item concluido: ${item.type}.`, "completed");
+              sendBunWsEvent(ws, { type: "itemCompleted", threadId, entry });
+              break;
+            }
+            case "error": {
+              sendBunWsEvent(ws, { type: "error", message: (params.message as string | undefined) || "Falha na sessao Codex." });
+              break;
+            }
+            case "warning":
+            case "guardianWarning": {
+              sendBunWsEvent(ws, { type: "error", message: (params.message as string | undefined) || "O Codex reportou um aviso durante a execucao." });
+              break;
+            }
+            default:
+              break;
+          }
+        } catch (error) {
+          sendBunWsEvent(ws, {
+            type: "error",
+            message: error instanceof Error ? error.message : "Falha ao processar evento do Codex.",
+          });
+        }
+      });
+    })().catch((error) => {
+      console.error("[codex-gateway] failed to connect codex", { userId: user.id, error });
+      sendBunWsEvent(ws, {
+        type: "error",
+        message: error instanceof Error ? error.message : "Nao foi possivel conectar ao Codex.",
+      });
+      ws.close();
+    });
+  }
+}
+
+type ExecWsStateEntry = {
+  user: AuthUserPayload;
+  currentThreadId: string | null;
+  socketClosed: boolean;
+  pendingConfirmations: Map<string, { threadId: string | null; prompt: string; context?: { pathname?: string | null } }>;
+};
+
+type AppWsStateEntry = {
+  user: AuthUserPayload;
+  codexClient: CodexAppServerClient;
+  currentThreadId: string | null;
+  currentTurnId: string | null;
+  fallbackTurnId: string;
+  socketClosed: boolean;
+  pendingConfirmations: Map<string, { threadId: string | null; prompt: string; context?: { pathname?: string | null } }>;
+};
+
+const execWsState = new WeakMap<ServerWebSocket<CodexWsData>, ExecWsStateEntry>();
+const appWsState = new WeakMap<ServerWebSocket<CodexWsData>, AppWsStateEntry>();
+
+/**
+ * Chamado pelo Bun.serve() websocket.message.
+ */
+export async function codexWsMessage(ws: ServerWebSocket<CodexWsData>, message: string | Buffer): Promise<void> {
+  const raw = typeof message === "string" ? message : message.toString();
+
+  try {
+    const payload = JSON.parse(raw) as CodexSocketIncomingMessage;
+
+    if (isCodexExecWorkflowEnabled()) {
+      const state = execWsState.get(ws);
+      if (!state) return;
+      const { user, pendingConfirmations } = state;
+
+      switch (payload.type) {
+        case "startDeviceLogin":
+        case "cancelDeviceLogin": {
+          sendBunWsEvent(ws, { type: "error", message: "O fluxo de login nao e usado no modo exec." });
+          break;
+        }
+        case "loadThread": {
+          const detail = await readCodexThreadForUser(user.id, payload.threadId);
+          state.currentThreadId = payload.threadId;
+          sendBunWsEvent(ws, { type: "threadLoaded", thread: detail.thread, timeline: detail.timeline });
+          break;
+        }
+        case "sendPrompt": {
+          const prompt = payload.prompt.trim();
+          if (!prompt) throw new Error("Prompt vazio.");
+
+          let threadId = payload.threadId?.trim() || null;
+          if (threadId) await ensureOwnedThread(user.id, threadId);
+
+          const collectedEntries: CodexTimelineEntry[] = [];
+          let turnId: string | null = null;
+          const fallbackTurnId = createCodexFallbackTurnId("exec-turn");
+
+          const result = await runCodexExecSession({
+            cwd: resolveWorkspaceRoot(),
+            threadId,
+            delegatedUserId: user.id,
+            prompt: buildCodexOperationalPrompt(prompt, {
+              user: { id: user.id, username: user.username, email: user.email ?? null, role: user.role },
+              pathname: payload.context?.pathname ?? null,
+            }),
+            onJsonLine: (event) => {
+              if (event.type === "thread.started") {
+                const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : null;
+                if (nextThreadId) {
+                  threadId = nextThreadId;
+                  state.currentThreadId = nextThreadId;
+                  if (!payload.threadId) {
+                    sendBunWsEvent(ws, {
+                      type: "threadCreated",
+                      thread: {
+                        id: nextThreadId,
+                        title: prompt.slice(0, 80) || "Nova conversa",
+                        preview: prompt.slice(0, 160) || "Sem resumo ainda.",
+                        updatedAt: Date.now(),
+                        createdAt: Date.now(),
+                        status: "active",
+                        lastOpenedAt: null,
+                      } satisfies CodexThreadSummary,
+                    });
+                  }
+                }
+                return;
+              }
+
+              if (event.type === "turn.started") {
+                const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
+                turnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
+                if (nextThreadId) { threadId = nextThreadId; state.currentThreadId = nextThreadId; }
+                if (!threadId) return;
+                sendBunWsEvent(ws, { type: "turnStarted", threadId, turnId });
+                sendBunWsEvent(ws, { type: "userPromptAccepted", threadId, prompt });
+                const userEntry: CodexTimelineEntry = {
+                  id: `user:${threadId}:${turnId ?? Date.now()}`,
+                  kind: "user",
+                  text: prompt,
+                  status: "completed",
+                  turnId: turnId ?? fallbackTurnId,
+                };
+                collectedEntries.push(userEntry);
+                sendBunWsEvent(ws, { type: "itemCompleted", threadId, entry: userEntry });
+                return;
+              }
+
+              if (event.type === "turn.completed") {
+                const rawThreadId = (event as { thread_id?: unknown }).thread_id;
+                const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                const nextThreadId = typeof rawThreadId === "string" ? rawThreadId : threadId;
+                const completedTurnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
+                if (nextThreadId) { threadId = nextThreadId; state.currentThreadId = nextThreadId; }
+                sendBunWsEvent(ws, { type: "turnCompleted", threadId, turnId: completedTurnId, status: "completed" });
+                return;
+              }
+
+              if (event.type === "item.completed") {
+                const item = event.item as CodexThreadItem | undefined;
+                const rawTurnId = (event as { turn_id?: unknown }).turn_id;
+                const eventTurnId = resolveCodexTurnId(rawTurnId, turnId, fallbackTurnId);
+                if (!item || !threadId) return;
+                const entry = serializeTimelineItem(eventTurnId, item);
+                if (!entry) return;
+                collectedEntries.push(entry);
+                sendBunWsEvent(ws, { type: "itemCompleted", threadId, entry });
+              }
+            },
+          });
+
+          if (!threadId) threadId = result.threadId;
+          if (!threadId) throw new Error("O Codex nao retornou uma thread.");
+
+          const assistantPreviewEntry = [...collectedEntries].reverse().find((e) => e.kind === "assistant");
+          const assistantPreview =
+            assistantPreviewEntry && "text" in assistantPreviewEntry ? assistantPreviewEntry.text : result.message || prompt;
+
+          await upsertThreadSummary(user.id, threadId, {
+            name: payload.threadId ? undefined : prompt.slice(0, 80) || "Nova conversa",
+            preview: assistantPreview.slice(0, 160),
+            status: result.status ?? "completed",
+          });
+          await appendTimelineEntries(user.id, threadId, collectedEntries);
+          state.currentThreadId = threadId;
+          break;
+        }
+        case "confirmPrompt": {
+          const pending = pendingConfirmations.get(payload.requestId);
+          if (!pending) {
+            sendBunWsEvent(ws, { type: "error", message: "Confirmacao nao encontrada." });
+            break;
+          }
+          pendingConfirmations.delete(payload.requestId);
+          if (!payload.accepted) {
+            sendBunWsEvent(ws, { type: "confirmationResolved", requestId: payload.requestId, accepted: false });
+            break;
+          }
+          sendBunWsEvent(ws, { type: "confirmationResolved", requestId: payload.requestId, accepted: true });
+          // Re-enqueue como nova mensagem
+          await codexWsMessage(ws, JSON.stringify({ type: "sendPrompt", threadId: pending.threadId, prompt: pending.prompt, context: pending.context }));
+          break;
+        }
+        case "interrupt": {
+          sendBunWsEvent(ws, { type: "error", message: "Interrupcao nao suportada no modo exec." });
+          break;
+        }
+        default:
+          sendBunWsEvent(ws, { type: "error", message: "Evento desconhecido do drawer Codex." });
+      }
+    } else {
+      // App-server workflow
+      const state = appWsState.get(ws);
+      if (!state) return;
+      const { user, codexClient, pendingConfirmations } = state;
+
+      async function executePrompt(
+        threadIdInput: string | null,
+        prompt: string,
+        context?: { pathname?: string | null },
+      ) {
+        let threadId = threadIdInput?.trim() || null;
+        const operationalPrompt = buildCodexOperationalPrompt(prompt, {
+          user: { id: user.id, username: user.username, email: user.email ?? null, role: user.role },
+          pathname: context?.pathname ?? null,
+        });
+
+        if (threadId) {
+          await ensureOwnedThread(user.id, threadId);
+          await codexClient.request("thread/resume", {
+            threadId,
+            cwd: resolveWorkspaceRoot(),
+            approvalPolicy: "never",
+            sandbox: buildWorkspaceWritePolicy(),
+          });
+        } else {
+          const created = await codexClient.request<{ thread: CodexThread }>("thread/start", {
+            cwd: resolveWorkspaceRoot(),
+            approvalPolicy: "never",
+            sandbox: buildWorkspaceWritePolicy(),
+          });
+          threadId = created.thread.id;
+          state.currentThreadId = threadId;
+          await syncThreadOwnership(user.id, created.thread);
+          sendBunWsEvent(ws, { type: "threadCreated", thread: summarizeThread(created.thread) });
+        }
+
+        await touchThreadOwnership(user.id, threadId);
+        sendBunWsEvent(ws, { type: "userPromptAccepted", threadId, prompt });
+        await codexClient.request("turn/start", {
+          threadId,
+          input: [{ type: "text", text: operationalPrompt }],
+          cwd: resolveWorkspaceRoot(),
+          approvalPolicy: "never",
+          sandboxPolicy: buildWorkspaceWritePolicy(),
+        });
+      }
+
+      switch (payload.type) {
+        case "startDeviceLogin": {
+          const response = await codexClient.request<
+            | { type: "chatgptDeviceCode"; loginId: string; verificationUrl: string; userCode: string }
+            | { type: string }
+          >("account/login/start", { type: "chatgptDeviceCode" });
+          if (response.type !== "chatgptDeviceCode") throw new Error("O Codex nao retornou device code.");
+          const deviceResponse = response as { type: "chatgptDeviceCode"; loginId: string; verificationUrl: string; userCode: string };
+          sendBunWsEvent(ws, { type: "deviceLoginStarted", loginId: deviceResponse.loginId, verificationUrl: deviceResponse.verificationUrl, userCode: deviceResponse.userCode });
+          break;
+        }
+        case "cancelDeviceLogin": {
+          await codexClient.request("account/login/cancel", { loginId: payload.loginId });
+          sendBunWsEvent(ws, { type: "deviceLoginCancelled", loginId: payload.loginId });
+          break;
+        }
+        case "loadThread": {
+          const detail = await loadThreadForSocket(codexClient, user.id, payload.threadId);
+          state.currentThreadId = payload.threadId;
+          sendBunWsEvent(ws, { type: "threadLoaded", thread: detail.thread, timeline: detail.timeline });
+          break;
+        }
+        case "sendPrompt": {
+          const prompt = payload.prompt.trim();
+          if (!prompt) throw new Error("Prompt vazio.");
+          await executePrompt(payload.threadId?.trim() || null, prompt, payload.context);
+          break;
+        }
+        case "confirmPrompt": {
+          const pending = pendingConfirmations.get(payload.requestId);
+          if (!pending) {
+            sendBunWsEvent(ws, { type: "error", message: "Confirmacao nao encontrada." });
+            break;
+          }
+          pendingConfirmations.delete(payload.requestId);
+          if (!payload.accepted) {
+            sendBunWsEvent(ws, { type: "confirmationResolved", requestId: payload.requestId, accepted: false });
+            break;
+          }
+          sendBunWsEvent(ws, { type: "confirmationResolved", requestId: payload.requestId, accepted: true });
+          await executePrompt(pending.threadId, pending.prompt, pending.context);
+          break;
+        }
+        case "interrupt": {
+          await ensureOwnedThread(user.id, payload.threadId);
+          await codexClient.request("turn/interrupt", { threadId: payload.threadId, turnId: payload.turnId });
+          sendBunWsEvent(ws, { type: "turnInterrupted", threadId: payload.threadId, turnId: payload.turnId });
+          break;
+        }
+        default:
+          sendBunWsEvent(ws, { type: "error", message: "Evento desconhecido do drawer Codex." });
+      }
+    }
+  } catch (error) {
+    sendBunWsEvent(ws, {
+      type: "error",
+      message: error instanceof Error ? error.message : "Falha ao processar evento do drawer Codex.",
+    });
+  }
+}
+
+/**
+ * Chamado pelo Bun.serve() websocket.close.
+ */
+export function codexWsClose(ws: ServerWebSocket<CodexWsData>): void {
+  if (isCodexExecWorkflowEnabled()) {
+    const state = execWsState.get(ws);
+    if (state) state.socketClosed = true;
+  } else {
+    const state = appWsState.get(ws);
+    if (state) {
+      state.socketClosed = true;
+      console.info("[codex-gateway] browser socket closed", { userId: state.user.id });
+      state.codexClient.close();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Express/ws transport (mantido para compatibilidade durante migração)
+// ---------------------------------------------------------------------------
 
 export function attachCodexGateway(server: HttpServer) {
   if (isCodexExecWorkflowEnabled()) {

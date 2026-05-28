@@ -1,16 +1,9 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import { AppError } from "../lib/app-error.js";
 
-export function errorHandler(
-  err: Error,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-) {
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({ message: err.message });
-  }
-
+export function errorHandler(err: Error, c: Context<AppEnv>) {
+  if (err instanceof AppError) return c.json({ message: err.message }, err.statusCode);
   console.error("Unhandled error:", err);
-  res.status(500).json({ message: "Erro interno do servidor" });
+  return c.json({ message: "Erro interno do servidor" }, 500);
 }

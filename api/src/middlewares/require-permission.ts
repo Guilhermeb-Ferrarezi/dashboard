@@ -1,5 +1,5 @@
-import type { Request, Response, NextFunction } from "express";
-
+import type { Context, Next } from "hono";
+import type { AppEnv } from "../types/hono";
 import { hasTokenPermission, type TokenScope } from "../lib/token-permissions.js";
 
 /**
@@ -10,22 +10,17 @@ import { hasTokenPermission, type TokenScope } from "../lib/token-permissions.js
  * - Tokens de API têm suas permissões verificadas via `hasTokenPermission()`.
  */
 export function requirePermission(scope: TokenScope) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user;
-
-    if (!user) {
-      return res.status(401).json({ message: "Não autenticado" });
-    }
-
+  return async (c: Context<AppEnv>, next: Next) => {
+    const user = c.get("user");
+    if (!user) return c.json({ message: "Não autenticado" }, 401);
     if (user.authType === "session" || user.authType === "service") {
-      return next();
+      await next();
+      return;
     }
-
     const perms = user.tokenPermissions ?? [];
     if (!hasTokenPermission(perms, scope)) {
-      return res.status(403).json({ message: "Permissão insuficiente para esta operação" });
+      return c.json({ message: "Permissão insuficiente para esta operação" }, 403);
     }
-
-    next();
+    await next();
   };
 }

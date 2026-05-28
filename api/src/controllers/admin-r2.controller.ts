@@ -1,5 +1,5 @@
-import type { Request, Response } from "express";
-import multer from "multer";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { uploadVctR2Object } from "../lib/vct-r2";
 
@@ -14,22 +14,6 @@ const ALLOWED_FOLDERS = [
   "checkout/products",
 ] as const;
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: MAX_IMAGE_SIZE_BYTES,
-    files: 1,
-  },
-  fileFilter(_req, file, callback) {
-    if (!file.mimetype.startsWith("image/")) {
-      callback(new Error("Envie apenas imagens."));
-      return;
-    }
-
-    callback(null, true);
-  },
-});
-
 function normalizeFolder(value: unknown) {
   if (typeof value !== "string") return "admin/uploads";
 
@@ -39,67 +23,52 @@ function normalizeFolder(value: unknown) {
     : normalized || "admin/uploads";
 }
 
-function parseMultipartRequest(req: Request, res: Response) {
-  return new Promise<void>((resolve, reject) => {
-    upload.single("image")(req, res, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-function isImageFile(file?: Express.Multer.File) {
-  return Boolean(file && file.mimetype.startsWith("image/"));
-}
-
-export async function uploadAdminR2Image(req: Request, res: Response) {
+export async function uploadAdminR2Image(c: Context<AppEnv>): Promise<Response> {
+  let body: Record<string, unknown>;
   try {
-    await parseMultipartRequest(req, res);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao processar o upload.";
-
-    if (message.includes("File too large")) {
-      res.status(400).json({ ok: false, message: "A imagem precisa ter no máximo 5 MB." });
-      return;
-    }
-
-    res.status(400).json({ ok: false, message });
-    return;
+    body = await c.req.parseBody();
+  } catch {
+    return c.json({ ok: false, message: "Falha ao processar o upload." }, 400);
   }
 
-  const image = req.file;
-  const folder = normalizeFolder(req.body?.folder);
+  const fileValue = body["image"];
 
-  if (!image || !isImageFile(image)) {
-    res.status(400).json({ ok: false, message: "Envie uma imagem válida." });
-    return;
+  if (!(fileValue instanceof File)) {
+    return c.json({ ok: false, message: "Envie uma imagem válida." }, 400);
   }
+
+  if (!fileValue.type.startsWith("image/")) {
+    return c.json({ ok: false, message: "Envie apenas imagens." }, 400);
+  }
+
+  if (fileValue.size > MAX_IMAGE_SIZE_BYTES) {
+    return c.json({ ok: false, message: "A imagem precisa ter no máximo 5 MB." }, 400);
+  }
+
+  const folder = normalizeFolder(body["folder"]);
+  const buffer = Buffer.from(await fileValue.arrayBuffer());
 
   try {
     const uploaded = await uploadVctR2Object({
-      buffer: image.buffer,
-      mimeType: image.mimetype,
-      fileName: image.originalname,
+      buffer,
+      mimeType: fileValue.type,
+      fileName: fileValue.name,
       folder,
     });
 
-    res.status(201).json({
+    return c.json({
       ok: true,
       image: {
         key: uploaded.key,
         url: uploaded.url,
         folder,
-        fileName: image.originalname,
-        mimeType: image.mimetype,
-        size: image.size,
+        fileName: fileValue.name,
+        mimeType: fileValue.type,
+        size: fileValue.size,
       },
-    });
+    }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao salvar a imagem.";
-    res.status(500).json({ ok: false, message });
+    return c.json({ ok: false, message }, 500);
   }
 }

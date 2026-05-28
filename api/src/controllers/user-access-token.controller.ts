@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   createUserAccessToken,
@@ -9,8 +10,8 @@ import {
   type UserAccessTokenType,
 } from "../lib/user-access-token";
 
-function getUserId(req: Request) {
-  return req.user?.id;
+function getUserId(c: Context<AppEnv>) {
+  return c.get("user")?.id;
 }
 
 type UserAccessTokenDeps = {
@@ -29,59 +30,58 @@ function normalizeType(value: unknown): UserAccessTokenType | null {
 }
 
 export async function listUserAccessTokensHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: UserAccessTokenDeps = {},
-) {
-  const userId = getUserId(req);
+): Promise<Response> {
+  const userId = getUserId(c);
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const type = normalizeType(req.query?.type);
+  const type = normalizeType(c.req.query("type"));
   const tokens = await (deps.listUserAccessTokens ?? listUserAccessTokens)(userId, type ?? undefined);
-  return res.json({ ok: true, tokens });
+  return c.json({ ok: true, tokens });
 }
 
 export async function createUserAccessTokenHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: UserAccessTokenDeps = {},
-) {
-  const userId = getUserId(req);
+): Promise<Response> {
+  const userId = getUserId(c);
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const label = typeof req.body?.label === "string" ? req.body.label.trim() : "";
+  const body = await c.req.json();
+  const label = typeof body?.label === "string" ? body.label.trim() : "";
 
   if (!label) {
-    return res.status(400).json({ message: "Preencha o nome do token." });
+    return c.json({ message: "Preencha o nome do token." }, 400);
   }
 
-  const requestedType = req.body?.type;
+  const requestedType = body?.type;
   const type = normalizeType(requestedType);
 
   if (requestedType !== undefined && !type) {
-    return res.status(400).json({ message: "Tipo de token invalido." });
+    return c.json({ message: "Tipo de token invalido." }, 400);
   }
 
-  const permissions = validatePermissions(req.body?.permissions);
+  const permissions = validatePermissions(body?.permissions);
 
-  const rawExpiresAt = req.body?.expiresAt;
+  const rawExpiresAt = body?.expiresAt;
   let expiresAt: Date | null = null;
   if (rawExpiresAt) {
     const parsed = new Date(rawExpiresAt);
     if (Number.isNaN(parsed.getTime())) {
-      return res.status(400).json({ message: "Data de expiracao invalida." });
+      return c.json({ message: "Data de expiracao invalida." }, 400);
     }
     expiresAt = parsed;
   }
 
   const description =
-    typeof req.body?.description === "string" ? req.body.description.slice(0, 500) : "";
+    typeof body?.description === "string" ? body.description.slice(0, 500) : "";
 
   const created = await (deps.createUserAccessToken ?? createUserAccessToken)({
     userId,
@@ -92,65 +92,59 @@ export async function createUserAccessTokenHandler(
     description,
   });
 
-  return res.status(201).json({
+  return c.json({
     ok: true,
     tokenId: created.id,
     token: created.plaintextToken,
     label,
     type,
-  });
+  }, 201);
 }
 
 export async function revokeUserAccessTokenHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: UserAccessTokenDeps = {},
-) {
-  const userId = getUserId(req);
+): Promise<Response> {
+  const userId = getUserId(c);
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const tokenId = Array.isArray(req.params.tokenId)
-    ? req.params.tokenId[0]
-    : req.params.tokenId;
+  const tokenId = c.req.param("tokenId");
 
   if (!tokenId) {
-    return res.status(400).json({ message: "Token nao informada." });
+    return c.json({ message: "Token nao informada." }, 400);
   }
 
   const revoked = await (deps.revokeUserAccessToken ?? revokeUserAccessToken)(userId, tokenId);
 
   if (!revoked) {
-    return res.status(404).json({ message: "Token nao encontrada." });
+    return c.json({ message: "Token nao encontrada." }, 404);
   }
 
-  return res.json({ ok: true, revoked: true, tokenId });
+  return c.json({ ok: true, revoked: true, tokenId });
 }
 
 export async function getUserTokenUsageHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: UserAccessTokenDeps = {},
-) {
-  const userId = getUserId(req);
+): Promise<Response> {
+  const userId = getUserId(c);
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const tokenId = Array.isArray(req.params.tokenId)
-    ? req.params.tokenId[0]
-    : req.params.tokenId;
+  const tokenId = c.req.param("tokenId");
 
   if (!tokenId) {
-    return res.status(400).json({ message: "Token nao informada." });
+    return c.json({ message: "Token nao informada." }, 400);
   }
 
-  const rawLimit = Number(req.query?.limit);
+  const rawLimit = Number(c.req.query("limit"));
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
 
   const logs = await (deps.listUserTokenUsage ?? listUserTokenUsage)(userId, tokenId, limit);
-  return res.json({ ok: true, logs });
+  return c.json({ ok: true, logs });
 }

@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 import { parsePagination } from "../lib/pagination";
@@ -171,53 +172,54 @@ function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
   };
 }
 
-export async function listContatos(req: Request, res: Response) {
+export async function listContatos(c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
-    const { page, limit, skip: offset } = parsePagination(req, 50);
-    const q = String(req.query.q || "").trim();
+    const { page, limit, skip: offset } = parsePagination(c, 50);
+    const q = String(c.req.query("q") || "").trim();
 
     let statusConversaFilter: StatusConversa | undefined;
-    if (req.query.statusConversa !== undefined && req.query.statusConversa !== "") {
-      const raw = req.query.statusConversa;
+    const rawStatusConversa = c.req.query("statusConversa");
+    if (rawStatusConversa !== undefined && rawStatusConversa !== "") {
       if (
-        typeof raw !== "string" ||
-        !STATUS_CONVERSA_VALIDOS.includes(raw as StatusConversa)
+        typeof rawStatusConversa !== "string" ||
+        !STATUS_CONVERSA_VALIDOS.includes(rawStatusConversa as StatusConversa)
       ) {
-        return res.status(400).json({ message: "Status de conversa inválido." });
+        return c.json({ message: "Status de conversa inválido." }, 400);
       }
-      statusConversaFilter = raw as StatusConversa;
+      statusConversaFilter = rawStatusConversa as StatusConversa;
     }
 
     let statusPagamentoFilter: StatusPagamento | undefined;
-    if (req.query.statusPagamento !== undefined && req.query.statusPagamento !== "") {
-      const raw = req.query.statusPagamento;
+    const rawStatusPagamento = c.req.query("statusPagamento");
+    if (rawStatusPagamento !== undefined && rawStatusPagamento !== "") {
       if (
-        typeof raw !== "string" ||
-        !STATUS_PAGAMENTO_VALIDOS.includes(raw as StatusPagamento)
+        typeof rawStatusPagamento !== "string" ||
+        !STATUS_PAGAMENTO_VALIDOS.includes(rawStatusPagamento as StatusPagamento)
       ) {
-        return res.status(400).json({ message: "Status de pagamento inválido." });
+        return c.json({ message: "Status de pagamento inválido." }, 400);
       }
-      statusPagamentoFilter = raw as StatusPagamento;
+      statusPagamentoFilter = rawStatusPagamento as StatusPagamento;
     }
 
     let jaParticipouFilter: boolean | undefined;
-    if (req.query.jaParticipou !== undefined && req.query.jaParticipou !== "") {
-      const raw = String(req.query.jaParticipou);
+    const rawJaParticipou = c.req.query("jaParticipou");
+    if (rawJaParticipou !== undefined && rawJaParticipou !== "") {
+      const raw = String(rawJaParticipou);
       if (raw !== "true" && raw !== "false") {
-        return res.status(400).json({ message: "Filtro jaParticipou deve ser true ou false." });
+        return c.json({ message: "Filtro jaParticipou deve ser true ou false." }, 400);
       }
       jaParticipouFilter = raw === "true";
     }
 
-    const naoRespondeu = req.query.naoRespondeu === "true";
-    const chamou = req.query.chamou === "true";
-    const naoChamou = req.query.naoChamou === "true";
-    const jogoFilter = typeof req.query.jogo === "string" ? req.query.jogo.trim() : "";
-    const servicoFilter = typeof req.query.servico === "string" ? req.query.servico.trim() : "";
-    const numeroInvalido = req.query.numeroInvalido === "true";
+    const naoRespondeu = c.req.query("naoRespondeu") === "true";
+    const chamou = c.req.query("chamou") === "true";
+    const naoChamou = c.req.query("naoChamou") === "true";
+    const jogoFilter = c.req.query("jogo")?.trim() ?? "";
+    const servicoFilter = c.req.query("servico")?.trim() ?? "";
+    const numeroInvalido = c.req.query("numeroInvalido") === "true";
 
-    const sortByRaw = String(req.query.sortBy || "prioridade");
+    const sortByRaw = String(c.req.query("sortBy") || "prioridade");
     // "nome" mantido como alias de "alfabetico" pra compatibilidade.
     const sortByNormalized = sortByRaw === "nome" ? "alfabetico" : sortByRaw;
     const sortBy = (["recente", "alfabetico", "alfabetico_desc"].includes(sortByNormalized) ? sortByNormalized : "prioridade") as "prioridade" | "recente" | "alfabetico" | "alfabetico_desc";
@@ -300,19 +302,20 @@ export async function listContatos(req: Request, res: Response) {
 
     const total = totalRow?.value ?? 0;
 
-    return res.json({
+    return c.json({
       contatos: contatos.map(serializeContato),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
     });
   } catch (error) {
     console.error("[corujao] listContatos error:", error);
-    return res.status(500).json({ message: "Erro ao listar contatos." });
+    return c.json({ message: "Erro ao listar contatos." }, 500);
   }
 }
 
-export async function createContato(req: Request, res: Response) {
+export async function createContato(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { nome, telefone, email, origem, observacoes, dataNascimento, jogos, servicos } = req.body as {
+    const body = await c.req.json();
+    const { nome, telefone, email, origem, observacoes, dataNascimento, jogos, servicos } = body as {
       nome?: string | null;
       telefone?: string;
       email?: string | null;
@@ -324,19 +327,19 @@ export async function createContato(req: Request, res: Response) {
     };
 
     if (!telefone?.trim()) {
-      return res.status(400).json({ message: "Telefone é obrigatório." });
+      return c.json({ message: "Telefone é obrigatório." }, 400);
     }
 
     let origemVal: Origem = "espontaneo";
     if (origem !== undefined && origem !== null && origem !== "") {
       if (!ORIGENS_VALIDAS.includes(origem as Origem)) {
-        return res.status(400).json({ message: "Origem inválida." });
+        return c.json({ message: "Origem inválida." }, 400);
       }
       origemVal = origem as Origem;
     }
 
     const birth = parseOptionalBirthDate(dataNascimento);
-    if (!birth.ok) return res.status(400).json({ message: birth.error });
+    if (!birth.ok) return c.json({ message: birth.error }, 400);
 
     const parsedJogos = parseJogos(jogos);
     if (!parsedJogos.ok) return res.status(400).json({ message: parsedJogos.error });
@@ -359,21 +362,22 @@ export async function createContato(req: Request, res: Response) {
       })
       .returning();
 
-    return res.status(201).json({ contato: serializeContato(contato!) });
+    return c.json({ contato: serializeContato(contato!) }, 201);
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "23505") {
-      return res.status(409).json({ message: duplicateMessage(error) });
+      return c.json({ message: duplicateMessage(error) }, 409);
     }
     console.error("[corujao] createContato error:", error);
-    return res.status(500).json({ message: "Erro ao criar contato." });
+    return c.json({ message: "Erro ao criar contato." }, 500);
   }
 }
 
-export async function updateContato(req: Request, res: Response) {
+export async function updateContato(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
+    const body = await c.req.json();
     const {
       nome,
       telefone,
@@ -386,7 +390,7 @@ export async function updateContato(req: Request, res: Response) {
       ultimoContatoEm,
       jogos,
       servicos
-    } = req.body as {
+    } = body as {
       nome?: string | null;
       telefone?: string;
       email?: string | null;
@@ -409,7 +413,7 @@ export async function updateContato(req: Request, res: Response) {
     }
 
     if (telefone !== undefined) {
-      if (!telefone.trim()) return res.status(400).json({ message: "Telefone é obrigatório." });
+      if (!telefone.trim()) return c.json({ message: "Telefone é obrigatório." }, 400);
       updates.telefone = telefone.trim();
     }
 
@@ -419,13 +423,13 @@ export async function updateContato(req: Request, res: Response) {
 
     if (dataNascimento !== undefined) {
       const birth = parseOptionalBirthDate(dataNascimento);
-      if (!birth.ok) return res.status(400).json({ message: birth.error });
+      if (!birth.ok) return c.json({ message: birth.error }, 400);
       updates.dataNascimento = birth.value;
     }
 
     if (origem !== undefined) {
       if (!ORIGENS_VALIDAS.includes(origem as Origem)) {
-        return res.status(400).json({ message: "Origem inválida." });
+        return c.json({ message: "Origem inválida." }, 400);
       }
       updates.origem = origem as Origem;
     }
@@ -436,13 +440,13 @@ export async function updateContato(req: Request, res: Response) {
 
     if (statusConversa !== undefined) {
       const parsed = parseStatusConversa(statusConversa);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.statusConversa = parsed.value;
     }
 
     if (statusPagamento !== undefined) {
       const parsed = parseStatusPagamento(statusPagamento);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.statusPagamento = parsed.value;
     }
 
@@ -471,22 +475,22 @@ export async function updateContato(req: Request, res: Response) {
       .where(eq(schema.corujaoContatos.id, id))
       .returning();
 
-    if (!contato) return res.status(404).json({ message: "Contato não encontrado." });
+    if (!contato) return c.json({ message: "Contato não encontrado." }, 404);
 
-    return res.json({ contato: serializeContato(contato) });
+    return c.json({ contato: serializeContato(contato) });
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "23505") {
-      return res.status(409).json({ message: duplicateMessage(error) });
+      return c.json({ message: duplicateMessage(error) }, 409);
     }
     console.error("[corujao] updateContato error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar contato." });
+    return c.json({ message: "Erro ao atualizar contato." }, 500);
   }
 }
 
-export async function marcarContato(req: Request, res: Response) {
+export async function marcarContato(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
     const now = new Date();
     const db = getCheckoutDb();
@@ -496,20 +500,20 @@ export async function marcarContato(req: Request, res: Response) {
       .where(eq(schema.corujaoContatos.id, id))
       .returning();
 
-    if (!contato) return res.status(404).json({ message: "Contato não encontrado." });
+    if (!contato) return c.json({ message: "Contato não encontrado." }, 404);
 
-    return res.json({ contato: serializeContato(contato) });
+    return c.json({ contato: serializeContato(contato) });
   } catch (error) {
     console.error("[corujao] marcarContato error:", error);
-    return res.status(500).json({ message: "Erro ao marcar contato." });
+    return c.json({ message: "Erro ao marcar contato." }, 500);
   }
 }
 
-export async function deleteContato(req: Request, res: Response) {
+export async function deleteContato(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -534,10 +538,10 @@ export async function deleteContato(req: Request, res: Response) {
       .returning({ id: schema.corujaoContatos.id });
 
     if (result.length === 0) {
-      return res.status(404).json({ message: "Contato não encontrado." });
+      return c.json({ message: "Contato não encontrado." }, 404);
     }
 
-    return res.json({
+    return c.json({
       deletedId: id,
       visitasRemovidas,
       receitaRemovidaCents
@@ -547,18 +551,19 @@ export async function deleteContato(req: Request, res: Response) {
     // mas previne perda silenciosa de venda quando entrar em uso).
     const pgError = error as { code?: string };
     if (pgError.code === "23503") {
-      return res.status(409).json({
+      return c.json({
         message: "Contato tem vendas registradas — apague as vendas antes."
-      });
+      }, 409);
     }
     console.error("[corujao] deleteContato error:", error);
-    return res.status(500).json({ message: "Erro ao apagar contato." });
+    return c.json({ message: "Erro ao apagar contato." }, 500);
   }
 }
 
-export async function importarContatos(req: Request, res: Response) {
+export async function importarContatos(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { contatos } = req.body as {
+    const body = await c.req.json();
+    const { contatos } = body as {
       contatos?: Array<{
         telefone?: string;
         nome?: string | null;
@@ -570,11 +575,11 @@ export async function importarContatos(req: Request, res: Response) {
     };
 
     if (!Array.isArray(contatos) || contatos.length === 0) {
-      return res.status(400).json({ message: "Envie um array 'contatos' com pelo menos 1 item." });
+      return c.json({ message: "Envie um array 'contatos' com pelo menos 1 item." }, 400);
     }
 
     if (contatos.length > 5000) {
-      return res.status(400).json({ message: "Máximo de 5000 contatos por importação." });
+      return c.json({ message: "Máximo de 5000 contatos por importação." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -627,7 +632,7 @@ export async function importarContatos(req: Request, res: Response) {
       duplicados += batch.length - result.length;
     }
 
-    return res.json({
+    return c.json({
       importados,
       duplicados,
       erros: erros.slice(0, 50),
@@ -635,11 +640,11 @@ export async function importarContatos(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[corujao] importarContatos error:", error);
-    return res.status(500).json({ message: "Erro ao importar contatos." });
+    return c.json({ message: "Erro ao importar contatos." }, 500);
   }
 }
 
-export async function exportarContatos(_req: Request, res: Response) {
+export async function exportarContatos(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const contatos = await db
@@ -664,32 +669,35 @@ export async function exportarContatos(_req: Request, res: Response) {
 
     const csv = [header, ...rows].join("\n");
 
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=contatos-corujao.csv");
-    return res.send(csv);
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=contatos-corujao.csv",
+      },
+    });
   } catch (error) {
     console.error("[corujao] exportarContatos error:", error);
-    return res.status(500).json({ message: "Erro ao exportar contatos." });
+    return _c.json({ message: "Erro ao exportar contatos." }, 500);
   }
 }
 
 // Retorna todos os jogos distintos cadastrados em contatos + os predefinidos
 // do frontend (consolidados aqui pra autocomplete sem duplicar lista no client).
-export async function listJogosDisponiveis(_req: Request, res: Response) {
+export async function listJogosDisponiveis(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const rows = await db.execute<{ jogo: string }>(
       sql`SELECT DISTINCT unnest(jogos) AS jogo FROM corujao_contatos WHERE array_length(jogos, 1) > 0 ORDER BY jogo`
     );
     const jogos = (rows as unknown as { jogo: string }[]).map((r) => r.jogo).filter(Boolean);
-    return res.json({ jogos });
+    return _c.json({ jogos });
   } catch (error) {
     console.error("[corujao] listJogosDisponiveis error:", error);
-    return res.status(500).json({ message: "Erro ao listar jogos." });
+    return _c.json({ message: "Erro ao listar jogos." }, 500);
   }
 }
 
-export async function getContatosMetricas(_req: Request, res: Response) {
+export async function getContatosMetricas(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const [row] = await db
@@ -703,7 +711,7 @@ export async function getContatosMetricas(_req: Request, res: Response) {
       })
       .from(schema.corujaoContatos);
 
-    return res.json({
+    return _c.json({
       total: row?.total ?? 0,
       naoChamou: row?.naoChamou ?? 0,
       chamou: row?.chamou ?? 0,
@@ -713,7 +721,7 @@ export async function getContatosMetricas(_req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[corujao] getContatosMetricas error:", error);
-    return res.status(500).json({ message: "Erro ao calcular métricas." });
+    return _c.json({ message: "Erro ao calcular métricas." }, 500);
   }
 }
 

@@ -1,5 +1,6 @@
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { aggregateRealtimeRows, SALES_PAGES } from "../lib/analytics";
 
@@ -16,10 +17,10 @@ function getClient() {
   }
 }
 
-export async function getRealtimeAnalytics(_req: Request, res: Response) {
+export async function getRealtimeAnalytics(_c: Context<AppEnv>): Promise<Response> {
   const ga4 = getClient();
   if (!ga4) {
-    return res.status(503).json({ message: "GA4 não configurado." });
+    return _c.json({ message: "GA4 não configurado." }, 503);
   }
 
   try {
@@ -42,7 +43,7 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
     const w30 = aggregateRealtimeRows(rt30[0].rows);
     const w5 = aggregateRealtimeRows(rt5[0].rows);
 
-    return res.json({
+    return _c.json({
       pages: w30.pages,
       totalActive: w30.total,
       pages5min: w5.pages,
@@ -50,21 +51,21 @@ export async function getRealtimeAnalytics(_req: Request, res: Response) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return res.status(500).json({ message: msg });
+    return _c.json({ message: msg }, 500);
   }
 }
 
-export async function getSalesPagesAnalytics(req: Request, res: Response) {
+export async function getSalesPagesAnalytics(c: Context<AppEnv>): Promise<Response> {
   const ga4 = getClient();
   if (!ga4) {
-    return res.status(503).json({
+    return c.json({
       error: "GA4 not configured",
       message: "GA4_PROPERTY_ID e GA4_CREDENTIALS_JSON são necessários.",
-    });
+    }, 503);
   }
 
-  const startDate = (req.query.startDate as string) || "30daysAgo";
-  const endDate = (req.query.endDate as string) || "today";
+  const startDate = c.req.query("startDate") || "30daysAgo";
+  const endDate = c.req.query("endDate") || "today";
 
   const analyticsClient = ga4.client;
 
@@ -170,10 +171,10 @@ export async function getSalesPagesAnalytics(req: Request, res: Response) {
       if (event === "cta_visible") pageMap[path].conversions.ctaVisible += count;
     }
 
-    return res.json({ pages: Object.values(pageMap) });
+    return c.json({ pages: Object.values(pageMap) });
   } catch (err: unknown) {
     console.error("[analytics] GA4 error:", err);
     const msg = err instanceof Error ? err.message : String(err);
-    return res.status(500).json({ message: msg });
+    return c.json({ message: msg }, 500);
   }
 }

@@ -1,8 +1,9 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { listProjects } from "../controllers/projects.controller";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 router.get("/", listProjects);
 

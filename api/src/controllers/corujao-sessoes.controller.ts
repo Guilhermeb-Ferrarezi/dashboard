@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gte, inArray } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 
@@ -96,10 +97,10 @@ async function fetchVagasVendidas(
   return map;
 }
 
-export async function listSessoes(req: Request, res: Response) {
+export async function listSessoes(c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
-    const futurasOnly = req.query.futuras === "true";
+    const futurasOnly = c.req.query("futuras") === "true";
 
     const today = new Date().toISOString().slice(0, 10);
     const whereClause = futurasOnly ? gte(schema.corujaoSessoes.data, today) : undefined;
@@ -118,16 +119,16 @@ export async function listSessoes(req: Request, res: Response) {
       sessoes.map((s) => s.id)
     );
 
-    return res.json({
+    return c.json({
       sessoes: sessoes.map((s) => serializeSessao(s, vagasMap.get(s.id) ?? 0))
     });
   } catch (error) {
     console.error("[corujao] listSessoes error:", error);
-    return res.status(500).json({ message: "Erro ao listar sessões." });
+    return c.json({ message: "Erro ao listar sessões." }, 500);
   }
 }
 
-export async function getProximaSessao(_req: Request, res: Response) {
+export async function getProximaSessao(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const today = new Date().toISOString().slice(0, 10);
@@ -144,19 +145,20 @@ export async function getProximaSessao(_req: Request, res: Response) {
       .orderBy(asc(schema.corujaoSessoes.data), asc(schema.corujaoSessoes.id))
       .limit(1);
 
-    if (!sessao) return res.json({ sessao: null });
+    if (!sessao) return _c.json({ sessao: null });
 
     const vagasMap = await fetchVagasVendidas(db, [sessao.id]);
-    return res.json({ sessao: serializeSessao(sessao, vagasMap.get(sessao.id) ?? 0) });
+    return _c.json({ sessao: serializeSessao(sessao, vagasMap.get(sessao.id) ?? 0) });
   } catch (error) {
     console.error("[corujao] getProximaSessao error:", error);
-    return res.status(500).json({ message: "Erro ao buscar próxima sessão." });
+    return _c.json({ message: "Erro ao buscar próxima sessão." }, 500);
   }
 }
 
-export async function createSessao(req: Request, res: Response) {
+export async function createSessao(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { data, totalVagas, status, observacoes } = req.body as {
+    const body = await c.req.json();
+    const { data, totalVagas, status, observacoes } = body as {
       data?: unknown;
       totalVagas?: unknown;
       status?: unknown;
@@ -164,19 +166,19 @@ export async function createSessao(req: Request, res: Response) {
     };
 
     const dataParsed = parseSessaoData(data);
-    if (!dataParsed.ok) return res.status(400).json({ message: dataParsed.error });
+    if (!dataParsed.ok) return c.json({ message: dataParsed.error }, 400);
 
     let totalVagasVal = 10;
     if (totalVagas !== undefined && totalVagas !== null) {
       const parsed = parseTotalVagas(totalVagas);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       totalVagasVal = parsed.value;
     }
 
     let statusVal: StatusSessao = "planejado";
     if (status !== undefined && status !== null && status !== "") {
       const parsed = parseSessaoStatus(status);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       statusVal = parsed.value;
     }
 
@@ -196,21 +198,22 @@ export async function createSessao(req: Request, res: Response) {
       })
       .returning();
 
-    return res.status(201).json({ sessao: serializeSessao(sessao!, 0) });
+    return c.json({ sessao: serializeSessao(sessao!, 0) }, 201);
   } catch (error) {
     console.error("[corujao] createSessao error:", error);
-    return res.status(500).json({ message: "Erro ao criar sessão." });
+    return c.json({ message: "Erro ao criar sessão." }, 500);
   }
 }
 
-export async function updateSessao(req: Request, res: Response) {
+export async function updateSessao(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
-    const { data, totalVagas, status, observacoes } = req.body as {
+    const body = await c.req.json();
+    const { data, totalVagas, status, observacoes } = body as {
       data?: unknown;
       totalVagas?: unknown;
       status?: unknown;
@@ -224,13 +227,13 @@ export async function updateSessao(req: Request, res: Response) {
     if (data !== undefined) {
       // PATCH aceita data passada (corrigir histórico de sessão já realizada).
       const parsed = parseSessaoDataAceitaPassado(data);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.data = parsed.value;
     }
 
     if (status !== undefined) {
       const parsed = parseSessaoStatus(status);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.status = parsed.value;
     }
 
@@ -244,7 +247,7 @@ export async function updateSessao(req: Request, res: Response) {
     let novoTotalVagas: number | undefined;
     if (totalVagas !== undefined) {
       const parsed = parseTotalVagas(totalVagas);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       novoTotalVagas = parsed.value;
     }
 
@@ -286,21 +289,21 @@ export async function updateSessao(req: Request, res: Response) {
     });
 
     if (!result.ok) {
-      return res.status(result.status ?? 400).json({ message: result.message });
+      return c.json({ message: result.message }, result.status ?? 400);
     }
 
-    return res.json({ sessao: serializeSessao(result.sessao, result.vagasVendidas) });
+    return c.json({ sessao: serializeSessao(result.sessao, result.vagasVendidas) });
   } catch (error) {
     console.error("[corujao] updateSessao error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar sessão." });
+    return c.json({ message: "Erro ao atualizar sessão." }, 500);
   }
 }
 
-export async function deleteSessao(req: Request, res: Response) {
+export async function deleteSessao(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -320,13 +323,13 @@ export async function deleteSessao(req: Request, res: Response) {
       .returning({ id: schema.corujaoSessoes.id });
 
     if (result.length === 0) {
-      return res.status(404).json({ message: "Sessão não encontrada." });
+      return c.json({ message: "Sessão não encontrada." }, 404);
     }
 
-    return res.json({ deletedId: id, visitasOrfanizadas });
+    return c.json({ deletedId: id, visitasOrfanizadas });
   } catch (error) {
     console.error("[corujao] deleteSessao error:", error);
-    return res.status(500).json({ message: "Erro ao apagar sessão." });
+    return c.json({ message: "Erro ao apagar sessão." }, 500);
   }
 }
 
@@ -341,4 +344,3 @@ export async function findSessaoById(id: number): Promise<SessaoRow | null> {
     .limit(1);
   return sessao ?? null;
 }
-

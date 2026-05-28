@@ -1,25 +1,27 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import { sendEmail } from "../lib/resend";
 import { escapeHtml } from "../lib/normalize";
 
-export async function sendCustomEmail(req: Request, res: Response) {
+export async function sendCustomEmail(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { to, subject, body } = req.body as {
+    const body = await c.req.json();
+    const { to, subject, body: emailBody } = body as {
       to?: string | string[];
       subject?: string;
       body?: string;
     };
 
     if (!to || (Array.isArray(to) && to.length === 0)) {
-      return res.status(400).json({ message: "Destinatário obrigatório." });
+      return c.json({ message: "Destinatário obrigatório." }, 400);
     }
 
     if (!subject?.trim()) {
-      return res.status(400).json({ message: "Assunto obrigatório." });
+      return c.json({ message: "Assunto obrigatório." }, 400);
     }
 
-    if (!body?.trim()) {
-      return res.status(400).json({ message: "Corpo do email obrigatório." });
+    if (!emailBody?.trim()) {
+      return c.json({ message: "Corpo do email obrigatório." }, 400);
     }
 
     const html = `
@@ -35,7 +37,7 @@ export async function sendCustomEmail(req: Request, res: Response) {
     </div>
     <div style="background:#111;border:1px solid #222;padding:32px 24px">
       <h2 style="color:#fff;font-size:18px;font-weight:700;margin:0 0 16px">${escapeHtml(subject.trim())}</h2>
-      <div style="color:#ccc;font-size:14px;line-height:1.7">${escapeHtml(body.trim()).replace(/\n/g, "<br>")}</div>
+      <div style="color:#ccc;font-size:14px;line-height:1.7">${escapeHtml(emailBody.trim()).replace(/\n/g, "<br>")}</div>
     </div>
     <p style="color:#666;font-size:12px;text-align:center;margin-top:24px">
       Santos Games Arena · Este email foi enviado pelo painel administrativo.
@@ -48,12 +50,12 @@ export async function sendCustomEmail(req: Request, res: Response) {
     const result = await sendEmail(recipients, subject.trim(), html);
 
     if (!result.ok) {
-      return res.status(502).json({ message: `Erro ao enviar: ${result.error}` });
+      return c.json({ message: `Erro ao enviar: ${result.error}` }, 502);
     }
 
-    return res.json({ message: "Email enviado.", recipients: recipients.length });
+    return c.json({ message: "Email enviado.", recipients: recipients.length });
   } catch (error) {
     console.error("[email] sendCustomEmail error:", error);
-    return res.status(500).json({ message: "Erro ao enviar email." });
+    return c.json({ message: "Erro ao enviar email." }, 500);
   }
 }

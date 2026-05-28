@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   listPortalRecents,
@@ -7,7 +8,7 @@ import {
 } from "../controllers/portal-recents.controller";
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 router.use(verifyJWTOrCodexServiceToken);
 router.get("/recents", listPortalRecents);

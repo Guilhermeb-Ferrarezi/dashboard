@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   createAdminAccessToken,
@@ -9,8 +10,8 @@ import {
   validatePermissions,
 } from "../lib/admin-access-token";
 
-function getAdminId(req: Request) {
-  return req.user?.id;
+function getAdminId(c: Context<AppEnv>) {
+  return c.get("user")?.id;
 }
 
 type AdminAccessTokenDeps = {
@@ -22,52 +23,51 @@ type AdminAccessTokenDeps = {
 };
 
 export async function listAdminAccessTokensHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: AdminAccessTokenDeps = {},
-) {
-  const adminId = getAdminId(req);
+): Promise<Response> {
+  const adminId = getAdminId(c);
 
   if (!adminId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
   const tokens = await (deps.listAdminAccessTokens ?? listAdminAccessTokens)(adminId);
-  return res.json({ ok: true, tokens });
+  return c.json({ ok: true, tokens });
 }
 
 export async function createAdminAccessTokenHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: AdminAccessTokenDeps = {},
-) {
-  const adminId = getAdminId(req);
+): Promise<Response> {
+  const adminId = getAdminId(c);
 
   if (!adminId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const type = typeof req.body?.type === "string" ? req.body.type.trim() : "";
-  const label = typeof req.body?.label === "string" ? req.body.label.trim() : "";
+  const body = await c.req.json();
+  const type = typeof body?.type === "string" ? body.type.trim() : "";
+  const label = typeof body?.label === "string" ? body.label.trim() : "";
 
   if (!type || !label) {
-    return res.status(400).json({ message: "Preencha tipo e nome do token." });
+    return c.json({ message: "Preencha tipo e nome do token." }, 400);
   }
 
-  const permissions = validatePermissions(req.body?.permissions);
+  const permissions = validatePermissions(body?.permissions);
 
-  const rawExpiresAt = req.body?.expiresAt;
+  const rawExpiresAt = body?.expiresAt;
   let expiresAt: Date | null = null;
   if (rawExpiresAt) {
     const parsed = new Date(rawExpiresAt);
     if (Number.isNaN(parsed.getTime())) {
-      return res.status(400).json({ message: "Data de expiracao invalida." });
+      return c.json({ message: "Data de expiracao invalida." }, 400);
     }
     expiresAt = parsed;
   }
 
   const description =
-    typeof req.body?.description === "string" ? req.body.description.slice(0, 500) : "";
+    typeof body?.description === "string" ? body.description.slice(0, 500) : "";
 
   const created = await (deps.createAdminAccessToken ?? createAdminAccessToken)({
     adminId,
@@ -78,32 +78,29 @@ export async function createAdminAccessTokenHandler(
     description,
   });
 
-  return res.status(201).json({
+  return c.json({
     ok: true,
     tokenId: created.id,
     token: created.plaintextToken,
     type,
     label,
-  });
+  }, 201);
 }
 
 export async function revokeAdminAccessTokenHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: AdminAccessTokenDeps = {},
-) {
-  const adminId = getAdminId(req);
+): Promise<Response> {
+  const adminId = getAdminId(c);
 
   if (!adminId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const tokenId = Array.isArray(req.params.tokenId)
-    ? req.params.tokenId[0]
-    : req.params.tokenId;
+  const tokenId = c.req.param("tokenId");
 
   if (!tokenId) {
-    return res.status(400).json({ message: "Token nao informada." });
+    return c.json({ message: "Token nao informada." }, 400);
   }
 
   const revoked = await (deps.revokeAdminAccessToken ?? revokeAdminAccessToken)(
@@ -112,17 +109,17 @@ export async function revokeAdminAccessTokenHandler(
   );
 
   if (!revoked) {
-    return res.status(404).json({ message: "Token nao encontrada." });
+    return c.json({ message: "Token nao encontrada." }, 404);
   }
 
-  return res.json({ ok: true, revoked: true, tokenId });
+  return c.json({ ok: true, revoked: true, tokenId });
 }
 
 export async function getCurrentAdminCodexTokenStatus(
-  req: Request,
+  c: Context<AppEnv>,
   deps: AdminAccessTokenDeps = {},
 ) {
-  const adminId = getAdminId(req);
+  const adminId = getAdminId(c);
 
   if (!adminId) {
     return null;
@@ -135,27 +132,24 @@ export async function getCurrentAdminCodexTokenStatus(
 }
 
 export async function getAdminTokenUsageHandler(
-  req: Request,
-  res: Response,
+  c: Context<AppEnv>,
   deps: AdminAccessTokenDeps = {},
-) {
-  const adminId = getAdminId(req);
+): Promise<Response> {
+  const adminId = getAdminId(c);
 
   if (!adminId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const tokenId = Array.isArray(req.params.tokenId)
-    ? req.params.tokenId[0]
-    : req.params.tokenId;
+  const tokenId = c.req.param("tokenId");
 
   if (!tokenId) {
-    return res.status(400).json({ message: "Token nao informada." });
+    return c.json({ message: "Token nao informada." }, 400);
   }
 
-  const rawLimit = Number(req.query?.limit);
+  const rawLimit = Number(c.req.query("limit"));
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
 
   const logs = await (deps.listAdminTokenUsage ?? listAdminTokenUsage)(adminId, tokenId, limit);
-  return res.json({ ok: true, logs });
+  return c.json({ ok: true, logs });
 }

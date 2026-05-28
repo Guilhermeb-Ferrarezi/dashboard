@@ -1,29 +1,11 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import type { Request, Response } from "express";
 import mongoose from "mongoose";
 
 import { deleteUser } from "./admin.controller";
 import { User } from "../models/User";
 import { UserAccessToken } from "../models/UserAccessToken";
 import { AdminAccessToken } from "../models/AdminAccessToken";
-
-type MockResponse = Partial<Response> & {
-  statusCode?: number;
-  body?: unknown;
-};
-
-function makeResponse(): MockResponse {
-  const res: MockResponse = {};
-  res.status = mock((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  });
-  res.json = mock((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  });
-  return res;
-}
+import { createMockContext } from "../test-utils/mock-context";
 
 describe("deleteUser", () => {
   const originalFindByIdAndDelete = User.findByIdAndDelete;
@@ -37,19 +19,16 @@ describe("deleteUser", () => {
   });
 
   test("retorna 400 para ObjectId inválido", async () => {
-    const req = { params: { id: "id-invalido" } } as unknown as Request;
-    const res = makeResponse();
-
-    await deleteUser(req, res as Response);
-
-    expect(res.statusCode).toBe(400);
-    expect((res.body as { message: string }).message).toBe("ID inválido.");
+    const c = createMockContext({ params: { id: "id-invalido" } });
+    const res = await deleteUser(c);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toBe("ID inválido.");
   });
 
   test("retorna 404 quando o usuário não existe e não toca nos tokens", async () => {
     const validId = new mongoose.Types.ObjectId().toString();
-    const req = { params: { id: validId } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ params: { id: validId } });
 
     User.findByIdAndDelete = mock(() => ({
       lean: async () => null,
@@ -58,17 +37,16 @@ describe("deleteUser", () => {
     const userRevoke = mock(async () => ({ modifiedCount: 0 }));
     UserAccessToken.updateMany = userRevoke as unknown as typeof UserAccessToken.updateMany;
 
-    await deleteUser(req, res as Response);
-
-    expect(res.statusCode).toBe(404);
-    expect((res.body as { message: string }).message).toBe("Usuário não encontrado.");
+    const res = await deleteUser(c);
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.message).toBe("Usuário não encontrado.");
     expect(userRevoke).not.toHaveBeenCalled();
   });
 
   test("revoga UserAccessToken e AdminAccessToken ao excluir usuário existente", async () => {
     const validId = new mongoose.Types.ObjectId().toString();
-    const req = { params: { id: validId } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ params: { id: validId } });
 
     User.findByIdAndDelete = mock(() => ({
       lean: async () => ({ _id: validId, username: "teste", role: "user" }),
@@ -79,18 +57,17 @@ describe("deleteUser", () => {
     UserAccessToken.updateMany = userRevoke as unknown as typeof UserAccessToken.updateMany;
     AdminAccessToken.updateMany = adminRevoke as unknown as typeof AdminAccessToken.updateMany;
 
-    await deleteUser(req, res as Response);
-
-    expect(res.statusCode).toBeUndefined();
-    expect((res.body as { message: string }).message).toBe("Usuário removido.");
+    const res = await deleteUser(c);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.message).toBe("Usuário removido.");
     expect(userRevoke).toHaveBeenCalledTimes(1);
     expect(adminRevoke).toHaveBeenCalledTimes(1);
   });
 
   test("passa filtro correto ao revogar UserAccessToken", async () => {
     const validId = new mongoose.Types.ObjectId().toString();
-    const req = { params: { id: validId } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ params: { id: validId } });
 
     User.findByIdAndDelete = mock(() => ({
       lean: async () => ({ _id: validId, username: "teste", role: "user" }),
@@ -101,7 +78,7 @@ describe("deleteUser", () => {
     UserAccessToken.updateMany = userRevoke as unknown as typeof UserAccessToken.updateMany;
     AdminAccessToken.updateMany = adminRevoke as unknown as typeof AdminAccessToken.updateMany;
 
-    await deleteUser(req, res as Response);
+    await deleteUser(c);
 
     const [userFilter] = userRevoke.mock.calls[0] as [unknown];
     expect(userFilter).toEqual({ userId: validId, revokedAt: null });

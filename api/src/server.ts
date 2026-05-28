@@ -1,10 +1,19 @@
 import dns from "node:dns/promises";
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import dotenv from "dotenv";
-import express from "express";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { compress } from "hono/compress";
 import mongoose from "mongoose";
+import dotenv from "dotenv";
+
+import type { AppEnv } from "./types/hono";
+import { errorHandler } from "./middlewares/error-handler";
+import { requestLogsMiddleware } from "./middlewares/request-logs";
+import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
+import { requireRole } from "./middlewares/role";
+
+import { createYoga } from "graphql-yoga";
+import { schema } from "./graphql/schema";
+import { createGraphQLContext } from "./graphql/context";
 
 import authRoutes from "./routes/auth.routes";
 import devLoginRoutes from "./routes/dev-login.routes";
@@ -12,19 +21,20 @@ import adminRoutes from "./routes/admin.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import projectRoutes from "./routes/projects.routes";
 import logsRoutes from "./routes/logs.routes";
-
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
-import codexRoutes from "./routes/codex.routes";
+import codexRoutes, { createCodexWsUpgradeHandler } from "./routes/codex.routes";
 import portalRoutes from "./routes/portal.routes";
 import checkoutRoutes from "./routes/checkout.routes";
 import corujaoRoutes from "./routes/corujao.routes";
 import corujaoPublicRoutes from "./routes/corujao-public.routes";
 import emailRoutes from "./routes/email.routes";
 import analyticsRoutes from "./routes/analytics.routes";
-import { runCheckoutMigrations } from "./db/index";
+import ssoRoutes from "./routes/sso.routes";
+
 import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
-import { addHealthClient, startHealthBroadcast, stopHealthBroadcast } from "./lib/health-sse";
+import { startHealthBroadcast, stopHealthBroadcast, addHealthClient } from "./lib/health-sse";
+import { addClient as addVagasClient } from "./lib/vagas-sse";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -36,30 +46,22 @@ import {
   listUserAccessTokensHandler,
   revokeUserAccessTokenHandler,
 } from "./controllers/user-access-token.controller";
-import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
-import { requestLogsMiddleware } from "./middlewares/request-logs";
-import { requireRole } from "./middlewares/role";
-import { errorHandler } from "./middlewares/error-handler";
-import { attachCodexGateway } from "./lib/codex";
+import {
+  codexWsOpen,
+  codexWsMessage,
+  codexWsClose,
+} from "./lib/codex";
 import { validateEnv } from "./config/env";
 
 dotenv.config();
 validateEnv();
 
-process.on("uncaughtException", (error) => {
-  console.error("[process] uncaughtException:", error);
-});
+process.on("uncaughtException", (err) => console.error("[process] uncaughtException:", err));
+process.on("unhandledRejection", (reason) => console.error("[process] unhandledRejection:", reason));
 
-process.on("unhandledRejection", (reason) => {
-  console.error("[process] unhandledRejection:", reason);
-});
-
-const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const baseAllowedOrigins =
-  process.env.ALLOWED_ORIGINS?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean) || [];
+  process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
 const allowedOrigins = isProduction
   ? baseAllowedOrigins
   : Array.from(
@@ -73,40 +75,111 @@ const allowedOrigins = isProduction
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
         "http://127.0.0.1:5173",
-        "http://[::1]:3000",
-        "http://[::1]:3001",
-        "http://[::1]:3002",
-        "http://[::1]:5173",
       ]),
     );
 
-function isAllowedLocalDevOrigin(origin: string) {
-  if (isProduction) {
-    return false;
-  }
+const app = new Hono<AppEnv>();
 
-  try {
-    const url = new URL(origin);
-    return (
-      url.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
-      ["3000", "3001", "3002", "3003", "5173"].includes(url.port)
-    );
-  } catch {
-    return false;
-  }
+app.use(
+  cors({
+    origin: (origin) => {
+      if (!origin) return origin;
+      if (allowedOrigins.includes(origin)) return origin;
+      if (!isProduction) {
+        try {
+          const url = new URL(origin);
+          if (
+            url.protocol === "http:" &&
+            ["localhost", "127.0.0.1"].includes(url.hostname)
+          ) {
+            return origin;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      return null;
+    },
+    credentials: true,
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
+app.use(compress({ encoding: "gzip" }));
+app.use(requestLogsMiddleware);
+
+// Rotas públicas e SSE
+app.get("/api/health/sse", addHealthClient);
+app.get("/api", (c) => c.json({ message: "Backend rodando!" }));
+
+// Auth
+app.route("/api/auth", authRoutes);
+
+// DEV LOGIN BYPASS — só monta em non-production
+if (!isProduction) {
+  app.route("/api/dev", devLoginRoutes);
+  console.log("⚠️  Dev login bypass habilitado em POST /api/dev/login");
 }
+
+// Rotas autenticadas
+app.route("/api/admin", adminRoutes);
+app.route("/api/dashboard", dashboardRoutes);
+app.route("/api/projects", projectRoutes);
+app.route("/api/logs", logsRoutes);
+app.route("/api/valorant-account", valorantRoutes);
+app.route("/api/vct", vctRoutes);
+app.route("/api/codex", codexRoutes);
+app.route("/api/portal", portalRoutes);
+app.route("/api/checkout", checkoutRoutes);
+app.route("/api/corujao/public", corujaoPublicRoutes);
+app.route("/api/corujao", corujaoRoutes);
+app.route("/api/email", emailRoutes);
+app.route("/api/analytics", analyticsRoutes);
+app.route("/api/sso", ssoRoutes);
+
+// SSE de vagas
+app.get("/api/corujao/public/vagas-sse", addVagasClient);
+
+// Rotas de usuário autenticado
+app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
+app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
+app.put("/api/user/preferences", verifyJWTOrCodexServiceToken, updateCurrentUserPreferences);
+app.get("/api/user/tokens", verifyJWTOrCodexServiceToken, listUserAccessTokensHandler);
+app.post("/api/user/tokens", verifyJWTOrCodexServiceToken, createUserAccessTokenHandler);
+app.post(
+  "/api/user/tokens/:tokenId/revoke",
+  verifyJWTOrCodexServiceToken,
+  revokeUserAccessTokenHandler,
+);
+app.get(
+  "/api/user/tokens/:tokenId/usage",
+  verifyJWTOrCodexServiceToken,
+  getUserTokenUsageHandler,
+);
+app.get(
+  "/api/user",
+  verifyJWTOrCodexServiceToken,
+  requireRole("user"),
+  (c) => c.json({ message: "Area do usuario liberada." }),
+);
+
+const yoga = createYoga({
+  schema,
+  graphqlEndpoint: "/graphql",
+  context: createGraphQLContext,
+  graphiql: !isProduction,
+});
+app.on(["GET", "POST"], "/graphql", (c) => yoga.fetch(c.req.raw, c.env));
+
+app.onError(errorHandler);
+
+// ---------------------------------------------------------------------------
+// Helpers Mongo
+// ---------------------------------------------------------------------------
 
 function extractMongoHost(uri: string) {
   return uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^:/?,]+)/)?.[1] ?? null;
-}
-
-function shouldUseMongoFallbackHost(host: string) {
-  if (["localhost", "127.0.0.1", "::1"].includes(host)) {
-    return true;
-  }
-
-  return !host.includes(".");
 }
 
 function replaceMongoHost(uri: string, host: string) {
@@ -117,198 +190,103 @@ function replaceMongoHost(uri: string, host: string) {
 }
 
 function describeMongoTarget(uri: string) {
-  const match = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^/?]+)(\/[^?]*)?/);
-  const host = match?.[1] ?? "desconhecido";
-  const dbPath = match?.[2] && match[2] !== "/" ? match[2] : "";
-
-  return `${host}${dbPath}`;
+  const m = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?([^/?]+)(\/[^?]*)?/);
+  return `${m?.[1] ?? "?"}${m?.[2] ?? ""}`;
 }
 
 function extractMongoDbName(uri: string) {
-  const match = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?[^/?]+\/([^?]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : null;
+  const m = uri.match(/^mongodb(?:\+srv)?:\/\/(?:[^@/]+@)?[^/?]+\/([^?]+)/);
+  return m?.[1] ? decodeURIComponent(m[1]) : null;
 }
 
-async function resolveMongoUri(uri: string) {
-  if (isProduction || uri.startsWith("mongodb+srv://")) {
-    return uri;
-  }
+async function resolveMongoUri(uri: string): Promise<string> {
+  if (isProduction || uri.startsWith("mongodb+srv://")) return uri;
 
   const originalHost = extractMongoHost(uri);
-  const defaultFallbackHost = "127.0.0.1";
-
-  if (!originalHost) {
-    return uri;
-  }
+  if (!originalHost) return uri;
 
   if (["localhost", "127.0.0.1", "::1"].includes(originalHost)) {
-    return originalHost === "localhost" ? replaceMongoHost(uri, defaultFallbackHost) : uri;
+    return originalHost === "localhost" ? replaceMongoHost(uri, "127.0.0.1") : uri;
   }
 
   try {
     await dns.lookup(originalHost);
     return uri;
   } catch {
-    if (!shouldUseMongoFallbackHost(originalHost)) {
-      return uri;
-    }
-
-    const configuredFallbackHost = process.env.MONGO_FALLBACK_HOST?.trim();
-    const fallbackHost =
-      !configuredFallbackHost || configuredFallbackHost === "localhost"
-        ? defaultFallbackHost
-        : configuredFallbackHost;
-
-    if (fallbackHost === originalHost) {
-      return uri;
-    }
-
-    console.warn(
-      `Mongo host "${originalHost}" nao foi resolvido neste ambiente. Tentando "${fallbackHost}" no lugar.`,
-    );
-
-    return replaceMongoHost(uri, fallbackHost);
+    /* fallback */
   }
+
+  const fallbackHost = process.env.MONGO_FALLBACK_HOST?.trim() || "127.0.0.1";
+  console.warn(`Mongo host "${originalHost}" nao resolvido. Tentando "${fallbackHost}".`);
+  return replaceMongoHost(uri, fallbackHost);
 }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        isAllowedLocalDevOrigin(origin)
-      ) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
-
-app.use(
-  compression({
-    threshold: 1024,
-    filter: (req, res) => {
-      const contentType = res.getHeader("Content-Type");
-      if (typeof contentType === "string" && contentType.includes("text/event-stream")) {
-        return false;
-      }
-      return compression.filter(req, res);
-    },
-  }),
-);
-app.use(cookieParser());
-app.use(express.json());
-app.use(requestLogsMiddleware);
-
-app.use("/api/auth", authRoutes);
-
-// DEV LOGIN BYPASS — só monta em non-production. Permite login local sem
-// passar pelo auth externo. Remover quando auth.santos-games.com aceitar localhost.
-if (process.env.NODE_ENV !== "production") {
-  app.use("/api/dev", devLoginRoutes);
-  console.log("⚠️  Dev login bypass habilitado em POST /api/dev/login");
-}
-
-app.use("/api/admin", adminRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api/logs", logsRoutes);
-app.use("/api/valorant-account", valorantRoutes);
-app.use("/api/vct", vctRoutes);
-app.use("/api/codex", codexRoutes);
-app.use("/api/portal", portalRoutes);
-app.use("/api/checkout", checkoutRoutes);
-app.use("/api/corujao/public", corujaoPublicRoutes);
-app.use("/api/corujao", corujaoRoutes);
-app.use("/api/email", emailRoutes);
-app.use("/api/analytics", analyticsRoutes);
-
-app.get("/api/health/sse", (req, res) => addHealthClient(res));
-
-app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
-app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
-app.put("/api/user/preferences", verifyJWTOrCodexServiceToken, updateCurrentUserPreferences);
-app.get("/api/user/tokens", verifyJWTOrCodexServiceToken, listUserAccessTokensHandler);
-app.post("/api/user/tokens", verifyJWTOrCodexServiceToken, createUserAccessTokenHandler);
-app.post("/api/user/tokens/:tokenId/revoke", verifyJWTOrCodexServiceToken, revokeUserAccessTokenHandler);
-app.get("/api/user/tokens/:tokenId/usage", verifyJWTOrCodexServiceToken, getUserTokenUsageHandler);
-
-app.get("/api/user", verifyJWTOrCodexServiceToken, requireRole("user"), (_req, res) => {
-  res.json({ message: "Area do usuario liberada." });
-});
-
-app.get("/api/admin", verifyJWTOrCodexServiceToken, requireRole("admin"), (_req, res) => {
-  res.json({ message: "Area administrativa liberada." });
-});
-
-app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
-
-app.use(errorHandler);
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
 
 async function start() {
   const mongoUri = process.env.MONGO_URI?.trim();
-  const configuredDbName = process.env.MONGO_DB_NAME?.trim();
-
   if (!mongoUri) {
     console.error("MONGO_URI nao configurada.");
     process.exit(1);
   }
 
-  const serverSelectionTimeoutMS =
-    Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 5000;
+  const resolvedMongoUri = await resolveMongoUri(mongoUri);
+  const dbName =
+    process.env.MONGO_DB_NAME?.trim() || extractMongoDbName(resolvedMongoUri) || undefined;
 
   try {
-    const resolvedMongoUri = await resolveMongoUri(mongoUri);
-    const dbName = configuredDbName || extractMongoDbName(resolvedMongoUri) || undefined;
-
     await mongoose.connect(resolvedMongoUri, {
       dbName,
-      serverSelectionTimeoutMS,
+      serverSelectionTimeoutMS:
+        Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 5000,
     });
-
-    const mongoTarget = dbName
-      ? `${describeMongoTarget(resolvedMongoUri)} [db=${dbName}]`
-      : describeMongoTarget(resolvedMongoUri);
-
-    console.log(`Mongo conectado em ${mongoTarget}`);
-
-    const port = Number(process.env.PORT) || 4000;
-    const server = app.listen(port, () => {
-      console.log(`Backend rodando: http://localhost:${port}`);
-    });
-
-    attachCodexGateway(server);
-    startPortalRecentsFlushLoop();
-    startHealthBroadcast();
-    // runCheckoutMigrations() desativado em 2026-05-26 — todas as 5
-    // operações estão cobertas pelas migrations Drizzle 0003/0004/0008.
-    // Função preservada em db/index.ts (@deprecated) por 1-2 sessões pra
-    // rollback de emergência; remover depois.
-    // runCheckoutMigrations().catch((err) =>
-    //   console.error("[checkout] migration error:", err)
-    // );
-
-    function shutdown() {
-      console.log("Shutting down…");
-      stopPortalRecentsFlushLoop();
-      stopHealthBroadcast();
-      server.close(() => process.exit(0));
-      setTimeout(() => process.exit(1), 5000);
-    }
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
+    console.log(`Mongo conectado em ${describeMongoTarget(resolvedMongoUri)}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Falha ao conectar ao Mongo: ${message}`);
     process.exit(1);
   }
+
+  const port = Number(process.env.PORT) || 4000;
+
+  // Referência ao server Bun (necessária para upgrade WS)
+  let serverRef: ReturnType<typeof Bun.serve>;
+
+  // Rota de upgrade WS do Codex (requer admin auth — aplicado antes de montar)
+  const codexWsUpgrade = createCodexWsUpgradeHandler(() => serverRef);
+  app.get(
+    "/api/codex/ws",
+    verifyJWTOrCodexServiceToken,
+    requireRole("admin"),
+    codexWsUpgrade,
+  );
+
+  serverRef = Bun.serve({
+    port,
+    fetch: app.fetch,
+    websocket: {
+      open: codexWsOpen,
+      message: codexWsMessage,
+      close: codexWsClose,
+    },
+  });
+
+  console.log(`Backend rodando: http://localhost:${port}`);
+  startPortalRecentsFlushLoop();
+  startHealthBroadcast();
+
+  function shutdown() {
+    console.log("Shutting down…");
+    stopPortalRecentsFlushLoop();
+    stopHealthBroadcast();
+    serverRef.stop();
+    setTimeout(() => process.exit(1), 5000);
+  }
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 void start();

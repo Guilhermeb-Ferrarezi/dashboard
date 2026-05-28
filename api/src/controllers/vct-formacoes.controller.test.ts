@@ -1,27 +1,9 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import type { Request, Response } from "express";
 
 import { removerFormacao, listarFormacoes } from "./vct-formacoes.controller";
 import { VctFormacaoJogador } from "../models/VctFormacaoJogador";
 import { VctFormacaoTime } from "../models/VctFormacaoTime";
-
-type MockResponse = Partial<Response> & {
-  statusCode?: number;
-  body?: unknown;
-};
-
-function makeResponse(): MockResponse {
-  const res: MockResponse = {};
-  res.status = mock((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  });
-  res.json = mock((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  });
-  return res;
-}
+import { createMockContext } from "../test-utils/mock-context";
 
 describe("formacoes", () => {
   const originalFindOne = VctFormacaoTime.findOne;
@@ -56,17 +38,17 @@ describe("formacoes", () => {
       return Promise.resolve({});
     }) as typeof VctFormacaoTime.deleteOne;
 
-    const req = {
+    const c = createMockContext({
       params: { id: "formacao-1" },
       query: { modalidade: "valorant" },
-    } as unknown as Request;
-    const res = makeResponse();
+    });
 
-    await removerFormacao(req, res as Response);
+    const response = await removerFormacao(c);
+    const data = await response.json();
 
     expect(deleteManyFilter).toEqual({ formacaoTimeId: "formacao-1" });
     expect(deleteOneFilter).toEqual({ _id: "formacao-1" });
-    expect(res.body).toMatchObject({ ok: true, removida: "formacao-1" });
+    expect(data).toMatchObject({ ok: true, removida: "formacao-1" });
   });
 
   test("lista formações juntando o time aos seus membros", async () => {
@@ -106,12 +88,12 @@ describe("formacoes", () => {
       }),
     })) as typeof VctFormacaoJogador.find;
 
-    const req = { query: { modalidade: "valorant" } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ query: { modalidade: "valorant" } });
 
-    await listarFormacoes(req, res as Response);
+    const response = await listarFormacoes(c);
+    const data = await response.json();
 
-    expect(res.body).toMatchObject({
+    expect(data).toMatchObject({
       ok: true,
       formacoes: [
         {

@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 import {
   atribuirTimesAutomatico,
   atualizarInscricao,
@@ -24,7 +25,7 @@ import {
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 router.post("/inscricao", criarInscricao);
 router.post("/formacoes", criarFormacao);

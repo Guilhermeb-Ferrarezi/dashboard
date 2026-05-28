@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   getCodexAccountStatus,
@@ -90,109 +91,107 @@ export async function resolveCodexThreadList(
   }
 }
 
-export async function getCodexAccount(_req: Request, res: Response) {
-  const account = await resolveCodexAccountStatusForAdmin(_req.user?.id);
-  return res.json({ ok: true, account });
+export async function getCodexAccount(c: Context<AppEnv>): Promise<Response> {
+  const account = await resolveCodexAccountStatusForAdmin(c.get("user")?.id);
+  return c.json({ ok: true, account });
 }
 
-export async function logoutCodex(_req: Request, res: Response) {
-  const accessState = await resolveCodexAccessState(_req.user?.id);
+export async function logoutCodex(c: Context<AppEnv>): Promise<Response> {
+  const accessState = await resolveCodexAccessState(c.get("user")?.id);
 
   if (!accessState.codexAccessTokenActive) {
-    return res.status(403).json({
+    return c.json({
       ok: false,
       message: accessState.codexAccessBlockedReason ?? "Codex bloqueado.",
-    });
+    }, 403);
   }
 
   await logoutCodexAccount();
-  return res.json({ ok: true, message: "Conta Codex desconectada." });
+  return c.json({ ok: true, message: "Conta Codex desconectada." });
 }
 
-export async function listCodexThreads(req: Request, res: Response) {
-  const userId = req.user?.id;
+export async function listCodexThreads(c: Context<AppEnv>): Promise<Response> {
+  const userId = c.get("user")?.id;
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
   const accessState = await resolveCodexAccessState(userId);
 
   if (!accessState.codexAccessTokenActive) {
-    return res.status(403).json({
+    return c.json({
       message: accessState.codexAccessBlockedReason ?? "Codex bloqueado.",
-    });
+    }, 403);
   }
 
   const threads = await resolveCodexThreadList(userId);
-  return res.json({ ok: true, threads });
+  return c.json({ ok: true, threads });
 }
 
-export async function readCodexThread(req: Request, res: Response) {
-  const userId = req.user?.id;
-  const threadId = Array.isArray(req.params.threadId)
-    ? req.params.threadId[0]
-    : req.params.threadId;
+export async function readCodexThread(c: Context<AppEnv>): Promise<Response> {
+  const userId = c.get("user")?.id;
+  const threadId = c.req.param("threadId");
 
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
   const accessState = await resolveCodexAccessState(userId);
 
   if (!accessState.codexAccessTokenActive) {
-    return res.status(403).json({
+    return c.json({
       message: accessState.codexAccessBlockedReason ?? "Codex bloqueado.",
-    });
+    }, 403);
   }
 
   if (!threadId) {
-    return res.status(400).json({ message: "Thread nao informada." });
+    return c.json({ message: "Thread nao informada." }, 400);
   }
 
   try {
     const detail = await readCodexThreadForUser(userId, threadId);
-    return res.json({ ok: true, ...detail });
+    return c.json({ ok: true, ...detail });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Nao foi possivel carregar a thread.";
 
     if (message.includes("nao pertence")) {
-      return res.status(404).json({ message });
+      return c.json({ message }, 404);
     }
 
-    return res.status(500).json({ message });
+    return c.json({ message }, 500);
   }
 }
 
-export function listCodexTools(_req: Request, res: Response) {
-  return res.json({ ok: true, tools: listCodexRuntimeTools() });
+export function listCodexTools(c: Context<AppEnv>): Response {
+  return c.json({ ok: true, tools: listCodexRuntimeTools() });
 }
 
-export async function runCodexTool(req: Request, res: Response) {
-  const toolId = Array.isArray(req.params.toolId)
-    ? req.params.toolId[0]
-    : req.params.toolId;
+export async function runCodexTool(c: Context<AppEnv>): Promise<Response> {
+  const toolId = c.req.param("toolId");
 
   if (!toolId) {
-    return res.status(400).json({ message: "Ferramenta nao informada." });
+    return c.json({ message: "Ferramenta nao informada." }, 400);
   }
 
+  const body = await c.req.json();
+
   try {
-    const result = await runCodexRuntimeTool(toolId, req.body?.params ?? {}, {
+    const result = await runCodexRuntimeTool(toolId, body?.params ?? {}, {
       workspaceRoot: process.cwd().endsWith("/api")
         ? process.cwd().replace(/\/api$/u, "")
         : process.cwd(),
-      cookieHeader: req.headers.cookie,
-      delegatedUserId: req.user?.id ?? null,
-      confirmed: Boolean(req.body?.confirmed),
+      cookieHeader: c.req.header("cookie"),
+      delegatedUserId: c.get("user")?.id ?? null,
+      confirmed: Boolean(body?.confirmed),
     });
 
-    return res.json({ ok: true, result });
+    return c.json({ ok: true, result });
   } catch (error) {
-    return res.status(400).json({
+    return c.json({
       ok: false,
       message: error instanceof Error ? error.message : "Falha ao executar ferramenta.",
-    });
+    }, 400);
   }
 }

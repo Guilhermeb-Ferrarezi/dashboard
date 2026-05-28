@@ -1,5 +1,6 @@
 import { and, count, desc, eq, ilike, inArray, or, sql, sum } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 import { createDotfyProduct, deleteDotfyProduct, updateDotfyProduct } from "../lib/dotfy-products";
@@ -95,7 +96,7 @@ function serializeClienteEnriquecido(
   };
 }
 
-export async function getDashboard(_req: Request, res: Response) {
+export async function getDashboard(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
 
@@ -150,7 +151,7 @@ export async function getDashboard(_req: Request, res: Response) {
     const receitaSemanaRow = receitaSemana as { value: number } | undefined;
     const pedidosHojeRow = pedidosHoje as { value: number } | undefined;
 
-    return res.json({
+    return _c.json({
       totalOrders: Number(totalOrders?.value ?? 0),
       paidOrders: paidCount,
       totalRevenueCents,
@@ -186,15 +187,15 @@ export async function getDashboard(_req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[checkout] getDashboard error:", error);
-    return res.status(500).json({ message: "Erro ao carregar dashboard." });
+    return _c.json({ message: "Erro ao carregar dashboard." }, 500);
   }
 }
 
-export async function listClientes(req: Request, res: Response) {
+export async function listClientes(c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
-    const { page, limit, skip: offset } = parsePagination(req, 20);
-    const q = String(req.query.q || "").trim();
+    const { page, limit, skip: offset } = parsePagination(c, 20);
+    const q = String(c.req.query("q") || "").trim();
 
     const searchFilter = q
       ? or(
@@ -217,7 +218,7 @@ export async function listClientes(req: Request, res: Response) {
     const total = Number(totalRow?.value ?? 0);
 
     if (customers.length === 0) {
-      return res.json({
+      return c.json({
         clientes: [],
         pagination: { page, limit, total, pages: Math.ceil(total / limit) }
       });
@@ -259,29 +260,30 @@ export async function listClientes(req: Request, res: Response) {
       lastOrderAt: s.lastOrderAt as string | null
     }));
 
-    return res.json({
+    return c.json({
       clientes: customers.map((c) => serializeClienteEnriquecido(c, typedStats, paidOrders)),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     console.error("[checkout] listClientes error:", error);
-    return res.status(500).json({ message: "Erro ao listar clientes." });
+    return c.json({ message: "Erro ao listar clientes." }, 500);
   }
 }
 
-export async function updateCliente(req: Request, res: Response) {
+export async function updateCliente(c: Context<AppEnv>): Promise<Response> {
   try {
-    const userId = Number(req.params.userId);
-    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+    const userId = Number(c.req.param("userId"));
+    if (isNaN(userId)) return c.json({ message: "ID inválido." }, 400);
 
-    const { userLogin, userEmail } = req.body as { userLogin?: string; userEmail?: string };
+    const body = await c.req.json();
+    const { userLogin, userEmail } = body as { userLogin?: string; userEmail?: string };
 
     const updates: Record<string, string | null> = {};
     if (userLogin !== undefined) updates.userLogin = userLogin.trim() || null;
     if (userEmail !== undefined) updates.userEmail = userEmail.trim() || null;
 
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "Nenhum campo para atualizar." });
+      return c.json({ message: "Nenhum campo para atualizar." }, 400);
     }
 
     const db = getCheckoutDb();
@@ -291,19 +293,19 @@ export async function updateCliente(req: Request, res: Response) {
       .where(eq(schema.checkoutCustomers.userId, userId))
       .returning();
 
-    if (!updated) return res.status(404).json({ message: "Cliente não encontrado." });
+    if (!updated) return c.json({ message: "Cliente não encontrado." }, 404);
 
-    return res.json({ ok: true });
+    return c.json({ ok: true });
   } catch (error) {
     console.error("[checkout] updateCliente error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar cliente." });
+    return c.json({ message: "Erro ao atualizar cliente." }, 500);
   }
 }
 
-export async function deleteCliente(req: Request, res: Response) {
+export async function deleteCliente(c: Context<AppEnv>): Promise<Response> {
   try {
-    const userId = Number(req.params.userId);
-    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+    const userId = Number(c.req.param("userId"));
+    if (isNaN(userId)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
 
@@ -319,7 +321,7 @@ export async function deleteCliente(req: Request, res: Response) {
       .limit(1);
 
     if (paidOrder) {
-      return res.status(403).json({ message: "Não é possível remover um cliente com pagamentos confirmados." });
+      return c.json({ message: "Não é possível remover um cliente com pagamentos confirmados." }, 403);
     }
 
     const [deleted] = await db
@@ -327,23 +329,23 @@ export async function deleteCliente(req: Request, res: Response) {
       .where(eq(schema.checkoutCustomers.userId, userId))
       .returning();
 
-    if (!deleted) return res.status(404).json({ message: "Cliente não encontrado." });
+    if (!deleted) return c.json({ message: "Cliente não encontrado." }, 404);
 
-    return res.json({ ok: true });
+    return c.json({ ok: true });
   } catch (error) {
     console.error("[checkout] deleteCliente error:", error);
-    return res.status(500).json({ message: "Erro ao remover cliente." });
+    return c.json({ message: "Erro ao remover cliente." }, 500);
   }
 }
 
-export async function listClientePedidos(req: Request, res: Response) {
+export async function listClientePedidos(c: Context<AppEnv>): Promise<Response> {
   try {
-    const userId = Number(req.params.userId);
-    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+    const userId = Number(c.req.param("userId"));
+    if (isNaN(userId)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
-    const { page, limit, skip: offset } = parsePagination(req, 15);
-    const descriptionFilter = String(req.query.description || "").trim();
+    const { page, limit, skip: offset } = parsePagination(c, 15);
+    const descriptionFilter = String(c.req.query("description") || "").trim();
 
     const baseFilter = descriptionFilter
       ? and(
@@ -387,7 +389,7 @@ export async function listClientePedidos(req: Request, res: Response) {
     const paidCount = Number(statusCounts.find((s) => s.status === "paid")?.total ?? 0);
     const refundedCount = Number(statusCounts.find((s) => s.status === "refunded")?.total ?? 0);
 
-    return res.json({
+    return c.json({
       pedidos: orders.map((o) => ({
         ...serializeOrder(o),
         paidAt: paidAtMap.get(o.id)?.toISOString() ?? null
@@ -398,14 +400,14 @@ export async function listClientePedidos(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[checkout] listClientePedidos error:", error);
-    return res.status(500).json({ message: "Erro ao listar pedidos do cliente." });
+    return c.json({ message: "Erro ao listar pedidos do cliente." }, 500);
   }
 }
 
-export async function getComprovante(req: Request, res: Response) {
+export async function getComprovante(c: Context<AppEnv>): Promise<Response> {
   try {
-    const orderId = Number(req.params.id);
-    if (isNaN(orderId)) return res.status(400).json({ message: "ID inválido." });
+    const orderId = Number(c.req.param("id"));
+    if (isNaN(orderId)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
     const [order] = await db
@@ -414,8 +416,8 @@ export async function getComprovante(req: Request, res: Response) {
       .where(eq(schema.checkoutOrders.id, orderId))
       .limit(1);
 
-    if (!order) return res.status(404).json({ message: "Pedido não encontrado." });
-    if (order.status !== "paid") return res.status(400).json({ message: "Pedido não foi pago." });
+    if (!order) return c.json({ message: "Pedido não encontrado." }, 404);
+    if (order.status !== "paid") return c.json({ message: "Pedido não foi pago." }, 400);
 
     const [customer] = await db
       .select()
@@ -448,17 +450,17 @@ ${safeChargeId ? `<div class="row"><span class="label">Charge ID</span><span cla
 <p style="margin-top:24px;font-size:12px;color:#999;text-align:center">Santos Tech · Comprovante gerado em ${new Date().toLocaleString("pt-BR")}</p>
 </body></html>`;
 
-    return res.type("html").send(html);
+    return c.html(html);
   } catch (error) {
     console.error("[checkout] getComprovante error:", error);
-    return res.status(500).json({ message: "Erro ao gerar comprovante." });
+    return c.json({ message: "Erro ao gerar comprovante." }, 500);
   }
 }
 
-export async function refundOrder(req: Request, res: Response) {
+export async function refundOrder(c: Context<AppEnv>): Promise<Response> {
   try {
-    const orderId = Number(req.params.id);
-    if (isNaN(orderId)) return res.status(400).json({ message: "ID inválido." });
+    const orderId = Number(c.req.param("id"));
+    if (isNaN(orderId)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
     const [order] = await db
@@ -467,25 +469,25 @@ export async function refundOrder(req: Request, res: Response) {
       .where(eq(schema.checkoutOrders.id, orderId))
       .limit(1);
 
-    if (!order) return res.status(404).json({ message: "Pedido não encontrado." });
-    if (order.status !== "paid") return res.status(400).json({ message: "Apenas pedidos pagos podem ser reembolsados." });
+    if (!order) return c.json({ message: "Pedido não encontrado." }, 404);
+    if (order.status !== "paid") return c.json({ message: "Apenas pedidos pagos podem ser reembolsados." }, 400);
 
     await db
       .update(schema.checkoutOrders)
       .set({ status: "refunded", updatedAt: new Date() })
       .where(eq(schema.checkoutOrders.id, orderId));
 
-    return res.json({ message: "Reembolso realizado.", orderId });
+    return c.json({ message: "Reembolso realizado.", orderId });
   } catch (error) {
     console.error("[checkout] refundOrder error:", error);
-    return res.status(500).json({ message: "Erro ao reembolsar." });
+    return c.json({ message: "Erro ao reembolsar." }, 500);
   }
 }
 
-export async function listClienteAssinaturas(req: Request, res: Response) {
+export async function listClienteAssinaturas(c: Context<AppEnv>): Promise<Response> {
   try {
-    const userId = Number(req.params.userId);
-    if (isNaN(userId)) return res.status(400).json({ message: "ID inválido." });
+    const userId = Number(c.req.param("userId"));
+    if (isNaN(userId)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
     const assinaturas = await db
@@ -494,7 +496,7 @@ export async function listClienteAssinaturas(req: Request, res: Response) {
       .where(eq(schema.checkoutSubscriptions.userId, userId))
       .orderBy(desc(schema.checkoutSubscriptions.createdAt));
 
-    return res.json({
+    return c.json({
       assinaturas: assinaturas.map((s) => ({
         id: s.id,
         userId: s.userId,
@@ -509,11 +511,11 @@ export async function listClienteAssinaturas(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("[checkout] listClienteAssinaturas error:", error);
-    return res.status(500).json({ message: "Erro ao listar assinaturas do cliente." });
+    return c.json({ message: "Erro ao listar assinaturas do cliente." }, 500);
   }
 }
 
-export async function getNovosPorMes(_req: Request, res: Response) {
+export async function getNovosPorMes(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const rows = await db.execute(sql`
@@ -526,14 +528,14 @@ export async function getNovosPorMes(_req: Request, res: Response) {
       ORDER BY mes ASC
     `);
 
-    return res.json({ data: Array.from(rows) });
+    return _c.json({ data: Array.from(rows) });
   } catch (error) {
     console.error("[checkout] getNovosPorMes error:", error);
-    return res.status(500).json({ message: "Erro ao buscar dados mensais." });
+    return _c.json({ message: "Erro ao buscar dados mensais." }, 500);
   }
 }
 
-export async function listProdutos(_req: Request, res: Response) {
+export async function listProdutos(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const produtos = await db
@@ -541,16 +543,17 @@ export async function listProdutos(_req: Request, res: Response) {
       .from(schema.checkoutProducts)
       .orderBy(desc(schema.checkoutProducts.createdAt));
 
-    return res.json({ produtos: produtos.map(serializeProduct) });
+    return _c.json({ produtos: produtos.map(serializeProduct) });
   } catch (error) {
     console.error("[checkout] listProdutos error:", error);
-    return res.status(500).json({ message: "Erro ao listar produtos." });
+    return _c.json({ message: "Erro ao listar produtos." }, 500);
   }
 }
 
-export async function createProduto(req: Request, res: Response) {
+export async function createProduto(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { name, description, amountCents, discountPercent, features, imageKey, imageUrl } = req.body as {
+    const body = await c.req.json();
+    const { name, description, amountCents, discountPercent, features, imageKey, imageUrl } = body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
@@ -561,19 +564,19 @@ export async function createProduto(req: Request, res: Response) {
     };
 
     if (!name?.trim()) {
-      return res.status(400).json({ message: "Nome é obrigatório." });
+      return c.json({ message: "Nome é obrigatório." }, 400);
     }
 
     const cents = Number(amountCents);
     if (!Number.isInteger(cents) || cents <= 0) {
-      return res.status(400).json({ message: "Valor inválido." });
+      return c.json({ message: "Valor inválido." }, 400);
     }
 
     let discPct: number | null = null;
     if (discountPercent !== undefined && discountPercent !== null && discountPercent !== "") {
       discPct = Number(discountPercent);
       if (!Number.isInteger(discPct) || discPct < 0 || discPct > 99) {
-        return res.status(400).json({ message: "Desconto deve ser entre 0 e 99%." });
+        return c.json({ message: "Desconto deve ser entre 0 e 99%." }, 400);
       }
     }
 
@@ -611,19 +614,20 @@ export async function createProduto(req: Request, res: Response) {
       console.warn("[checkout] dotfy product sync failed:", dotfyResult.error);
     }
 
-    return res.status(201).json({ produto: serializeProduct(produto!) });
+    return c.json({ produto: serializeProduct(produto!) }, 201);
   } catch (error) {
     console.error("[checkout] createProduto error:", error);
-    return res.status(500).json({ message: "Erro ao criar produto." });
+    return c.json({ message: "Erro ao criar produto." }, 500);
   }
 }
 
-export async function updateProduto(req: Request, res: Response) {
+export async function updateProduto(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
-    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao } = req.body as {
+    const body = await c.req.json();
+    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao } = body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
@@ -650,7 +654,7 @@ export async function updateProduto(req: Request, res: Response) {
     if (amountCents !== undefined) {
       const cents = Number(amountCents);
       if (!Number.isInteger(cents) || cents <= 0) {
-        return res.status(400).json({ message: "Valor inválido." });
+        return c.json({ message: "Valor inválido." }, 400);
       }
       updates.amountCents = cents;
     }
@@ -660,7 +664,7 @@ export async function updateProduto(req: Request, res: Response) {
       } else {
         const discPct = Number(discountPercent);
         if (!Number.isInteger(discPct) || discPct < 0 || discPct > 99) {
-          return res.status(400).json({ message: "Desconto deve ser entre 0 e 99%." });
+          return c.json({ message: "Desconto deve ser entre 0 e 99%." }, 400);
         }
         updates.discountPercent = discPct;
       }
@@ -676,7 +680,7 @@ export async function updateProduto(req: Request, res: Response) {
       .where(eq(schema.checkoutProducts.id, id))
       .returning();
 
-    if (!produto) return res.status(404).json({ message: "Produto não encontrado." });
+    if (!produto) return c.json({ message: "Produto não encontrado." }, 404);
 
     if (name !== undefined || amountCents !== undefined || discountPercent !== undefined || imageUrl !== undefined) {
       try {
@@ -701,17 +705,17 @@ export async function updateProduto(req: Request, res: Response) {
       }
     }
 
-    return res.json({ produto: serializeProduct(produto) });
+    return c.json({ produto: serializeProduct(produto) });
   } catch (error) {
     console.error("[checkout] updateProduto error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar produto." });
+    return c.json({ message: "Erro ao atualizar produto." }, 500);
   }
 }
 
-export async function deleteProduto(req: Request, res: Response) {
+export async function deleteProduto(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
     const [deleted] = await db
@@ -719,7 +723,7 @@ export async function deleteProduto(req: Request, res: Response) {
       .where(eq(schema.checkoutProducts.id, id))
       .returning();
 
-    if (!deleted) return res.status(404).json({ message: "Produto não encontrado." });
+    if (!deleted) return c.json({ message: "Produto não encontrado." }, 404);
 
     try {
       if (deleted.dotfyProductId) {
@@ -732,32 +736,33 @@ export async function deleteProduto(req: Request, res: Response) {
       console.warn("[checkout] dotfy product delete error:", err);
     }
 
-    return res.json({ message: "Produto removido." });
+    return c.json({ message: "Produto removido." });
   } catch (error) {
     console.error("[checkout] deleteProduto error:", error);
-    return res.status(500).json({ message: "Erro ao remover produto." });
+    return c.json({ message: "Erro ao remover produto." }, 500);
   }
 }
 
 // ── Cupons ────────────────────────────────────────────────────────────────────
 
-export async function listCupons(_req: Request, res: Response) {
+export async function listCupons(_c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     const cupons = await db
       .select()
       .from(schema.checkoutCoupons)
       .orderBy(desc(schema.checkoutCoupons.createdAt));
-    return res.json({ cupons: cupons.map(serializeCupom) });
+    return _c.json({ cupons: cupons.map(serializeCupom) });
   } catch (error) {
     console.error("[checkout] listCupons error:", error);
-    return res.status(500).json({ message: "Erro ao listar cupons." });
+    return _c.json({ message: "Erro ao listar cupons." }, 500);
   }
 }
 
-export async function createCupom(req: Request, res: Response) {
+export async function createCupom(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { code, discountPercent, maxUses, expiresAt } = req.body as {
+    const body = await c.req.json();
+    const { code, discountPercent, maxUses, expiresAt } = body as {
       code?: string;
       discountPercent?: unknown;
       maxUses?: unknown;
@@ -765,19 +770,19 @@ export async function createCupom(req: Request, res: Response) {
     };
 
     if (!code?.trim()) {
-      return res.status(400).json({ message: "Código é obrigatório." });
+      return c.json({ message: "Código é obrigatório." }, 400);
     }
 
     const discPct = Number(discountPercent);
     if (!Number.isInteger(discPct) || discPct < 1 || discPct > 99) {
-      return res.status(400).json({ message: "Desconto deve ser entre 1 e 99%." });
+      return c.json({ message: "Desconto deve ser entre 1 e 99%." }, 400);
     }
 
     let maxUsesVal: number | null = null;
     if (maxUses !== undefined && maxUses !== null && maxUses !== "") {
       maxUsesVal = Number(maxUses);
       if (!Number.isInteger(maxUsesVal) || maxUsesVal < 1) {
-        return res.status(400).json({ message: "Limite de usos inválido." });
+        return c.json({ message: "Limite de usos inválido." }, 400);
       }
     }
 
@@ -794,22 +799,23 @@ export async function createCupom(req: Request, res: Response) {
       })
       .returning();
 
-    return res.status(201).json({ cupom: serializeCupom(cupom!) });
+    return c.json({ cupom: serializeCupom(cupom!) }, 201);
   } catch (error: unknown) {
     if ((error as { code?: string }).code === "23505") {
-      return res.status(409).json({ message: "Já existe um cupom com esse código." });
+      return c.json({ message: "Já existe um cupom com esse código." }, 409);
     }
     console.error("[checkout] createCupom error:", error);
-    return res.status(500).json({ message: "Erro ao criar cupom." });
+    return c.json({ message: "Erro ao criar cupom." }, 500);
   }
 }
 
-export async function updateCupom(req: Request, res: Response) {
+export async function updateCupom(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
-    const { discountPercent, maxUses, expiresAt, active } = req.body as {
+    const body = await c.req.json();
+    const { discountPercent, maxUses, expiresAt, active } = body as {
       discountPercent?: unknown;
       maxUses?: unknown;
       expiresAt?: string | null;
@@ -823,7 +829,7 @@ export async function updateCupom(req: Request, res: Response) {
     if (discountPercent !== undefined) {
       const discPct = Number(discountPercent);
       if (!Number.isInteger(discPct) || discPct < 1 || discPct > 99) {
-        return res.status(400).json({ message: "Desconto deve ser entre 1 e 99%." });
+        return c.json({ message: "Desconto deve ser entre 1 e 99%." }, 400);
       }
       updates.discountPercent = discPct;
     }
@@ -834,7 +840,7 @@ export async function updateCupom(req: Request, res: Response) {
       } else {
         const val = Number(maxUses);
         if (!Number.isInteger(val) || val < 1) {
-          return res.status(400).json({ message: "Limite de usos inválido." });
+          return c.json({ message: "Limite de usos inválido." }, 400);
         }
         updates.maxUses = val;
       }
@@ -853,19 +859,19 @@ export async function updateCupom(req: Request, res: Response) {
       .where(eq(schema.checkoutCoupons.id, id))
       .returning();
 
-    if (!cupom) return res.status(404).json({ message: "Cupom não encontrado." });
+    if (!cupom) return c.json({ message: "Cupom não encontrado." }, 404);
 
-    return res.json({ cupom: serializeCupom(cupom) });
+    return c.json({ cupom: serializeCupom(cupom) });
   } catch (error) {
     console.error("[checkout] updateCupom error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar cupom." });
+    return c.json({ message: "Erro ao atualizar cupom." }, 500);
   }
 }
 
-export async function deleteCupom(req: Request, res: Response) {
+export async function deleteCupom(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ message: "ID inválido." });
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
     const db = getCheckoutDb();
     const [deleted] = await db
@@ -873,11 +879,11 @@ export async function deleteCupom(req: Request, res: Response) {
       .where(eq(schema.checkoutCoupons.id, id))
       .returning();
 
-    if (!deleted) return res.status(404).json({ message: "Cupom não encontrado." });
+    if (!deleted) return c.json({ message: "Cupom não encontrado." }, 404);
 
-    return res.json({ message: "Cupom removido." });
+    return c.json({ message: "Cupom removido." });
   } catch (error) {
     console.error("[checkout] deleteCupom error:", error);
-    return res.status(500).json({ message: "Erro ao remover cupom." });
+    return c.json({ message: "Erro ao remover cupom." }, 500);
   }
 }

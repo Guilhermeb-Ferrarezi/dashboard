@@ -1,5 +1,6 @@
 import { asc, eq } from "drizzle-orm";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { getCheckoutDb, schema } from "../db/index";
 
@@ -52,12 +53,12 @@ async function ensureBootstrap(
   });
 }
 
-export async function listColaboradores(req: Request, res: Response) {
+export async function listColaboradores(c: Context<AppEnv>): Promise<Response> {
   try {
     const db = getCheckoutDb();
     await ensureBootstrap(db);
 
-    const ativoFilter = req.query.ativo;
+    const ativoFilter = c.req.query("ativo");
     let whereClause;
     if (ativoFilter === "true") whereClause = eq(schema.colaboradores.ativo, true);
     else if (ativoFilter === "false") whereClause = eq(schema.colaboradores.ativo, false);
@@ -68,19 +69,20 @@ export async function listColaboradores(req: Request, res: Response) {
       .where(whereClause)
       .orderBy(asc(schema.colaboradores.nome));
 
-    return res.json({ colaboradores: colaboradores.map(serializeColaborador) });
+    return c.json({ colaboradores: colaboradores.map(serializeColaborador) });
   } catch (error) {
     console.error("[corujao] listColaboradores error:", error);
-    return res.status(500).json({ message: "Erro ao listar colaboradores." });
+    return c.json({ message: "Erro ao listar colaboradores." }, 500);
   }
 }
 
-export async function createColaborador(req: Request, res: Response) {
+export async function createColaborador(c: Context<AppEnv>): Promise<Response> {
   try {
-    const { nome, ativo } = req.body as { nome?: unknown; ativo?: unknown };
+    const body = await c.req.json();
+    const { nome, ativo } = body as { nome?: unknown; ativo?: unknown };
 
     const nomeParsed = parseColaboradorNome(nome);
-    if (!nomeParsed.ok) return res.status(400).json({ message: nomeParsed.error });
+    if (!nomeParsed.ok) return c.json({ message: nomeParsed.error }, 400);
 
     const ativoVal = typeof ativo === "boolean" ? ativo : true;
 
@@ -94,21 +96,22 @@ export async function createColaborador(req: Request, res: Response) {
       })
       .returning();
 
-    return res.status(201).json({ colaborador: serializeColaborador(colaborador!) });
+    return c.json({ colaborador: serializeColaborador(colaborador!) }, 201);
   } catch (error) {
     console.error("[corujao] createColaborador error:", error);
-    return res.status(500).json({ message: "Erro ao criar colaborador." });
+    return c.json({ message: "Erro ao criar colaborador." }, 500);
   }
 }
 
-export async function updateColaborador(req: Request, res: Response) {
+export async function updateColaborador(c: Context<AppEnv>): Promise<Response> {
   try {
-    const id = Number(req.params.id);
+    const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ message: "ID inválido." });
+      return c.json({ message: "ID inválido." }, 400);
     }
 
-    const { nome, ativo } = req.body as { nome?: unknown; ativo?: unknown };
+    const body = await c.req.json();
+    const { nome, ativo } = body as { nome?: unknown; ativo?: unknown };
 
     const updates: Partial<typeof schema.colaboradores.$inferInsert> = {
       updatedAt: new Date()
@@ -116,13 +119,13 @@ export async function updateColaborador(req: Request, res: Response) {
 
     if (nome !== undefined) {
       const parsed = parseColaboradorNome(nome);
-      if (!parsed.ok) return res.status(400).json({ message: parsed.error });
+      if (!parsed.ok) return c.json({ message: parsed.error }, 400);
       updates.nome = parsed.value;
     }
 
     if (ativo !== undefined) {
       if (typeof ativo !== "boolean") {
-        return res.status(400).json({ message: "Campo ativo deve ser true ou false." });
+        return c.json({ message: "Campo ativo deve ser true ou false." }, 400);
       }
       updates.ativo = ativo;
     }
@@ -134,11 +137,11 @@ export async function updateColaborador(req: Request, res: Response) {
       .where(eq(schema.colaboradores.id, id))
       .returning();
 
-    if (!colaborador) return res.status(404).json({ message: "Colaborador não encontrado." });
+    if (!colaborador) return c.json({ message: "Colaborador não encontrado." }, 404);
 
-    return res.json({ colaborador: serializeColaborador(colaborador) });
+    return c.json({ colaborador: serializeColaborador(colaborador) });
   } catch (error) {
     console.error("[corujao] updateColaborador error:", error);
-    return res.status(500).json({ message: "Erro ao atualizar colaborador." });
+    return c.json({ message: "Erro ao atualizar colaborador." }, 500);
   }
 }

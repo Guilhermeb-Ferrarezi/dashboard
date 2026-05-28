@@ -1,6 +1,8 @@
-import type { Response } from "express";
+import { streamSSE } from "hono/streaming";
+import type { Context } from "hono";
 import { count, and, asc, gte, inArray } from "drizzle-orm";
 import { getCheckoutDb, schema } from "../db/index";
+import type { AppEnv } from "../types/hono";
 
 type VagasPayload = {
   sessaoId: number;
@@ -10,22 +12,35 @@ type VagasPayload = {
   vagasRestantes: number;
 } | null;
 
-const clients = new Set<Response>();
+type SseWriter = {
+  write: (data: string) => void | Promise<void>;
+};
 
-export function addClient(res: Response) {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*"
+const clients = new Set<SseWriter>();
+
+// Handler Hono para SSE de vagas — usado como middleware de rota
+export function addClient(c: Context<AppEnv>) {
+  return streamSSE(c, async (stream) => {
+    const writer: SseWriter = {
+      write: (data: string) => stream.write(data),
+    };
+    clients.add(writer);
+    stream.onAbort(() => clients.delete(writer));
+
+    const payload = await getVagasPayload();
+    await stream.write(`event: vagas-update\ndata: ${JSON.stringify(payload)}\n\n`);
+
+    // manter stream vivo até o cliente desconectar
+    await new Promise<void>((resolve) => stream.onAbort(resolve));
   });
-  res.write("\n");
+}
 
-  clients.add(res);
-  res.on("close", () => clients.delete(res));
+export function addSseClient(writer: SseWriter, onClose: (fn: () => void) => void) {
+  clients.add(writer);
+  onClose(() => clients.delete(writer));
 
   getVagasPayload().then((data) => {
-    res.write(`event: vagas-update\ndata: ${JSON.stringify(data)}\n\n`);
+    writer.write(`event: vagas-update\ndata: ${JSON.stringify(data)}\n\n`);
   });
 }
 

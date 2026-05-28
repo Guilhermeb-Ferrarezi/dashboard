@@ -1,10 +1,10 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Context, Next } from "hono";
+import type { AppEnv } from "../types/hono";
 
 export function requireRole(role: "user" | "admin") {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user;
-    if (!user || user.role !== role)
-      return res.status(403).json({ message: "Forbidden: incorrect role" });
-    next();
+  return async (c: Context<AppEnv>, next: Next) => {
+    const user = c.get("user");
+    if (!user || user.role !== role) return c.json({ message: "Forbidden: incorrect role" }, 403);
+    await next();
   };
 }

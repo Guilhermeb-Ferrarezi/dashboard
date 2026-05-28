@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   createCupom,
@@ -22,7 +23,7 @@ import {
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 

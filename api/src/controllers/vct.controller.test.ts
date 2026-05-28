@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import type { Request, Response } from "express";
 
 import {
   atribuirTimesAutomatico,
@@ -12,24 +11,7 @@ import {
 import { VCT_INSCRICAO_STATUS } from "../lib/vct-inscricao-status";
 import { VctInscricao } from "../models/VctInscricao";
 import { VctTime } from "../models/VctTime";
-
-type MockResponse = Partial<Response> & {
-  statusCode?: number;
-  body?: unknown;
-};
-
-function makeResponse(): MockResponse {
-  const res: MockResponse = {};
-  res.status = mock((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  });
-  res.json = mock((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  });
-  return res;
-}
+import { createMockContext } from "../test-utils/mock-context";
 
 describe("atualizarInscricao", () => {
   const originalFindByIdAndUpdate = VctInscricao.findByIdAndUpdate;
@@ -51,7 +33,7 @@ describe("atualizarInscricao", () => {
   });
 
   test("persists the inscription detail fields edited from the details modal", async () => {
-    const req = {
+    const c = createMockContext({
       params: { id: "inscricao-1" },
       body: {
         nome: " Guilherme ",
@@ -78,13 +60,13 @@ describe("atualizarInscricao", () => {
         observacoes: "  precisa revisar  ",
         highlightColor: " blue ",
       },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await atualizarInscricao(req, res as Response);
+    const response = await atualizarInscricao(c);
+    const data = await response.json();
 
-    expect(res.statusCode).toBeUndefined();
-    expect(res.body).toMatchObject({
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
       ok: true,
       inscricao: {
         _id: "inscricao-1",
@@ -107,7 +89,7 @@ describe("atualizarInscricao", () => {
   });
 
   test("aceita salvar uma edicao quando campos legados do compromisso estao vazios", async () => {
-    const req = {
+    const c = createMockContext({
       params: { id: "inscricao-2" },
       body: {
         nome: " Guilherme ",
@@ -134,13 +116,13 @@ describe("atualizarInscricao", () => {
         observacoes: "",
         highlightColor: "",
       },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await atualizarInscricao(req, res as Response);
+    const response = await atualizarInscricao(c);
+    const data = await response.json();
 
-    expect(res.statusCode).toBeUndefined();
-    expect(res.body).toMatchObject({
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
       ok: true,
       inscricao: {
         _id: "inscricao-2",
@@ -180,17 +162,17 @@ describe("status de participacao no campeonato", () => {
       return Promise.resolve({ modifiedCount: 2 });
     }) as typeof VctInscricao.updateMany;
 
-    const req = {
+    const c = createMockContext({
       body: {
         ids: ["inscricao-1", "inscricao-2"],
         status: VCT_INSCRICAO_STATUS.INACTIVE,
       },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await atualizarStatusInscricoes(req, res as Response);
+    const response = await atualizarStatusInscricoes(c);
+    const data = await response.json();
 
-    expect(res.body).toMatchObject({
+    expect(data).toMatchObject({
       ok: true,
       atualizados: 2,
       status: VCT_INSCRICAO_STATUS.INACTIVE,
@@ -226,10 +208,12 @@ describe("status de participacao no campeonato", () => {
       return Promise.resolve({ modifiedCount: 1 });
     }) as typeof VctInscricao.updateMany;
 
-    const req = { params: { numero: "1" }, body: {} } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({
+      params: { numero: "1" },
+      body: {},
+    });
 
-    await preencherTime(req, res as Response);
+    await preencherTime(c);
 
     expect(updateManyFilter).toEqual({ _id: { $in: ["ativo"] } });
     expect(updateManyUpdate).toEqual({ time: 1 });
@@ -263,10 +247,9 @@ describe("status de participacao no campeonato", () => {
       }),
     })) as typeof VctTime.find;
 
-    const req = { body: {} } as Request;
-    const res = makeResponse();
+    const c = createMockContext({ body: {} });
 
-    await atribuirTimesAutomatico(req, res as Response);
+    await atribuirTimesAutomatico(c);
 
     expect(bulkWriteOps).toEqual([
       { updateOne: { filter: { _id: "ativo" }, update: { $set: { time: 1 } } } },
@@ -294,13 +277,13 @@ describe("modalidades de inscricao", () => {
       };
     }) as typeof VctInscricao.find;
 
-    const req = { query: { modalidade: "counter-strike" } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ query: { modalidade: "counter-strike" } });
 
-    await listarInscricoes(req, res as Response);
+    const response = await listarInscricoes(c);
+    const data = await response.json();
 
     expect(filterUsed).toEqual({ modalidade: "counter-strike" });
-    expect(res.body).toMatchObject({
+    expect(data).toMatchObject({
       ok: true,
       inscricoes: [{ _id: "cs-1", modalidade: "counter-strike" }],
     });
@@ -317,10 +300,10 @@ describe("modalidades de inscricao", () => {
       };
     }) as typeof VctInscricao.find;
 
-    const req = { query: { modalidade: "valorant" } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({ query: { modalidade: "valorant" } });
 
-    await listarInscricoes(req, res as Response);
+    const response = await listarInscricoes(c);
+    const data = await response.json();
 
     expect(filterUsed).toEqual({
       $or: [
@@ -328,7 +311,7 @@ describe("modalidades de inscricao", () => {
         { modalidade: { $exists: false } },
       ],
     });
-    expect(res.body).toMatchObject({
+    expect(data).toMatchObject({
       ok: true,
       inscricoes: [{ _id: "legacy-1" }],
     });
@@ -358,14 +341,13 @@ describe("modalidades de inscricao", () => {
       return Promise.resolve({ modifiedCount: 1 });
     }) as typeof VctInscricao.updateMany;
 
-    const req = {
+    const c = createMockContext({
       params: { numero: "1" },
       query: { modalidade: "counter-strike" },
       body: {},
-    } as unknown as Request;
-    const res = makeResponse();
+    });
 
-    await preencherTime(req, res as Response);
+    await preencherTime(c);
 
     expect(filterUsed).toEqual({ modalidade: "counter-strike" });
     expect(updateManyFilter).toEqual({ _id: { $in: ["cs-ativo"] } });
@@ -397,14 +379,18 @@ describe("remocao de time", () => {
       };
     }) as typeof VctTime.findOneAndDelete;
 
-    const req = { params: { numero: "8" }, query: { modalidade: "lol" } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({
+      params: { numero: "8" },
+      query: { modalidade: "lol" },
+      body: {},
+    });
 
-    await removerTime(req, res as Response);
+    const response = await removerTime(c);
+    const data = await response.json();
 
     expect(existsFilter).toEqual({ modalidade: "lol", time: 8 });
     expect(deleteFilter).toEqual({ modalidade: "lol", numero: 8 });
-    expect(res.body).toMatchObject({ ok: true, removido: 8 });
+    expect(data).toMatchObject({ ok: true, removido: 8 });
   });
 
   test("bloqueia a remocao quando o time ainda tem inscritos", async () => {
@@ -417,13 +403,16 @@ describe("remocao de time", () => {
       };
     }) as typeof VctTime.findOneAndDelete;
 
-    const req = { params: { numero: "8" } } as unknown as Request;
-    const res = makeResponse();
+    const c = createMockContext({
+      params: { numero: "8" },
+      body: {},
+    });
 
-    await removerTime(req, res as Response);
+    const response = await removerTime(c);
+    const data = await response.json();
 
-    expect(res.statusCode).toBe(409);
-    expect(res.body).toMatchObject({
+    expect(response.status).toBe(409);
+    expect(data).toMatchObject({
       ok: false,
       message: "Limpe o time antes de removê-lo.",
     });
