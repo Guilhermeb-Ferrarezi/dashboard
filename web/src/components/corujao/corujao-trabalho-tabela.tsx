@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   ArrowUpDownIcon,
   CheckIcon,
+  MessageIcon,
   MoonIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -53,6 +54,11 @@ import {
   type ProximaSessao
 } from "./corujao-proxima-sessao-card";
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
+import {
+  CorujaoMensagemDialog,
+  applyMensagemVariables,
+  readMensagemChamar,
+} from "./corujao-mensagem-dialog";
 
 type SessaoOption = {
   id: number;
@@ -325,6 +331,7 @@ export function CorujaoTrabalhoTabela() {
 
   type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number; numeroInvalido: number };
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [mensagemDialogOpen, setMensagemDialogOpen] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -551,7 +558,12 @@ export function CorujaoTrabalhoTabela() {
       toast.error("Telefone inválido para WhatsApp.");
       return;
     }
-    window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+    const mensagemTemplate = readMensagemChamar();
+    const mensagem = mensagemTemplate ? applyMensagemVariables(mensagemTemplate, contato) : "";
+    const url = mensagem
+      ? `https://wa.me/${normalized}?text=${encodeURIComponent(mensagem)}`
+      : `https://wa.me/${normalized}`;
+    window.open(url, "_blank", "noopener,noreferrer");
 
     setRowBusy(contato.id);
     try {
@@ -896,10 +908,21 @@ export function CorujaoTrabalhoTabela() {
             </Button>
           )}
         </div>
-        <Button onClick={openCreate} className="gap-1.5">
-          <PlusIcon className="h-4 w-4" />
-          Novo contato
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMensagemDialogOpen(true)}
+            title="Mensagem padrão pro WhatsApp"
+            className="h-9 w-9"
+          >
+            <MessageIcon className="h-4 w-4" />
+          </Button>
+          <Button onClick={openCreate} className="gap-1.5">
+            <PlusIcon className="h-4 w-4" />
+            Novo contato
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
@@ -1506,6 +1529,11 @@ export function CorujaoTrabalhoTabela() {
           setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
           setDeleteTarget(null);
         }}
+      />
+
+      <CorujaoMensagemDialog
+        open={mensagemDialogOpen}
+        onOpenChange={setMensagemDialogOpen}
       />
     </div>
   );

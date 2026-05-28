@@ -15,6 +15,7 @@ import {
   CaretDown,
   CaretRight,
   CaretUp,
+  ChatCircleText,
   Check,
   CheckCircle,
   Clipboard,
@@ -103,6 +104,7 @@ export const BadgeCheckIcon = SealCheck;
 export const BellRingIcon = BellRinging;
 export const BookOpenTextIcon = BookOpenText;
 export const CalendarIcon = CalendarBlank;
+export const MessageIcon = ChatCircleText;
 export const CheckIcon = Check;
 export const ChevronDownIcon = CaretDown;
 export const ChevronRightIcon = CaretRight;
