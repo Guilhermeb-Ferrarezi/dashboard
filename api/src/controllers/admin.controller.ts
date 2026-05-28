@@ -153,5 +153,10 @@ export async function deleteUser(req: Request, res: Response) {
   const user = await User.findByIdAndDelete(id).lean();
   if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
 
+  await Promise.all([
+    UserAccessToken.updateMany({ userId: id, revokedAt: null }, { revokedAt: new Date() }),
+    AdminAccessToken.updateMany({ adminId: id, revokedAt: null }, { revokedAt: new Date() }),
+  ]);
+
   return res.json({ message: "Usuário removido." });
 }
