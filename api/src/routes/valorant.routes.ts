@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 function parseRiotId(value: unknown) {
   if (typeof value !== "string") return null;
@@ -35,12 +36,12 @@ function getFriendlyValorantMessage(message: string) {
   return message;
 }
 
-router.post("/lookup", async (req, res) => {
-  const riotId = parseRiotId(req.body?.riotId);
+router.post("/lookup", async (c) => {
+  const body = await c.req.json();
+  const riotId = parseRiotId(body?.riotId);
 
   if (!riotId) {
-    res.status(400).json({ ok: false, message: "Informe o Riot ID no formato Nome#TAG." });
-    return;
+    return c.json({ ok: false, message: "Informe o Riot ID no formato Nome#TAG." }, 400);
   }
 
   const lookupUrl =
@@ -64,19 +65,19 @@ router.post("/lookup", async (req, res) => {
         typeof payload?.message === "string"
           ? getFriendlyValorantMessage(payload.message)
           : "Nao foi possivel validar esse Riot ID.";
-      res.status(response.status).json(
+      return c.json(
         payload ? { ...payload, message } : { ok: false, message },
+        response.status as Parameters<typeof c.json>[1],
       );
-      return;
     }
 
-    res.json(payload);
+    return c.json(payload as Record<string, unknown>);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida.";
-    res.status(502).json({
+    return c.json({
       ok: false,
       message: getFriendlyValorantMessage(`Nao foi possivel consultar o perfil Valorant agora. ${message}`),
-    });
+    }, 502);
   }
 });
 
