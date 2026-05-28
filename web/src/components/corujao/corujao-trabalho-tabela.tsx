@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  ArrowUpDownIcon,
   CheckIcon,
   MoonIcon,
   MoreHorizontalIcon,
@@ -271,6 +272,8 @@ function formatRelativeContact(iso: string | null): string {
 
 function getStatusChamada(contato: { ultimoContatoEm: string | null; statusConversa: string | null }): { label: string; tone: StatusBadgeTone } {
   if (!contato.ultimoContatoEm) return { label: "Não chamou", tone: "muted" };
+  if (contato.statusConversa === "sem_resposta") return { label: "Não respondeu", tone: "red" };
+  if (contato.statusConversa === "recusou") return { label: "Número inválido", tone: "red" };
   const respondeu = contato.statusConversa && contato.statusConversa !== "sem_resposta";
   if (respondeu) return { label: "Respondeu", tone: "emerald" };
   const horasDesde = (Date.now() - new Date(contato.ultimoContatoEm).getTime()) / 3_600_000;
@@ -323,6 +326,7 @@ export function CorujaoTrabalhoTabela() {
   const [filterConversa, setFilterConversa] = useState<StatusConversa | "">("");
   const [filterPagamento, setFilterPagamento] = useState<StatusPagamento | "">("");
   const [filterChamada, setFilterChamada] = useState<"" | "chamou" | "nao_chamou" | "nao_respondeu">("");
+  const [sortBy, setSortBy] = useState<"prioridade" | "recente" | "alfabetico" | "alfabetico_desc">("prioridade");
 
   type Metricas = { total: number; naoChamou: number; chamou: number; respondeu: number; naoRespondeu: number };
   const [metricas, setMetricas] = useState<Metricas | null>(null);
@@ -363,7 +367,8 @@ export function CorujaoTrabalhoTabela() {
     setLoading(true);
     const params = new URLSearchParams({
       page: String(page),
-      limit: String(PAGE_SIZE)
+      limit: String(PAGE_SIZE),
+      sortBy
     });
     if (debouncedQuery) params.set("q", debouncedQuery);
     if (filterConversa) params.set("statusConversa", filterConversa);
@@ -397,7 +402,7 @@ export function CorujaoTrabalhoTabela() {
     reload();
     reloadMetricas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedQuery, filterConversa, filterPagamento, filterChamada]);
+  }, [page, debouncedQuery, filterConversa, filterPagamento, filterChamada, sortBy]);
 
   async function reloadProximaSessao() {
     setProximaLoading(true);
@@ -567,7 +572,7 @@ export function CorujaoTrabalhoTabela() {
     }
   }
 
-  async function handleSetChamada(contato: Contato, action: "chamou" | "nao_respondeu" | "limpar") {
+  async function handleSetChamada(contato: Contato, action: "chamou" | "nao_respondeu" | "numero_invalido" | "limpar") {
     setRowBusy(contato.id);
     try {
       if (action === "chamou") {
@@ -577,12 +582,20 @@ export function CorujaoTrabalhoTabela() {
         );
         setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
       } else if (action === "nao_respondeu") {
-        const forceOld = new Date(Date.now() - 25 * 3600_000).toISOString();
         const res = await clientApi<{ contato: Contato }>(`/corujao/contatos/${contato.id}`, {
           method: "PATCH",
           body: JSON.stringify({
-            ultimoContatoEm: contato.ultimoContatoEm ?? forceOld,
+            ultimoContatoEm: contato.ultimoContatoEm ?? new Date().toISOString(),
             statusConversa: "sem_resposta"
+          })
+        });
+        setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
+      } else if (action === "numero_invalido") {
+        const res = await clientApi<{ contato: Contato }>(`/corujao/contatos/${contato.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ultimoContatoEm: contato.ultimoContatoEm ?? new Date().toISOString(),
+            statusConversa: "recusou"
           })
         });
         setContatos((cur) => cur.map((c) => (c.id === contato.id ? res.contato : c)));
@@ -904,7 +917,19 @@ export function CorujaoTrabalhoTabela() {
           <Table variant="linear">
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy(sortBy === "alfabetico" ? "alfabetico_desc" : sortBy === "alfabetico_desc" ? "prioridade" : "alfabetico");
+                      setPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Nome
+                    <ArrowUpDownIcon className={`size-3 ${sortBy.startsWith("alfabetico") ? "text-foreground" : "text-muted-foreground/50"}`} />
+                  </button>
+                </TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Conversa</TableHead>
                 <TableHead>Pagamento</TableHead>
@@ -1057,6 +1082,9 @@ export function CorujaoTrabalhoTabela() {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSetChamada(contato, "nao_respondeu")}>
                                 Não respondeu
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSetChamada(contato, "numero_invalido")}>
+                                Número inválido
                               </DropdownMenuItem>
                               {contato.ultimoContatoEm && (
                                 <DropdownMenuItem

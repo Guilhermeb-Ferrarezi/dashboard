@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  ArrowUpDownIcon,
   DownloadIcon,
   MoonIcon,
   MoreHorizontalIcon,
@@ -224,6 +225,7 @@ export function CorujaoContatosLista() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"recente" | "alfabetico" | "alfabetico_desc">("recente");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -246,7 +248,7 @@ export function CorujaoContatosLista() {
 
   async function reload() {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), sortBy });
     if (debouncedQuery) params.set("q", debouncedQuery);
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
@@ -264,7 +266,7 @@ export function CorujaoContatosLista() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedQuery]);
+  }, [page, debouncedQuery, sortBy]);
 
   async function handleExportar() {
     try {
@@ -425,7 +427,7 @@ export function CorujaoContatosLista() {
               placeholder="Buscar por nome, telefone ou email…"
               value={query}
               onChange={(e) => handleSearch(e.target.value)}
-              className="h-9 text-sm"
+              className="h-9 w-64 text-sm"
             />
           </div>
           {!loading && (
@@ -473,7 +475,19 @@ export function CorujaoContatosLista() {
           <Table variant="linear">
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortBy(sortBy === "alfabetico" ? "alfabetico_desc" : sortBy === "alfabetico_desc" ? "recente" : "alfabetico");
+                      setPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    Nome
+                    <ArrowUpDownIcon className={`size-3 ${sortBy.startsWith("alfabetico") ? "text-foreground" : "text-muted-foreground/50"}`} />
+                  </button>
+                </TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead>Status</TableHead>

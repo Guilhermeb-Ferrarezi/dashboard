@@ -146,7 +146,8 @@ export async function listContatos(req: Request, res: Response) {
     const chamou = req.query.chamou === "true";
     const naoChamou = req.query.naoChamou === "true";
 
-    const sortBy = req.query.sortBy === "recente" ? "recente" : "prioridade";
+    const sortByRaw = String(req.query.sortBy || "prioridade");
+    const sortBy = (["recente", "alfabetico", "alfabetico_desc"].includes(sortByRaw) ? sortByRaw : "prioridade") as "prioridade" | "recente" | "alfabetico" | "alfabetico_desc";
 
     const conditions: SQL[] = [];
     if (q) {
@@ -170,12 +171,20 @@ export async function listContatos(req: Request, res: Response) {
     if (naoRespondeu) {
       conditions.push(
         sql`${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL
-          AND ${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours'
-          AND (${schema.corujaoContatos.statusConversa} IS NULL OR ${schema.corujaoContatos.statusConversa} = 'sem_resposta')`
+          AND (
+            ${schema.corujaoContatos.statusConversa} = 'sem_resposta'
+            OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)
+          )`
       );
     }
     if (chamou) {
-      conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL`);
+      conditions.push(
+        sql`${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL
+          AND (
+            ${schema.corujaoContatos.ultimoContatoEm} >= NOW() - interval '24 hours'
+            OR (${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} != 'sem_resposta')
+          )`
+      );
     }
     if (naoChamou) {
       conditions.push(sql`${schema.corujaoContatos.ultimoContatoEm} IS NULL`);
@@ -183,15 +192,17 @@ export async function listContatos(req: Request, res: Response) {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // prioridade (default): quem nunca foi contatado vem primeiro (NULLS FIRST),
-    // depois quem foi contatado há mais tempo. Desempate por created_at desc.
     const orderByClause =
       sortBy === "recente"
         ? [desc(schema.corujaoContatos.createdAt)]
-        : [
-            sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
-            desc(schema.corujaoContatos.createdAt)
-          ];
+        : sortBy === "alfabetico"
+          ? [sql`${schema.corujaoContatos.nome} ASC NULLS LAST`, desc(schema.corujaoContatos.createdAt)]
+          : sortBy === "alfabetico_desc"
+            ? [sql`${schema.corujaoContatos.nome} DESC NULLS LAST`, desc(schema.corujaoContatos.createdAt)]
+            : [
+                sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
+                desc(schema.corujaoContatos.createdAt)
+              ];
 
     const [[totalRow], contatos] = await Promise.all([
       db.select({ value: count() }).from(schema.corujaoContatos).where(whereClause),
@@ -560,7 +571,7 @@ export async function getContatosMetricas(_req: Request, res: Response) {
         naoChamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NULL)::int`,
         chamou: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL)::int`,
         respondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.statusConversa} IS NOT NULL AND ${schema.corujaoContatos.statusConversa} != 'sem_resposta')::int`,
-        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND ${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND (${schema.corujaoContatos.statusConversa} IS NULL OR ${schema.corujaoContatos.statusConversa} = 'sem_resposta'))::int`
+        naoRespondeu: sql<number>`COUNT(*) FILTER (WHERE ${schema.corujaoContatos.ultimoContatoEm} IS NOT NULL AND (${schema.corujaoContatos.statusConversa} = 'sem_resposta' OR (${schema.corujaoContatos.ultimoContatoEm} < NOW() - interval '24 hours' AND ${schema.corujaoContatos.statusConversa} IS NULL)))::int`
       })
       .from(schema.corujaoContatos);
 
