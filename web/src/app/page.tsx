@@ -1,5 +1,5 @@
-import { ClientRedirect } from "@/components/navigation/client-redirect";
-import { LoginForm } from "@/components/auth/login-form";
+import { redirect } from "next/navigation";
+
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +8,8 @@ export default async function IndexPage() {
   const user = await getSessionUser();
 
   if (user) {
-    return <ClientRedirect to="/home" label="dashboard" />;
+    redirect("/home");
   }
 
-  return <LoginForm />;
+  redirect("/login");
 }
