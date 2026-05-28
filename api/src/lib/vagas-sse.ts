@@ -1,5 +1,8 @@
+import { streamSSE } from "hono/streaming";
+import type { Context } from "hono";
 import { count, and, asc, gte, inArray } from "drizzle-orm";
 import { getCheckoutDb, schema } from "../db/index";
+import type { AppEnv } from "../types/hono";
 
 type VagasPayload = {
   sessaoId: number;
@@ -14,6 +17,23 @@ type SseWriter = {
 };
 
 const clients = new Set<SseWriter>();
+
+// Handler Hono para SSE de vagas — usado como middleware de rota
+export function addClient(c: Context<AppEnv>) {
+  return streamSSE(c, async (stream) => {
+    const writer: SseWriter = {
+      write: (data: string) => stream.write(data),
+    };
+    clients.add(writer);
+    stream.onAbort(() => clients.delete(writer));
+
+    const payload = await getVagasPayload();
+    await stream.write(`event: vagas-update\ndata: ${JSON.stringify(payload)}\n\n`);
+
+    // manter stream vivo até o cliente desconectar
+    await new Promise<void>((resolve) => stream.onAbort(resolve));
+  });
+}
 
 export function addSseClient(writer: SseWriter, onClose: (fn: () => void) => void) {
   clients.add(writer);
