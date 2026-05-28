@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
 import { createDotfyProduct, deleteDotfyProduct, updateDotfyProduct } from "../lib/dotfy-products";
+import { escapeHtml } from "../lib/normalize";
 import { parsePagination } from "../lib/pagination";
 
 function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
@@ -422,6 +423,11 @@ export async function getComprovante(req: Request, res: Response) {
       .where(eq(schema.checkoutCustomers.userId, order.userId))
       .limit(1);
 
+    const safeDescription = escapeHtml(order.description);
+    const safeLogin = escapeHtml(customer?.userLogin ?? "—");
+    const safeEmail = escapeHtml(customer?.userEmail ?? "—");
+    const safeChargeId = order.chargeId ? escapeHtml(order.chargeId) : null;
+
     const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><title>Comprovante #${order.id}</title>
 <style>body{font-family:system-ui,sans-serif;max-width:600px;margin:40px auto;padding:20px;color:#1a1a1a}
@@ -432,13 +438,13 @@ h1{font-size:20px;border-bottom:2px solid #22c55e;padding-bottom:8px}
 @media print{body{margin:0}}</style></head><body>
 <h1>Comprovante de pagamento</h1>
 <div class="row"><span class="label">ID do pedido</span><span class="value">#${order.id}</span></div>
-<div class="row"><span class="label">Produto</span><span class="value">${order.description}</span></div>
+<div class="row"><span class="label">Produto</span><span class="value">${safeDescription}</span></div>
 <div class="row"><span class="label">Valor</span><span class="value">R$ ${(order.amountCents / 100).toFixed(2).replace(".", ",")}</span></div>
 <div class="row"><span class="label">Status</span><span class="status">Pago</span></div>
 <div class="row"><span class="label">Data</span><span class="value">${order.createdAt.toLocaleDateString("pt-BR")}</span></div>
-<div class="row"><span class="label">Cliente</span><span class="value">${customer?.userLogin ?? "—"}</span></div>
-<div class="row"><span class="label">E-mail</span><span class="value">${customer?.userEmail ?? "—"}</span></div>
-${order.chargeId ? `<div class="row"><span class="label">Charge ID</span><span class="value" style="font-family:monospace;font-size:12px">${order.chargeId}</span></div>` : ""}
+<div class="row"><span class="label">Cliente</span><span class="value">${safeLogin}</span></div>
+<div class="row"><span class="label">E-mail</span><span class="value">${safeEmail}</span></div>
+${safeChargeId ? `<div class="row"><span class="label">Charge ID</span><span class="value" style="font-family:monospace;font-size:12px">${safeChargeId}</span></div>` : ""}
 <p style="margin-top:24px;font-size:12px;color:#999;text-align:center">Santos Tech · Comprovante gerado em ${new Date().toLocaleString("pt-BR")}</p>
 </body></html>`;
 
