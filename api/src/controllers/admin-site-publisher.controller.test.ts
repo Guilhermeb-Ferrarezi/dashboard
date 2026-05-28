@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +9,7 @@ import {
   listAdminPublishedSitesHandler,
 } from "./admin-site-publisher.controller";
 import { publishStaticSiteZip } from "../lib/site-publisher";
+import { createMockContext } from "../test-utils/mock-context";
 
 const originalStorageDir = process.env.SITE_PUBLISHER_STORAGE_DIR;
 
@@ -27,15 +28,6 @@ async function createArchiveBuffer() {
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
-function createResponseMock() {
-  const res = {
-    json: mock((value: unknown) => value),
-    status: mock((_code: number) => res),
-  };
-
-  return res;
-}
-
 describe("admin-site-publisher controller", () => {
   test("lista e remove rotas publicadas", async () => {
     const storageDir = await mkdtemp(path.join(os.tmpdir(), "site-publisher-controller-"));
@@ -49,29 +41,25 @@ describe("admin-site-publisher controller", () => {
       archiveSizeBytes: archiveBuffer.byteLength,
     });
 
-    const listRes = createResponseMock();
-    await listAdminPublishedSitesHandler({} as never, listRes as never);
+    const listCtx = createMockContext();
+    const listResponse = await listAdminPublishedSitesHandler(listCtx);
+    const listData = await listResponse.json();
 
-    expect(listRes.json).toHaveBeenCalledWith({
+    expect(listData).toMatchObject({
       sites: expect.arrayContaining([
         expect.objectContaining({ route: "/demo/site", title: "Site Demo" }),
       ]),
     });
 
-    const deleteRes = createResponseMock();
-    await deleteAdminSiteHandler(
-      {
-        body: {
-          route: "/demo/site",
-        },
-      } as never,
-      deleteRes as never,
-    );
+    const deleteCtx = createMockContext({
+      body: { route: "/demo/site" },
+    });
+    const deleteResponse = await deleteAdminSiteHandler(deleteCtx);
+    const deleteData = await deleteResponse.json();
 
-    expect(deleteRes.json).toHaveBeenCalledWith({
+    expect(deleteData).toMatchObject({
       ok: true,
       site: { route: "/demo/site" },
     });
   });
 });
-

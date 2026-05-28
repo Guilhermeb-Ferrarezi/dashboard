@@ -1,36 +1,17 @@
-import { describe, expect, mock, test } from "bun:test";
-import type { Request, Response } from "express";
+import { describe, expect, test } from "bun:test";
 
 import {
   createUserAccessTokenHandler,
   listUserAccessTokensHandler,
   revokeUserAccessTokenHandler,
 } from "./user-access-token.controller";
-
-type MockResponse = Partial<Response> & {
-  statusCode?: number;
-  body?: unknown;
-};
-
-function makeResponse(): MockResponse {
-  const res: MockResponse = {};
-  res.status = mock((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  });
-  res.json = mock((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  });
-  return res;
-}
+import { createMockContext } from "../test-utils/mock-context";
 
 describe("user access token controller", () => {
   test("lista tokens do usuario atual", async () => {
-    const req = { user: { id: "user-1", role: "user" } } as Request;
-    const res = makeResponse();
+    const c = createMockContext({ user: { id: "user-1", role: "user" } });
 
-    await listUserAccessTokensHandler(req, res as Response, {
+    const response = await listUserAccessTokensHandler(c, {
       listUserAccessTokens: async () => [
         {
           id: "token-1",
@@ -45,7 +26,8 @@ describe("user access token controller", () => {
       ],
     });
 
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(data).toEqual({
       ok: true,
       tokens: [
         {
@@ -63,43 +45,43 @@ describe("user access token controller", () => {
   });
 
   test("filtra tokens pelo tipo solicitado", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "user-1", role: "user" },
       query: { type: "codex" },
-    } as Request;
-    const res = makeResponse();
+    });
     let receivedType: string | undefined;
 
-    await listUserAccessTokensHandler(req, res as Response, {
+    const response = await listUserAccessTokensHandler(c, {
       listUserAccessTokens: async (_userId, type) => {
         receivedType = type;
         return [];
       },
     });
 
+    const data = await response.json();
     expect(receivedType).toBe("codex");
-    expect(res.body).toEqual({
+    expect(data).toEqual({
       ok: true,
       tokens: [],
     });
   });
 
   test("cria token e retorna o valor bruto apenas uma vez", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "user-1", role: "user" },
       body: { label: "Meu bot", type: "account" },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await createUserAccessTokenHandler(req, res as Response, {
+    const response = await createUserAccessTokenHandler(c, {
       createUserAccessToken: async () => ({
         id: "token-1",
         plaintextToken: "uat_secret",
       }),
     });
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(response.status).toBe(201);
+    expect(data).toEqual({
       ok: true,
       tokenId: "token-1",
       token: "uat_secret",
@@ -109,21 +91,21 @@ describe("user access token controller", () => {
   });
 
   test("cria token do codex quando o modo pede", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "user-1", role: "user" },
       body: { label: "Codex", type: "codex" },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await createUserAccessTokenHandler(req, res as Response, {
+    const response = await createUserAccessTokenHandler(c, {
       createUserAccessToken: async () => ({
         id: "token-1",
         plaintextToken: "uat_secret",
       }),
     });
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(response.status).toBe(201);
+    expect(data).toEqual({
       ok: true,
       tokenId: "token-1",
       token: "uat_secret",
@@ -133,17 +115,17 @@ describe("user access token controller", () => {
   });
 
   test("revoga token do usuario atual", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "user-1", role: "user" },
       params: { tokenId: "token-1" },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await revokeUserAccessTokenHandler(req, res as Response, {
+    const response = await revokeUserAccessTokenHandler(c, {
       revokeUserAccessToken: async () => true,
     });
 
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(data).toEqual({
       ok: true,
       revoked: true,
       tokenId: "token-1",

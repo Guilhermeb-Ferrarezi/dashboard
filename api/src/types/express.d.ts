@@ -1,0 +1,20 @@
+import "express";
+import type { AdminAccessTokenSummary } from "../lib/admin-access-token";
+
+export interface AuthUserPayload {
+  id: string;
+  username: string;
+  email?: string | null;
+  role: "user" | "admin";
+  exp?: number;
+  iat?: number;
+  authType?: "session" | "token" | "service";
+  tokenPermissions?: string[];
+}
+
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: AuthUserPayload;
+    codexAccessToken?: AdminAccessTokenSummary;
+  }
+}

@@ -1,36 +1,17 @@
-import { describe, expect, mock, test } from "bun:test";
-import type { Request, Response } from "express";
+import { describe, expect, test } from "bun:test";
 
 import {
   createAdminAccessTokenHandler,
   listAdminAccessTokensHandler,
   revokeAdminAccessTokenHandler,
 } from "./admin-access-token.controller";
-
-type MockResponse = Partial<Response> & {
-  statusCode?: number;
-  body?: unknown;
-};
-
-function makeResponse(): MockResponse {
-  const res: MockResponse = {};
-  res.status = mock((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  });
-  res.json = mock((body: unknown) => {
-    res.body = body;
-    return res as Response;
-  });
-  return res;
-}
+import { createMockContext } from "../test-utils/mock-context";
 
 describe("admin access token controller", () => {
   test("lista tokens do admin atual", async () => {
-    const req = { user: { id: "admin-1", role: "admin" } } as Request;
-    const res = makeResponse();
+    const c = createMockContext({ user: { id: "admin-1", role: "admin" } });
 
-    await listAdminAccessTokensHandler(req, res as Response, {
+    const response = await listAdminAccessTokensHandler(c, {
       listAdminAccessTokens: async () => [
         {
           id: "token-1",
@@ -45,7 +26,8 @@ describe("admin access token controller", () => {
       ],
     });
 
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(data).toEqual({
       ok: true,
       tokens: [
         {
@@ -63,21 +45,21 @@ describe("admin access token controller", () => {
   });
 
   test("cria token e retorna o valor bruto apenas uma vez", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "admin-1", role: "admin" },
       body: { type: "codex", label: "Codex" },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await createAdminAccessTokenHandler(req, res as Response, {
+    const response = await createAdminAccessTokenHandler(c, {
       createAdminAccessToken: async () => ({
         id: "token-1",
         plaintextToken: "at_secret",
       }),
     });
 
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(response.status).toBe(201);
+    expect(data).toEqual({
       ok: true,
       tokenId: "token-1",
       token: "at_secret",
@@ -87,17 +69,17 @@ describe("admin access token controller", () => {
   });
 
   test("revoga token do admin atual", async () => {
-    const req = {
+    const c = createMockContext({
       user: { id: "admin-1", role: "admin" },
       params: { tokenId: "token-1" },
-    } as Request;
-    const res = makeResponse();
+    });
 
-    await revokeAdminAccessTokenHandler(req, res as Response, {
+    const response = await revokeAdminAccessTokenHandler(c, {
       revokeAdminAccessToken: async () => true,
     });
 
-    expect(res.body).toEqual({
+    const data = await response.json();
+    expect(data).toEqual({
       ok: true,
       revoked: true,
       tokenId: "token-1",

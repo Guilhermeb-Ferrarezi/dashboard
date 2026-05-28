@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import jwt from "jsonwebtoken";
 
 import { UserAccessToken } from "../models/UserAccessToken";
 import { User } from "../models/User";
 import { verifyJWTOrCodexServiceToken } from "./codex-service-auth";
+import { createMockContext } from "../test-utils/mock-context";
+import { createTestSessionToken } from "../test-utils/create-session-token";
 
 const originalEnv = {
   CODEX_ACCESS_TOKEN: process.env.CODEX_ACCESS_TOKEN,
@@ -21,101 +22,80 @@ afterEach(() => {
   UserAccessToken.updateOne = originalUserAccessTokenUpdateOne;
 });
 
-function createResponse() {
-  const response = {
-    statusCode: 200,
-    body: null as unknown,
-    status(code: number) {
-      this.statusCode = code;
-      return this;
-    },
-    json(payload: unknown) {
-      this.body = payload;
-      return this;
-    },
-  };
-
-  return response;
-}
-
 describe("codex service auth", () => {
   test("aceita o token delegado do sistema sem cookie de sessao", async () => {
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
 
-    const req = {
-      cookies: {},
+    const c = createMockContext({
       headers: {
         authorization: "Bearer codex_service_token",
       },
-    } as never;
-    const res = createResponse() as never;
+    });
     let nextCalled = false;
 
-    await verifyJWTOrCodexServiceToken(req, res, () => {
+    await verifyJWTOrCodexServiceToken(c, async () => {
       nextCalled = true;
     });
 
     expect(nextCalled).toBe(true);
-    expect((req as { user?: { role?: string } }).user?.role).toBe("admin");
+    expect(c.get("user")?.role).toBe("admin");
   });
 
   test("aceita um JWT de sessao valido de usuario comum", async () => {
-    process.env.JWT_SECRET = "test_secret";
+    const secret = "test_secret";
+    process.env.JWT_SECRET = secret;
 
-    const req = {
-      cookies: {},
+    const token = await createTestSessionToken(
+      { userId: 123, login: "alice", email: "alice@example.com", role: 0 },
+      secret,
+    );
+
+    const c = createMockContext({
       headers: {
-        authorization: `Bearer ${jwt.sign(
-          { id: "user-123", username: "alice", role: "user" },
-          "test_secret",
-        )}`,
+        authorization: `Bearer ${token}`,
       },
-    } as never;
-    const res = createResponse() as never;
+    });
     let nextCalled = false;
 
-    await verifyJWTOrCodexServiceToken(req, res, () => {
+    await verifyJWTOrCodexServiceToken(c, async () => {
       nextCalled = true;
     });
 
     expect(nextCalled).toBe(true);
-    expect((req as { user?: { id?: string; role?: string } }).user?.id).toBe("user-123");
-    expect((req as { user?: { role?: string } }).user?.role).toBe("user");
+    expect(c.get("user")?.id).toBe("123");
+    expect(c.get("user")?.role).toBe("user");
   });
 
   test("aceita token de serviço com usuário delegado", async () => {
+    const secret = "test_secret";
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
-    User.findById = (() => ({
-      select: () => ({
-        lean: () => Promise.resolve({
-          _id: "user-123",
-          username: "Admin",
-          email: "admin@santos.tech",
-          role: "admin",
-        }),
-      }),
-    })) as never;
+    process.env.JWT_SECRET = secret;
 
-    const req = {
-      cookies: {},
+    // Gera um token de sessão no formato customizado que o middleware espera
+    const userToken = await createTestSessionToken(
+      { userId: 123, login: "Admin", email: "admin@santos.tech", role: 1 },
+      secret,
+    );
+
+    const c = createMockContext({
       headers: {
         authorization: "Bearer codex_service_token",
-        "x-codex-user-id": "user-123",
+        "x-codex-user-id": "123",
+        "x-codex-user-token": userToken,
       },
-    } as never;
-    const res = createResponse() as never;
+    });
     let nextCalled = false;
 
     await new Promise<void>((resolve) => {
-      verifyJWTOrCodexServiceToken(req, res, () => {
+      verifyJWTOrCodexServiceToken(c, async () => {
         nextCalled = true;
         resolve();
       });
     });
 
     expect(nextCalled).toBe(true);
-    expect((req as { user?: { id?: string; email?: string | null } }).user?.id).toBe("user-123");
-    expect((req as { user?: { email?: string | null } }).user?.email).toBe("admin@santos.tech");
+    expect(c.get("user")?.id).toBe("123");
+    expect(c.get("user")?.email).toBe("admin@santos.tech");
   });
 
   test("aceita token pessoal de API do usuario", async () => {
@@ -152,43 +132,36 @@ describe("codex service auth", () => {
       }),
     })) as never;
 
-    const req = {
-      cookies: {},
+    const c = createMockContext({
       headers: {
         authorization: "Bearer uat_secret",
       },
-      method: "GET",
-      path: "/api/test",
-      ip: null,
-    } as never;
-    const res = createResponse() as never;
+    });
     let nextCalled = false;
 
     await new Promise<void>((resolve) => {
-      verifyJWTOrCodexServiceToken(req, res, () => {
+      verifyJWTOrCodexServiceToken(c, async () => {
         nextCalled = true;
         resolve();
       });
     });
 
     expect(nextCalled).toBe(true);
-    expect((req as { user?: { id?: string; role?: string } }).user?.id).toBe("user-123");
-    expect((req as { user?: { role?: string } }).user?.role).toBe("user");
+    expect(c.get("user")?.id).toBe("user-123");
+    expect(c.get("user")?.role).toBe("user");
   });
 
-  test("rejeita quando nenhum token esta presente", () => {
-    const req = {
-      cookies: {},
+  test("rejeita quando nenhum token esta presente", async () => {
+    const c = createMockContext({
       headers: {},
-    } as never;
-    const res = createResponse() as never;
+    });
     let nextCalled = false;
 
-    verifyJWTOrCodexServiceToken(req, res, () => {
+    const response = await verifyJWTOrCodexServiceToken(c, async () => {
       nextCalled = true;
     });
 
     expect(nextCalled).toBe(false);
-    expect((res as { statusCode: number; body: unknown }).statusCode).toBe(401);
+    expect((response as Response).status).toBe(401);
   });
 });
