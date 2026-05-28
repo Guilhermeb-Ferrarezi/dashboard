@@ -235,4 +235,36 @@ describe("codex tool runtime", () => {
       ),
     ).rejects.toThrow("Parâmetro não suportado: banana.");
   });
+
+  test("search_dashboard_pages retorna paths atuais /painel/* e nao os obsoletos /home /admin", async () => {
+    const homeResult = await runCodexRuntimeTool(
+      "search_dashboard_pages",
+      { query: "home" },
+      { workspaceRoot: createWorkspace() },
+    );
+
+    const homePages = (homeResult.data as { results: Array<{ path: string }> }).results;
+    expect(homePages.some((p) => p.path === "/painel")).toBe(true);
+    expect(homePages.every((p) => p.path !== "/home")).toBe(true);
+
+    const adminResult = await runCodexRuntimeTool(
+      "search_dashboard_pages",
+      { query: "admin" },
+      { workspaceRoot: createWorkspace() },
+    );
+
+    const adminPages = (adminResult.data as { results: Array<{ path: string }> }).results;
+    expect(adminPages.some((p) => p.path === "/painel/admin")).toBe(true);
+    expect(adminPages.every((p) => p.path !== "/admin")).toBe(true);
+
+    const tokenResult = await runCodexRuntimeTool(
+      "search_dashboard_pages",
+      { query: "codex" },
+      { workspaceRoot: createWorkspace() },
+    );
+
+    const tokenPages = (tokenResult.data as { results: Array<{ path: string }> }).results;
+    expect(tokenPages.some((p) => p.path === "/painel/admin/users")).toBe(true);
+    expect(tokenPages.every((p) => p.path !== "/admin/users")).toBe(true);
+  });
 });
