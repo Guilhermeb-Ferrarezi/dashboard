@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import type { CollectionInfo } from "mongodb";
+import { parsePagination } from "../lib/pagination";
 
 const LOGS_DB_NAME = process.env.LOGS_MONGO_DB_NAME?.trim() || "logs";
 const LOG_PROJECTS_COLLECTION =
@@ -225,8 +226,7 @@ export async function listProjectLogs(req: Request, res: Response) {
   const method = typeof req.query.method === "string" ? req.query.method.trim().toUpperCase() : "";
   const from = typeof req.query.from === "string" ? req.query.from.trim() : "";
   const to = typeof req.query.to === "string" ? req.query.to.trim() : "";
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const { page, limit } = parsePagination(req, 20);
 
   if (!projectId) {
     return res.status(400).json({ message: "projectId e obrigatorio." });

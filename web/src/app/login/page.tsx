@@ -1,23 +1,20 @@
-import { ClientRedirect } from "@/components/navigation/client-redirect";
-import { LoginForm } from "@/components/auth/login-form";
-import { getSessionUser } from "@/lib/session";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { getAuthLoginUrl } from "@/lib/auth-api";
 
-interface LoginPageProps {
-  searchParams?: Promise<{
-    error?: string;
-  }>;
-}
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const denied = searchParams.get("denied");
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const user = await getSessionUser();
+  useEffect(() => {
+    if (denied) {
+      window.location.href = "https://santos-games.com";
+    } else {
+      window.location.href = getAuthLoginUrl();
+    }
+  }, [denied]);
 
-  if (user) {
-    return <ClientRedirect to="/home" label="dashboard" />;
-  }
-
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-
-  return <LoginForm error={resolvedSearchParams?.error} />;
+  return null;
 }

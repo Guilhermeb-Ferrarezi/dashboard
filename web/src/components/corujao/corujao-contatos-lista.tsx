@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi, getClientApiBaseUrl } from "@/lib/api";
+import { formatDateShort } from "@/lib/format";
 
 import { CorujaoDeleteContatoDialog } from "./corujao-delete-contato-dialog";
 
@@ -139,13 +140,7 @@ function formFromContato(c: Contato): FormValues {
   };
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
+const formatDate = formatDateShort;
 
 function origemLabel(value: Origem) {
   return ORIGEM_OPTIONS.find((o) => o.value === value)?.label ?? value;
@@ -234,6 +229,8 @@ export function CorujaoContatosLista() {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Contato | null>(null);
 
+  const [sortByNome, setSortByNome] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importData, setImportData] = useState<Array<{ telefone: string; nome?: string; email?: string; dataNascimento?: string }>>([]);
   const [importing, setImporting] = useState(false);
@@ -250,6 +247,7 @@ export function CorujaoContatosLista() {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), sortBy });
     if (debouncedQuery) params.set("q", debouncedQuery);
+    if (sortByNome) params.set("sortBy", "nome");
     try {
       const res = await clientApi<{ contatos: Contato[]; pagination: PaginationState }>(
         `/corujao/contatos?${params.toString()}`

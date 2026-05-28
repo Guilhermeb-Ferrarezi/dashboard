@@ -39,7 +39,7 @@ function createResponse() {
 }
 
 describe("codex service auth", () => {
-  test("aceita o token delegado do sistema sem cookie de sessao", () => {
+  test("aceita o token delegado do sistema sem cookie de sessao", async () => {
     process.env.CODEX_ACCESS_TOKEN = "codex_service_token";
 
     const req = {
@@ -51,7 +51,7 @@ describe("codex service auth", () => {
     const res = createResponse() as never;
     let nextCalled = false;
 
-    verifyJWTOrCodexServiceToken(req, res, () => {
+    await verifyJWTOrCodexServiceToken(req, res, () => {
       nextCalled = true;
     });
 
@@ -59,7 +59,7 @@ describe("codex service auth", () => {
     expect((req as { user?: { role?: string } }).user?.role).toBe("admin");
   });
 
-  test("aceita um JWT de sessao valido de usuario comum", () => {
+  test("aceita um JWT de sessao valido de usuario comum", async () => {
     process.env.JWT_SECRET = "test_secret";
 
     const req = {
@@ -74,7 +74,7 @@ describe("codex service auth", () => {
     const res = createResponse() as never;
     let nextCalled = false;
 
-    verifyJWTOrCodexServiceToken(req, res, () => {
+    await verifyJWTOrCodexServiceToken(req, res, () => {
       nextCalled = true;
     });
 

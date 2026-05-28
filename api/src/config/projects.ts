@@ -28,7 +28,7 @@ export const portalProjects: ProjectDefinition[] = [
     id: "portal",
     name: "Portal",
     description: "Entrada principal para conteudo, rotinas e operacoes centrais.",
-    url: process.env.PORTAL_URL || "https://portal.santos-tech.com",
+    url: process.env.PORTAL_URL || "https://portal.santos-games.com",
     category: "Operacao",
     audience: "Equipe",
     tags: ["home", "conteudo", "operacao"],
@@ -42,7 +42,7 @@ export const portalProjects: ProjectDefinition[] = [
     name: "Admin Portal",
     description: "Painel administrativo com piloto de acesso por ticket SSO.",
     url:
-      process.env.ADMIN_PORTAL_URL || "https://admin-portal.santos-tech.com",
+      process.env.ADMIN_PORTAL_URL || "https://admin-portal.santos-games.com",
     category: "Administracao",
     audience: "Interno",
     tags: ["admin", "usuarios", "sso"],

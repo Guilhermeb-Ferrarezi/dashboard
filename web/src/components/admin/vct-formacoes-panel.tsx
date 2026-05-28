@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { clientApi } from "@/lib/api";
+import { formatDateTime as formatDateTimeLib } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { VctFormacaoSummary } from "@/types/portal";
 import { CalendarIcon, ImageIcon, MailIcon, PhoneIcon, UsersIcon } from "@/components/ui/icons";
@@ -51,13 +52,7 @@ export function formatDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return formatDateTimeLib(date, { year: "2-digit" });
 }
 
 export function getMemberName(member: VctFormacaoSummary["membros"][number]) {

@@ -14,7 +14,11 @@ export function ClientRedirect({ to, label }: ClientRedirectProps) {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(to);
+    if (/^https?:\/\//.test(to)) {
+      window.location.href = to;
+    } else {
+      router.replace(to);
+    }
   }, [router, to]);
 
   return (

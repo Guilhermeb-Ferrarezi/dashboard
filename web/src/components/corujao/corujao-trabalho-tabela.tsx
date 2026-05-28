@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { clientApi } from "@/lib/api";
+import { formatDateShort } from "@/lib/format";
 
 import {
   CorujaoProximaSessaoCard,
@@ -247,13 +248,7 @@ function formFromContato(c: Contato): FormValues {
   };
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
-}
+const formatDate = formatDateShort;
 
 function formatRelativeContact(iso: string | null): string {
   if (!iso) return "Nunca";

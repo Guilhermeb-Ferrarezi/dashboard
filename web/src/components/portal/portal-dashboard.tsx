@@ -53,6 +53,7 @@ import type {
   DashboardWindowSummary,
 } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
+import { formatAbsolute } from "@/lib/date";
 
 interface PortalDashboardProps {
   user: SessionUser;
@@ -82,14 +83,7 @@ function formatDuration(ms: number) {
   return `${(ms / 1000).toFixed(ms >= 10_000 ? 0 : 1)} s`;
 }
 
-function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
+const formatDateTime = formatAbsolute;
 
 function formatTimeLabel(label: string) {
   if (label.includes("/")) return label;

@@ -1,7 +1,8 @@
-import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { Request, Response } from "express";
 
 import { getCheckoutDb, schema } from "../db/index";
+import { parsePagination } from "../lib/pagination";
 
 const IMPORT_BATCH_SIZE = 100;
 
@@ -104,9 +105,7 @@ function serializeContato(row: typeof schema.corujaoContatos.$inferSelect) {
 export async function listContatos(req: Request, res: Response) {
   try {
     const db = getCheckoutDb();
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Number(req.query.limit) || 50);
-    const offset = (page - 1) * limit;
+    const { page, limit, skip: offset } = parsePagination(req, 50);
     const q = String(req.query.q || "").trim();
 
     let statusConversaFilter: StatusConversa | undefined;
@@ -147,7 +146,9 @@ export async function listContatos(req: Request, res: Response) {
     const naoChamou = req.query.naoChamou === "true";
 
     const sortByRaw = String(req.query.sortBy || "prioridade");
-    const sortBy = (["recente", "alfabetico", "alfabetico_desc"].includes(sortByRaw) ? sortByRaw : "prioridade") as "prioridade" | "recente" | "alfabetico" | "alfabetico_desc";
+    // "nome" mantido como alias de "alfabetico" pra compatibilidade.
+    const sortByNormalized = sortByRaw === "nome" ? "alfabetico" : sortByRaw;
+    const sortBy = (["recente", "alfabetico", "alfabetico_desc"].includes(sortByNormalized) ? sortByNormalized : "prioridade") as "prioridade" | "recente" | "alfabetico" | "alfabetico_desc";
 
     const conditions: SQL[] = [];
     if (q) {
@@ -196,9 +197,9 @@ export async function listContatos(req: Request, res: Response) {
       sortBy === "recente"
         ? [desc(schema.corujaoContatos.createdAt)]
         : sortBy === "alfabetico"
-          ? [sql`${schema.corujaoContatos.nome} ASC NULLS LAST`, desc(schema.corujaoContatos.createdAt)]
+          ? [sql`${schema.corujaoContatos.nome} ASC NULLS LAST`, asc(schema.corujaoContatos.id)]
           : sortBy === "alfabetico_desc"
-            ? [sql`${schema.corujaoContatos.nome} DESC NULLS LAST`, desc(schema.corujaoContatos.createdAt)]
+            ? [sql`${schema.corujaoContatos.nome} DESC NULLS LAST`, asc(schema.corujaoContatos.id)]
             : [
                 sql`${schema.corujaoContatos.ultimoContatoEm} ASC NULLS FIRST`,
                 desc(schema.corujaoContatos.createdAt)

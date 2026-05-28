@@ -1,23 +1,29 @@
 import type { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
 
-dotenv.config();
+import { verifySessionToken } from "../lib/session-token";
 
-export function verifyJWT(req: Request, res: Response, next: NextFunction) {
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "sga_auth";
+const ADMIN_ROLE = 1;
+
+export async function verifyJWT(req: Request, res: Response, next: NextFunction) {
   const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Token missing" });
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
-    req.user = decoded as Request["user"];
-    next();
-  } catch {
+  const session = await verifySessionToken(token, process.env.JWT_SECRET!);
+  if (!session) {
     return res.status(403).json({ message: "Invalid token" });
   }
+
+  req.user = {
+    id: String(session.userId),
+    username: session.login,
+    email: session.email,
+    role: session.role === ADMIN_ROLE ? "admin" : "user",
+    authType: "session",
+  };
+  next();
 }
 
-// Optional Basic Auth middleware
 export function basicAuth(req: Request, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
 
@@ -39,4 +45,3 @@ export function basicAuth(req: Request, res: Response, next: NextFunction) {
 
   return res.status(403).json({ message: "Invalid Basic Auth" });
 }
-

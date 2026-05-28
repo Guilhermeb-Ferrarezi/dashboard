@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { clientApi } from "@/lib/api";
+import { AUTH_API_URL } from "@/lib/auth-api";
 import type { SessionUser } from "@/lib/session";
 
 import { AccountSettingsDialog } from "@/components/portal/account-settings-dialog";
@@ -43,7 +44,13 @@ export function UserMenu({
 
   async function handleLogout() {
     try {
-      await clientApi<{ message: string }>("/auth/logout", { method: "POST" });
+      await Promise.allSettled([
+        fetch(`${AUTH_API_URL}/api/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+        }),
+        clientApi<{ message: string }>("/auth/logout", { method: "POST" }),
+      ]);
       router.replace("/login");
       router.refresh();
     } catch (error) {
@@ -99,7 +106,7 @@ export function UserMenu({
                   </p>
                   <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                     <MailIcon className="size-3.5" />
-                    {user.email ?? "sem-email@santos-tech.com"}
+                    {user.email ?? "sem-email@santos-games.com"}
                   </p>
                   <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-2 py-1 text-[0.68rem] font-medium uppercase tracking-[0.18em] text-primary">
                     <ShieldIcon className="size-3" />
@@ -119,7 +126,7 @@ export function UserMenu({
                 const body = encodeURIComponent(
                   `\n\n---\nURL: ${typeof window !== "undefined" ? window.location.href : ""}\nUsuário: ${user.username} (${user.role})\nNavegador: ${typeof navigator !== "undefined" ? navigator.userAgent : ""}`,
                 );
-                window.open(`mailto:suporte@santos-tech.com?subject=${subject}&body=${body}`);
+                window.open(`mailto:suporte@santos-games.com?subject=${subject}&body=${body}`);
               }}
             >
               <ExternalLinkIcon />

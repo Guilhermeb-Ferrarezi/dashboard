@@ -1,4 +1,5 @@
 import dns from "node:dns/promises";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,7 +11,7 @@ import adminRoutes from "./routes/admin.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import projectRoutes from "./routes/projects.routes";
 import logsRoutes from "./routes/logs.routes";
-import ssoRoutes from "./routes/sso.routes";
+
 import valorantRoutes from "./routes/valorant.routes";
 import vctRoutes from "./routes/vct.routes";
 import codexRoutes from "./routes/codex.routes";
@@ -19,8 +20,10 @@ import checkoutRoutes from "./routes/checkout.routes";
 import corujaoRoutes from "./routes/corujao.routes";
 import corujaoPublicRoutes from "./routes/corujao-public.routes";
 import emailRoutes from "./routes/email.routes";
+import analyticsRoutes from "./routes/analytics.routes";
 import { runCheckoutMigrations } from "./db/index";
 import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
+import { addHealthClient, startHealthBroadcast, stopHealthBroadcast } from "./lib/health-sse";
 import {
   getCurrentUser,
   updateCurrentUserProfile,
@@ -35,9 +38,12 @@ import {
 import { verifyJWTOrCodexServiceToken } from "./middlewares/codex-service-auth";
 import { requestLogsMiddleware } from "./middlewares/request-logs";
 import { requireRole } from "./middlewares/role";
+import { errorHandler } from "./middlewares/error-handler";
 import { attachCodexGateway } from "./lib/codex";
+import { validateEnv } from "./config/env";
 
 dotenv.config();
+validateEnv();
 
 process.on("uncaughtException", (error) => {
   console.error("[process] uncaughtException:", error);
@@ -180,10 +186,22 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-sso-shared-secret"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
+app.use(
+  compression({
+    threshold: 1024,
+    filter: (req, res) => {
+      const contentType = res.getHeader("Content-Type");
+      if (typeof contentType === "string" && contentType.includes("text/event-stream")) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(cookieParser());
 app.use(express.json());
 app.use(requestLogsMiddleware);
@@ -193,7 +211,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/logs", logsRoutes);
-app.use("/api/sso", ssoRoutes);
 app.use("/api/valorant-account", valorantRoutes);
 app.use("/api/vct", vctRoutes);
 app.use("/api/codex", codexRoutes);
@@ -202,6 +219,9 @@ app.use("/api/checkout", checkoutRoutes);
 app.use("/api/corujao/public", corujaoPublicRoutes);
 app.use("/api/corujao", corujaoRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
+app.get("/api/health/sse", (req, res) => addHealthClient(res));
 
 app.get("/api/user/me", verifyJWTOrCodexServiceToken, getCurrentUser);
 app.put("/api/user/profile", verifyJWTOrCodexServiceToken, updateCurrentUserProfile);
@@ -220,6 +240,8 @@ app.get("/api/admin", verifyJWTOrCodexServiceToken, requireRole("admin"), (_req,
 });
 
 app.get("/api", (_req, res) => res.json({ message: "Backend rodando!" }));
+
+app.use(errorHandler);
 
 async function start() {
   const mongoUri = process.env.MONGO_URI?.trim();
@@ -255,6 +277,7 @@ async function start() {
 
     attachCodexGateway(server);
     startPortalRecentsFlushLoop();
+    startHealthBroadcast();
     // runCheckoutMigrations() desativado em 2026-05-26 — todas as 5
     // operações estão cobertas pelas migrations Drizzle 0003/0004/0008.
     // Função preservada em db/index.ts (@deprecated) por 1-2 sessões pra
@@ -266,6 +289,7 @@ async function start() {
     function shutdown() {
       console.log("Shutting down…");
       stopPortalRecentsFlushLoop();
+      stopHealthBroadcast();
       server.close(() => process.exit(0));
       setTimeout(() => process.exit(1), 5000);
     }

@@ -1,12 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 
 import { readCodexServiceTokenFromRequest, resolveCodexServiceToken } from "../lib/codex-service-token";
+import { verifySessionToken } from "../lib/session-token";
 import { authenticateUserAccessToken, hashUserAccessToken, logUserTokenUsage } from "../lib/user-access-token";
-import { User } from "../models/User";
+
+const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "sga_auth";
+const ADMIN_ROLE = 1;
 
 function readAuthToken(req: Request) {
-  const cookieToken = req.cookies?.auth_token;
+  const cookieToken = req.cookies?.[AUTH_COOKIE_NAME];
   if (typeof cookieToken === "string" && cookieToken.trim()) {
     return cookieToken.trim();
   }
@@ -23,11 +25,17 @@ export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, 
   const authToken = readAuthToken(req);
 
   if (authToken) {
-    try {
-      req.user = jwt.verify(authToken, process.env.JWT_SECRET!) as Request["user"];
+    const session = await verifySessionToken(authToken, process.env.JWT_SECRET!);
+
+    if (session) {
+      req.user = {
+        id: String(session.userId),
+        username: session.login,
+        email: session.email,
+        role: session.role === ADMIN_ROLE ? "admin" : "user",
+        authType: "session",
+      };
       return next();
-    } catch {
-      // fall through to service token
     }
   }
 
@@ -47,26 +55,27 @@ export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, 
         id: "codex-service",
         username: "codex-agent",
         role: "admin",
+        authType: "service",
       };
       return next();
     }
 
     try {
-      const user = await User.findById(delegatedUserId)
-        .select("_id username email role")
-        .lean();
-
-      if (!user) {
-        return res.status(403).json({ message: "Invalid delegated user" });
+      const delegatedToken = req.headers["x-codex-user-token"] as string | undefined;
+      if (delegatedToken) {
+        const session = await verifySessionToken(delegatedToken, process.env.JWT_SECRET!);
+        if (session) {
+          req.user = {
+            id: String(session.userId),
+            username: session.login,
+            email: session.email,
+            role: session.role === ADMIN_ROLE ? "admin" : "user",
+            authType: "service",
+          };
+          return next();
+        }
       }
-
-      req.user = {
-        id: String(user._id),
-        username: user.username,
-        email: user.email ?? null,
-        role: user.role,
-      };
-      return next();
+      return res.status(403).json({ message: "Invalid delegated user" });
     } catch {
       return res.status(403).json({ message: "Invalid delegated user" });
     }
@@ -76,7 +85,11 @@ export async function verifyJWTOrCodexServiceToken(req: Request, res: Response, 
     const authenticatedUserToken = await authenticateUserAccessToken(authToken);
 
     if (authenticatedUserToken) {
-      req.user = authenticatedUserToken.user;
+      req.user = {
+        ...authenticatedUserToken.user,
+        authType: "token",
+        tokenPermissions: authenticatedUserToken.token.permissions ?? [],
+      };
       void logUserTokenUsage({
         tokenId: authenticatedUserToken.token.id,
         tokenHash: hashUserAccessToken(authToken),

@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { serverApi } from "@/lib/api-server";
 import type { ThemePreferences } from "@/lib/theme-preferences";
@@ -33,21 +32,16 @@ export async function getSessionUser() {
   }
 }
 
-export async function requireSession() {
+export async function requireSession(): Promise<SessionUser> {
+  const { redirect } = await import("next/navigation");
   const user = await getSessionUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  return user;
-}
-
-export async function requireAdminSession() {
-  const user = await requireSession();
-
   if (user.role !== "admin") {
-    redirect("/home");
+    redirect("/login?denied=1");
   }
 
   return user;

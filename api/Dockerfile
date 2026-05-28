@@ -28,5 +28,8 @@ RUN mkdir -p /root/.codex
 
 EXPOSE 4000
 
+# NOTE: Running as root is required because the Codex agent uses privileged mode
+# (sandbox execution, SYS_ADMIN, seccomp=unconfined). Do NOT add a USER directive here.
+
 ENTRYPOINT ["/usr/local/bin/bootstrap-codex-home.sh"]
 CMD ["bun", "src/server.ts"]

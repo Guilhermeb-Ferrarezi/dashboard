@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 import readline from "node:readline";
 import type { IncomingMessage } from "node:http";
 import type { AddressInfo, Server as HttpServer } from "node:net";
-import jwt from "jsonwebtoken";
+import { verifySessionToken } from "./session-token";
 import WebSocket, { WebSocketServer } from "ws";
 
 import type { AuthUserPayload } from "../types/express";
@@ -1466,21 +1466,30 @@ function parseCookieHeader(cookieHeader: string | undefined) {
   );
 }
 
-function authenticateAdminSocket(request: IncomingMessage) {
+async function authenticateAdminSocket(request: IncomingMessage) {
   const cookies = parseCookieHeader(request.headers.cookie);
-  const token = cookies.auth_token;
+  const cookieName = process.env.AUTH_COOKIE_NAME || "sga_auth";
+  const token = cookies[cookieName];
 
   if (!token) {
     throw new Error("Missing token");
   }
 
-  const payload = jwt.verify(token, process.env.JWT_SECRET!) as AuthUserPayload;
+  const session = await verifySessionToken(token, process.env.JWT_SECRET!);
+  if (!session) {
+    throw new Error("Invalid or expired token");
+  }
 
-  if (payload.role !== "admin") {
+  if (session.role !== 1) {
     throw new Error("Acesso restrito a admins.");
   }
 
-  return payload;
+  return {
+    id: String(session.userId),
+    username: session.login,
+    email: session.email,
+    role: "admin" as const,
+  };
 }
 
 function sendBrowserEvent(socket: WebSocket, payload: Record<string, unknown>) {

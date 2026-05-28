@@ -19,6 +19,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { clientApi } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 
 type StatusSessao = "planejado" | "aberto" | "lotado" | "realizado" | "cancelado";
 
@@ -47,13 +48,7 @@ type Painel = {
 
 type PeriodoChip = "mes" | "semana" | "todos" | "custom";
 
-function formatBRL(cents: number): string {
-  return (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2
-  });
-}
+const formatBRL = formatCurrency;
 
 function formatPct(taxa: number): string {
   return `${Math.round(taxa * 100)}%`;

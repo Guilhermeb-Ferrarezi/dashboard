@@ -28,6 +28,7 @@ import {
   XIcon,
 } from "@/components/ui/icons";
 import { getClientApiBaseUrl } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type PublishedSiteSummary = {
@@ -52,12 +53,7 @@ function formatBytes(value: number) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
+const formatDate = formatDateTime;
 
 function extractHtmlTitle(html: string) {
   const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);

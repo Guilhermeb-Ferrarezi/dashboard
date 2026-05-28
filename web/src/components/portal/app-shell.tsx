@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   ChevronRightIcon,
   LayoutDashboardIcon,
@@ -35,7 +35,6 @@ import type { SessionUser } from "@/lib/session";
 import { useTrackRecentlyVisited } from "@/hooks/use-recently-visited";
 import { ApiHealthIndicator } from "@/components/portal/api-health-indicator";
 import { CommandPalette } from "@/components/portal/command-palette";
-import { ConnectivityToasts } from "@/components/portal/connectivity-toasts";
 import { KeyboardShortcutsOverlay } from "@/components/portal/keyboard-shortcuts-overlay";
 import { SkipToContent } from "@/components/portal/skip-to-content";
 import { SystemBanner } from "@/components/portal/system-banner";
@@ -49,7 +48,9 @@ import {
   PortalRecentSection,
 } from "@/components/portal/portal-recent-section";
 import { hydratePortalRecentsFromServer } from "@/components/portal/portal-recents";
-import { CodexDrawer } from "@/components/portal/codex-drawer";
+const CodexDrawer = lazy(() =>
+  import("@/components/portal/codex-drawer").then((m) => ({ default: m.CodexDrawer }))
+);
 import {
   buildPortalSidebarGroups,
   portalIconMap,
@@ -390,7 +391,6 @@ export function AppShell({
       <PortalQuickSearchDialog user={user} logsHref={logsHref} />
       <KeyboardShortcutsOverlay />
       <CommandPalette />
-      <ConnectivityToasts />
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-3 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
@@ -589,15 +589,17 @@ export function AppShell({
                 className="hidden min-h-0 min-w-0 shrink-0 overflow-hidden border-l border-border/60 bg-background/95 px-3 py-[var(--app-page-padding-y)] lg:block"
                 style={{ width: `${codexWidth}px` }}
               >
-                <CodexDrawer
-                  user={user}
-                  open={codexOpen}
-                  onOpenChange={setCodexOpen}
-                  onRequestOpenSettings={() => {
-                    setSettingsSection("codex");
-                    setSettingsOpen(true);
-                  }}
-                />
+                <Suspense fallback={null}>
+                  <CodexDrawer
+                    user={user}
+                    open={codexOpen}
+                    onOpenChange={setCodexOpen}
+                    onRequestOpenSettings={() => {
+                      setSettingsSection("codex");
+                      setSettingsOpen(true);
+                    }}
+                  />
+                </Suspense>
               </aside>
             </>
           ) : null}

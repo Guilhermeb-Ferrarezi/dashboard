@@ -27,21 +27,14 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { clientApi } from "@/lib/api";
+import { formatDateTimeShort } from "@/lib/format";
 import type { CheckoutClienteSummary } from "@/types/portal";
 
 const PAGE_SIZE = 20;
 
 type Pagination = { page: number; limit: number; total: number; pages: number };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+const formatDate = formatDateTimeShort;
 
 function truncateId(id: string, maxLen = 20) {
   return id.length > maxLen ? id.slice(0, maxLen) + "…" : id;

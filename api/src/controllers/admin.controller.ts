@@ -1,22 +1,22 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 
+import { normalizeEmail } from "../lib/normalize";
 import { User } from "../models/User";
+import { UserAccessToken } from "../models/UserAccessToken";
+import { AdminAccessToken } from "../models/AdminAccessToken";
 import mongoose from "mongoose";
-
-function normalizeEmail(email?: string) {
-  return email?.trim().toLowerCase() || undefined;
-}
 
 function serializeUser(user: {
   _id: unknown;
+  authUserId?: number;
   username: string;
   email?: string | null;
   role: "user" | "admin";
   createdAt?: Date;
 }) {
   return {
-    id: String(user._id),
+    id: user.authUserId != null ? String(user.authUserId) : String(user._id),
     username: user.username,
     email: user.email ?? null,
     role: user.role,
@@ -27,7 +27,7 @@ function serializeUser(user: {
 export async function listUsers(_req: Request, res: Response) {
   const users = await User.find()
     .sort({ createdAt: -1 })
-    .select("_id username email role createdAt")
+    .select("_id authUserId username email role createdAt")
     .lean();
 
   return res.json({ users: users.map(serializeUser) });
@@ -51,7 +51,11 @@ export async function createUser(req: Request, res: Response) {
     return res.status(400).json({ message: "Usuario ou email ja existe." });
   }
 
-  const hashed = await bcrypt.hash(password, 10);
+  if (password.length < 8) {
+    return res.status(400).json({ message: "A senha deve ter pelo menos 8 caracteres" });
+  }
+
+  const hashed = await bcrypt.hash(password, 12);
   const user = await User.create({
     username,
     email: normalizedEmail,
@@ -100,8 +104,8 @@ export async function updateUser(req: Request, res: Response) {
 
   if (password !== undefined) {
     const trimmed = password.trim();
-    if (trimmed.length < 6) return res.status(400).json({ message: "Senha deve ter ao menos 6 caracteres." });
-    updates.password = await bcrypt.hash(trimmed, 10);
+    if (trimmed.length < 8) return res.status(400).json({ message: "A senha deve ter pelo menos 8 caracteres" });
+    updates.password = await bcrypt.hash(trimmed, 12);
   }
 
   if (Object.keys(updates).length === 0) {
@@ -120,10 +124,22 @@ export async function updateUser(req: Request, res: Response) {
   }
 
   const user = await User.findByIdAndUpdate(id, { $set: updates }, { new: true })
-    .select("_id username email role createdAt")
+    .select("_id authUserId username email role createdAt")
     .lean();
 
   if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
+
+  // Revoke all active tokens on password change
+  if (updates.password) {
+    await UserAccessToken.updateMany(
+      { userId: id, revokedAt: null },
+      { revokedAt: new Date() },
+    );
+    await AdminAccessToken.updateMany(
+      { adminId: id, revokedAt: null },
+      { revokedAt: new Date() },
+    );
+  }
 
   return res.json({ message: "Usuário atualizado.", user: serializeUser(user) });
 }

@@ -1,11 +1,10 @@
 import type { Request, Response } from "express";
 
+import { normalizeEmail } from "../lib/normalize";
 import { User } from "../models/User";
+import { UserAccessToken } from "../models/UserAccessToken";
+import { AdminAccessToken } from "../models/AdminAccessToken";
 import { normalizeThemePreferences, type ThemePreferences } from "../lib/theme-preferences";
-
-function normalizeEmail(email?: string) {
-  return email?.trim().toLowerCase() || undefined;
-}
 
 function serializePreferences(preferences?: Partial<ThemePreferences> | null) {
   return normalizeThemePreferences(preferences);
@@ -13,13 +12,14 @@ function serializePreferences(preferences?: Partial<ThemePreferences> | null) {
 
 function serializeUser(user: {
   _id: unknown;
+  authUserId?: number;
   username: string;
   email?: string | null;
   role: "user" | "admin";
   preferences?: Partial<ThemePreferences> | null;
 }) {
   return {
-    id: String(user._id),
+    id: user.authUserId != null ? String(user.authUserId) : String(user._id),
     username: user.username,
     email: user.email ?? null,
     role: user.role,
@@ -28,35 +28,76 @@ function serializeUser(user: {
 }
 
 export async function getCurrentUser(req: Request, res: Response) {
-  const userId = req.user?.id;
+  const authUserId = Number(req.user?.id);
 
-  if (!userId) {
+  if (!req.user?.id || Number.isNaN(authUserId)) {
     return res.status(401).json({ message: "Missing token" });
   }
 
-  const user = await User.findById(userId)
-    .select("_id username email role preferences")
-    .lean();
+  let user = await User.findOne({ authUserId }).lean();
 
   if (!user) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    const legacy = await User.findOne({
+      $or: [
+        { email: req.user!.email },
+        { username: req.user!.username },
+      ],
+      authUserId: { $exists: false },
+    });
+
+    if (legacy) {
+      legacy.authUserId = authUserId;
+      legacy.role = req.user!.role;
+      await legacy.save();
+      const oldId = String(legacy._id);
+      const newId = String(authUserId);
+      await Promise.all([
+        UserAccessToken.updateMany({ userId: oldId }, { userId: newId }),
+        AdminAccessToken.updateMany({ adminId: oldId }, { adminId: newId }),
+      ]);
+      try {
+        const { default: mongoose } = await import("mongoose");
+        const db = mongoose.connection.db;
+        if (db) {
+          await Promise.all([
+            db.collection("codexthreadsessions").updateMany({ userId: oldId }, { $set: { userId: newId } }),
+            db.collection("portalrecents").updateMany({ userId: oldId }, { $set: { userId: newId } }),
+          ]);
+        }
+      } catch {}
+      user = legacy.toObject();
+    } else {
+      const newUser = new User({
+        authUserId,
+        username: req.user!.username,
+        email: req.user!.email,
+        role: req.user!.role,
+      });
+      await newUser.save();
+      user = newUser.toObject();
+    }
   }
 
   return res.json({ ok: true, user: serializeUser(user) });
 }
 
 export async function updateCurrentUserPreferences(req: Request, res: Response) {
-  const userId = req.user?.id;
+  const authUserId = Number(req.user?.id);
   const payload = req.body?.preferences ?? req.body;
 
-  if (!userId) {
+  if (!req.user?.id || Number.isNaN(authUserId)) {
     return res.status(401).json({ message: "Missing token" });
   }
 
-  const user = await User.findById(userId);
+  let user = await User.findOne({ authUserId });
 
   if (!user) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    user = new User({
+      authUserId,
+      username: req.user!.username,
+      email: req.user!.email,
+      role: req.user!.role,
+    });
   }
 
   user.preferences = normalizeThemePreferences(payload);
@@ -71,11 +112,11 @@ export async function updateCurrentUserPreferences(req: Request, res: Response) 
 }
 
 export async function updateCurrentUserProfile(req: Request, res: Response) {
-  const userId = req.user?.id;
+  const authUserId = Number(req.user?.id);
   const username = typeof req.body?.username === "string" ? req.body.username.trim() : "";
   const email = normalizeEmail(req.body?.email);
 
-  if (!userId) {
+  if (!req.user?.id || Number.isNaN(authUserId)) {
     return res.status(401).json({ message: "Missing token" });
   }
 
@@ -88,7 +129,7 @@ export async function updateCurrentUserProfile(req: Request, res: Response) {
   }
 
   const existingUser = await User.findOne({
-    _id: { $ne: userId },
+    authUserId: { $ne: authUserId },
     $or: [{ username }, ...(email ? [{ email }] : [])],
   });
 
@@ -96,10 +137,15 @@ export async function updateCurrentUserProfile(req: Request, res: Response) {
     return res.status(409).json({ message: "Nome ou email ja esta em uso." });
   }
 
-  const user = await User.findById(userId);
+  let user = await User.findOne({ authUserId });
 
   if (!user) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    user = new User({
+      authUserId,
+      username: req.user!.username,
+      email: req.user!.email,
+      role: req.user!.role,
+    });
   }
 
   user.username = username;
