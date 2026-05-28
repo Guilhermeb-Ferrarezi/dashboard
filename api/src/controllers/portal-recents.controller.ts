@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   getPortalRecents,
@@ -6,43 +7,45 @@ import {
   trackPortalRecent,
 } from "../lib/portal-recents-store";
 
-export async function listPortalRecents(req: Request, res: Response) {
-  const userId = req.user?.id;
+export async function listPortalRecents(c: Context<AppEnv>): Promise<Response> {
+  const userId = c.get("user")?.id;
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
   const items = await getPortalRecents(userId);
-  return res.json({ items });
+  return c.json({ items });
 }
 
-export async function trackPortalRecentHandler(req: Request, res: Response) {
-  const userId = req.user?.id;
+export async function trackPortalRecentHandler(c: Context<AppEnv>): Promise<Response> {
+  const userId = c.get("user")?.id;
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const item = req.body?.item ?? req.body;
+  const body = await c.req.json();
+  const item = body?.item ?? body;
   const items = await trackPortalRecent(userId, item);
 
   if (!items) {
-    return res.status(400).json({ message: "Recent invalido." });
+    return c.json({ message: "Recent invalido." }, 400);
   }
 
-  return res.json({ items });
+  return c.json({ items });
 }
 
-export async function togglePortalRecentPinHandler(req: Request, res: Response) {
-  const userId = req.user?.id;
+export async function togglePortalRecentPinHandler(c: Context<AppEnv>): Promise<Response> {
+  const userId = c.get("user")?.id;
   if (!userId) {
-    return res.status(401).json({ message: "Missing token" });
+    return c.json({ message: "Missing token" }, 401);
   }
 
-  const id = typeof req.body?.id === "string" ? req.body.id : null;
+  const body = await c.req.json();
+  const id = typeof body?.id === "string" ? body.id : null;
   if (!id) {
-    return res.status(400).json({ message: "id obrigatorio." });
+    return c.json({ message: "id obrigatorio." }, 400);
   }
 
   const items = await togglePortalRecentPin(userId, id);
-  return res.json({ items });
+  return c.json({ items });
 }
