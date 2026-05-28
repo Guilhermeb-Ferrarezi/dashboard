@@ -12,7 +12,6 @@ export default async function DebugSessionPage() {
   const allCookies = cookieStore.getAll().map((c) => ({
     name: c.name,
     valueLength: c.value.length,
-    valuePreview: c.value.slice(0, 20) + "...",
   }));
 
   const envInfo = {
@@ -27,8 +26,14 @@ export default async function DebugSessionPage() {
   };
 
   try {
-    const data = await serverApi<unknown>("/user/me", { cookieHeader });
-    userMeResult = { ok: true, body: data };
+    const data = (await serverApi<{ user?: { id?: string; role?: string } }>(
+      "/user/me",
+      { cookieHeader },
+    )) as { user?: { id?: string; role?: string } };
+    userMeResult = {
+      ok: true,
+      body: { user: { id: data.user?.id, role: data.user?.role } },
+    };
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
     userMeResult = {
