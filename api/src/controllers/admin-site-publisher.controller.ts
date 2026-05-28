@@ -1,5 +1,5 @@
-import type { Request, Response } from "express";
-import multer from "multer";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import {
   deletePublishedSite,
@@ -10,38 +10,6 @@ import {
 
 const MAX_ARCHIVE_SIZE_BYTES = 20 * 1024 * 1024;
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: MAX_ARCHIVE_SIZE_BYTES,
-    files: 1,
-  },
-  fileFilter(_req, file, callback) {
-    const isZipMime = file.mimetype.includes("zip") || file.mimetype === "application/octet-stream";
-    const isZipName = file.originalname.toLowerCase().endsWith(".zip");
-
-    if (!isZipMime && !isZipName) {
-      callback(new Error("Envie apenas arquivos ZIP."));
-      return;
-    }
-
-    callback(null, true);
-  },
-});
-
-function parseMultipartRequest(req: Request, res: Response) {
-  return new Promise<void>((resolve, reject) => {
-    upload.single("archive")(req, res, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
 function parseRoute(value: unknown) {
   if (typeof value !== "string") {
     throw new Error("Informe uma rota válida.");
@@ -50,58 +18,62 @@ function parseRoute(value: unknown) {
   return normalizePublishedRoute(value);
 }
 
-export async function listAdminPublishedSitesHandler(_req: Request, res: Response) {
+export async function listAdminPublishedSitesHandler(c: Context<AppEnv>): Promise<Response> {
   const sites = await listPublishedSites();
-  res.json({ sites });
+  return c.json({ sites });
 }
 
-export async function publishAdminSiteHandler(req: Request, res: Response) {
+export async function publishAdminSiteHandler(c: Context<AppEnv>): Promise<Response> {
+  let body: Record<string, unknown>;
   try {
-    await parseMultipartRequest(req, res);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao processar o ZIP.";
-
-    if (message.includes("File too large")) {
-      res.status(400).json({ ok: false, message: "O ZIP precisa ter no máximo 20 MB." });
-      return;
-    }
-
-    res.status(400).json({ ok: false, message });
-    return;
+    body = await c.req.parseBody();
+  } catch {
+    return c.json({ ok: false, message: "Falha ao processar o ZIP." }, 400);
   }
 
-  const archive = req.file;
+  const archiveFile = body["archive"];
+
+  if (!(archiveFile instanceof File)) {
+    return c.json({ ok: false, message: "Envie um arquivo ZIP válido." }, 400);
+  }
+
+  if (archiveFile.size > MAX_ARCHIVE_SIZE_BYTES) {
+    return c.json({ ok: false, message: "O ZIP precisa ter no máximo 20 MB." }, 400);
+  }
+
+  const isZipMime = archiveFile.type.includes("zip") || archiveFile.type === "application/octet-stream";
+  const isZipName = archiveFile.name.toLowerCase().endsWith(".zip");
+
+  if (!isZipMime && !isZipName) {
+    return c.json({ ok: false, message: "Envie apenas arquivos ZIP." }, 400);
+  }
 
   try {
-    const route = parseRoute(req.body?.route);
-
-    if (!archive) {
-      res.status(400).json({ ok: false, message: "Envie um arquivo ZIP válido." });
-      return;
-    }
+    const route = parseRoute(body["route"]);
+    const archiveBuffer = Buffer.from(await archiveFile.arrayBuffer());
 
     const published = await publishStaticSiteZip({
       route,
-      archiveBuffer: archive.buffer,
-      archiveFileName: archive.originalname,
-      archiveSizeBytes: archive.size,
+      archiveBuffer,
+      archiveFileName: archiveFile.name,
+      archiveSizeBytes: archiveFile.size,
     });
 
-    res.status(201).json({ ok: true, site: published });
+    return c.json({ ok: true, site: published }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao publicar o site.";
-    res.status(400).json({ ok: false, message });
+    return c.json({ ok: false, message }, 400);
   }
 }
 
-export async function deleteAdminSiteHandler(req: Request, res: Response) {
+export async function deleteAdminSiteHandler(c: Context<AppEnv>): Promise<Response> {
   try {
-    const route = parseRoute(req.body?.route);
+    const body = await c.req.json();
+    const route = parseRoute(body?.route);
     const deleted = await deletePublishedSite(route);
-    res.json({ ok: true, site: deleted });
+    return c.json({ ok: true, site: deleted });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao remover o site.";
-    res.status(400).json({ ok: false, message });
+    return c.json({ ok: false, message }, 400);
   }
 }
-

@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import mongoose from "mongoose";
 
 import { User } from "../models/User";
@@ -143,7 +144,7 @@ async function loadRecentLogs(projects: DashboardProjectInput[]) {
   return logs;
 }
 
-export async function getDashboardSummary(_req: Request, res: Response) {
+export async function getDashboardSummary(_c: Context<AppEnv>): Promise<Response> {
   const [registrations, projects] = await Promise.all([
     VctInscricao.find({})
       .select("_id modalidade nome nick status createdAt")
@@ -169,7 +170,7 @@ export async function getDashboardSummary(_req: Request, res: Response) {
     projects,
   });
 
-  return res.json({
+  return _c.json({
     summary,
     totals: {
       registrations: registrationRecords.length,

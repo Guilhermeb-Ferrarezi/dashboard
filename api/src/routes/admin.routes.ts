@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Hono } from "hono";
+import type { AppEnv } from "../types/hono";
 
 import { createUser, deleteUser, listUsers, updateUser } from "../controllers/admin.controller";
 import { uploadAdminR2Image } from "../controllers/admin-r2.controller";
@@ -16,7 +17,7 @@ import {
 import { verifyJWTOrCodexServiceToken } from "../middlewares/codex-service-auth";
 import { requireRole } from "../middlewares/role";
 
-const router = Router();
+const router = new Hono<AppEnv>();
 
 router.use(verifyJWTOrCodexServiceToken, requireRole("admin"));
 router.get("/users", listUsers);

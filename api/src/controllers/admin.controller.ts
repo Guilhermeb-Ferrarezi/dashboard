@@ -1,4 +1,5 @@
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import bcrypt from "bcrypt";
 
 import { normalizeEmail } from "../lib/normalize";
@@ -24,23 +25,22 @@ function serializeUser(user: {
   };
 }
 
-export async function listUsers(_req: Request, res: Response) {
+export async function listUsers(_c: Context<AppEnv>): Promise<Response> {
   const users = await User.find()
     .sort({ createdAt: -1 })
     .select("_id authUserId username email role createdAt")
     .lean();
 
-  return res.json({ users: users.map(serializeUser) });
+  return _c.json({ users: users.map(serializeUser) });
 }
 
-export async function createUser(req: Request, res: Response) {
-  const { username, email, password, role } = req.body;
+export async function createUser(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
+  const { username, email, password, role } = body;
   const normalizedEmail = normalizeEmail(email);
 
   if (!username || !password || !normalizedEmail) {
-    return res
-      .status(400)
-      .json({ message: "Preencha usuario, email e senha." });
+    return c.json({ message: "Preencha usuario, email e senha." }, 400);
   }
 
   const existingUser = await User.findOne({
@@ -48,11 +48,11 @@ export async function createUser(req: Request, res: Response) {
   });
 
   if (existingUser) {
-    return res.status(400).json({ message: "Usuario ou email ja existe." });
+    return c.json({ message: "Usuario ou email ja existe." }, 400);
   }
 
   if (password.length < 8) {
-    return res.status(400).json({ message: "A senha deve ter pelo menos 8 caracteres" });
+    return c.json({ message: "A senha deve ter pelo menos 8 caracteres" }, 400);
   }
 
   const hashed = await bcrypt.hash(password, 12);
@@ -63,19 +63,20 @@ export async function createUser(req: Request, res: Response) {
     role: role === "admin" ? "admin" : "user",
   });
 
-  return res.status(201).json({
+  return c.json({
     message: "Usuario criado com sucesso.",
     user: serializeUser(user),
-  });
+  }, 201);
 }
 
-export async function updateUser(req: Request, res: Response) {
-  const { id } = req.params;
+export async function updateUser(c: Context<AppEnv>): Promise<Response> {
+  const id = c.req.param("id");
   if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ message: "ID inválido." });
+    return c.json({ message: "ID inválido." }, 400);
   }
 
-  const { username, email, password, role } = req.body as {
+  const body = await c.req.json();
+  const { username, email, password, role } = body as {
     username?: string;
     email?: string;
     password?: string;
@@ -86,7 +87,7 @@ export async function updateUser(req: Request, res: Response) {
 
   if (username !== undefined) {
     const trimmed = username.trim();
-    if (!trimmed) return res.status(400).json({ message: "Nome de usuário não pode ser vazio." });
+    if (!trimmed) return c.json({ message: "Nome de usuário não pode ser vazio." }, 400);
     updates.username = trimmed;
   }
 
@@ -97,19 +98,19 @@ export async function updateUser(req: Request, res: Response) {
 
   if (role !== undefined) {
     if (role !== "user" && role !== "admin") {
-      return res.status(400).json({ message: "Perfil inválido." });
+      return c.json({ message: "Perfil inválido." }, 400);
     }
     updates.role = role;
   }
 
   if (password !== undefined) {
     const trimmed = password.trim();
-    if (trimmed.length < 8) return res.status(400).json({ message: "A senha deve ter pelo menos 8 caracteres" });
+    if (trimmed.length < 8) return c.json({ message: "A senha deve ter pelo menos 8 caracteres" }, 400);
     updates.password = await bcrypt.hash(trimmed, 12);
   }
 
   if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ message: "Nenhum campo para atualizar." });
+    return c.json({ message: "Nenhum campo para atualizar." }, 400);
   }
 
   if (updates.username || updates.email !== undefined) {
@@ -119,7 +120,7 @@ export async function updateUser(req: Request, res: Response) {
 
     if (orConditions.length > 0) {
       const conflict = await User.findOne({ $or: orConditions, _id: { $ne: id } }).lean();
-      if (conflict) return res.status(400).json({ message: "Nome de usuário ou email já em uso." });
+      if (conflict) return c.json({ message: "Nome de usuário ou email já em uso." }, 400);
     }
   }
 
@@ -127,7 +128,7 @@ export async function updateUser(req: Request, res: Response) {
     .select("_id authUserId username email role createdAt")
     .lean();
 
-  if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
+  if (!user) return c.json({ message: "Usuário não encontrado." }, 404);
 
   // Revoke all active tokens on password change
   if (updates.password) {
@@ -141,17 +142,17 @@ export async function updateUser(req: Request, res: Response) {
     );
   }
 
-  return res.json({ message: "Usuário atualizado.", user: serializeUser(user) });
+  return c.json({ message: "Usuário atualizado.", user: serializeUser(user) });
 }
 
-export async function deleteUser(req: Request, res: Response) {
-  const { id } = req.params;
+export async function deleteUser(c: Context<AppEnv>): Promise<Response> {
+  const id = c.req.param("id");
   if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ message: "ID inválido." });
+    return c.json({ message: "ID inválido." }, 400);
   }
 
   const user = await User.findByIdAndDelete(id).lean();
-  if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
+  if (!user) return c.json({ message: "Usuário não encontrado." }, 404);
 
-  return res.json({ message: "Usuário removido." });
+  return c.json({ message: "Usuário removido." });
 }

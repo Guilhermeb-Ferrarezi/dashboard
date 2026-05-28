@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
-import type { Request, Response } from "express";
+import type { Context } from "hono";
+import type { AppEnv } from "../types/hono";
 import mongoose from "mongoose";
 import type { CollectionInfo } from "mongodb";
 import { parsePagination } from "../lib/pagination";
@@ -26,7 +27,7 @@ function normalizeSlug(input: string) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
@@ -135,7 +136,7 @@ function getLogUser(entry: Record<string, unknown>) {
   };
 }
 
-export async function listLogProjects(_req: Request, res: Response) {
+export async function listLogProjects(_c: Context<AppEnv>): Promise<Response> {
   const db = getLogsDb();
   const [collections, metadataEntries] = await Promise.all([
     db.listCollections().toArray(),
@@ -169,18 +170,19 @@ export async function listLogProjects(_req: Request, res: Response) {
     }),
   );
 
-  return res.json({ projects });
+  return _c.json({ projects });
 }
 
-export async function createLogProject(req: Request, res: Response) {
+export async function createLogProject(c: Context<AppEnv>): Promise<Response> {
+  const body = await c.req.json();
   const name =
-    typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    typeof body?.name === "string" ? body.name.trim() : "";
   const slugInput =
-    typeof req.body?.slug === "string" ? req.body.slug.trim() : "";
+    typeof body?.slug === "string" ? body.slug.trim() : "";
   const slug = normalizeSlug(slugInput);
 
   if (!name || !slug) {
-    return res.status(400).json({ message: "Nome e slug sao obrigatorios." });
+    return c.json({ message: "Nome e slug sao obrigatorios." }, 400);
   }
 
   const db = getLogsDb();
@@ -188,7 +190,7 @@ export async function createLogProject(req: Request, res: Response) {
   const existingCollections = await db.listCollections({ name: collectionName }).toArray();
 
   if (existingCollections.length > 0) {
-    return res.status(409).json({ message: "Ja existe um projeto com esse slug." });
+    return c.json({ message: "Ja existe um projeto com esse slug." }, 409);
   }
 
   const metadataCollection = db.collection<LogProjectMetadata>(
@@ -199,7 +201,7 @@ export async function createLogProject(req: Request, res: Response) {
   });
 
   if (existingMetadata) {
-    return res.status(409).json({ message: "Ja existe um projeto com esse slug." });
+    return c.json({ message: "Ja existe um projeto com esse slug." }, 409);
   }
 
   await db.createCollection(collectionName);
@@ -214,29 +216,29 @@ export async function createLogProject(req: Request, res: Response) {
 
   await metadataCollection.insertOne(metadata);
 
-  return res.status(201).json({
+  return c.json({
     project: getProjectPayload(collectionName, metadata),
-  });
+  }, 201);
 }
 
-export async function listProjectLogs(req: Request, res: Response) {
+export async function listProjectLogs(c: Context<AppEnv>): Promise<Response> {
   const projectId =
-    typeof req.query.projectId === "string" ? req.query.projectId : "";
-  const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-  const method = typeof req.query.method === "string" ? req.query.method.trim().toUpperCase() : "";
-  const from = typeof req.query.from === "string" ? req.query.from.trim() : "";
-  const to = typeof req.query.to === "string" ? req.query.to.trim() : "";
-  const { page, limit } = parsePagination(req, 20);
+    typeof c.req.query("projectId") === "string" ? c.req.query("projectId") : "";
+  const search = typeof c.req.query("search") === "string" ? (c.req.query("search") as string).trim() : "";
+  const method = typeof c.req.query("method") === "string" ? (c.req.query("method") as string).trim().toUpperCase() : "";
+  const from = typeof c.req.query("from") === "string" ? (c.req.query("from") as string).trim() : "";
+  const to = typeof c.req.query("to") === "string" ? (c.req.query("to") as string).trim() : "";
+  const { page, limit } = parsePagination(c, 20);
 
   if (!projectId) {
-    return res.status(400).json({ message: "projectId e obrigatorio." });
+    return c.json({ message: "projectId e obrigatorio." }, 400);
   }
 
   const db = getLogsDb();
   const collections = await db.listCollections({ name: projectId }).toArray();
 
   if (collections.length === 0) {
-    return res.status(404).json({ message: "Projeto de logs nao encontrado." });
+    return c.json({ message: "Projeto de logs nao encontrado." }, 404);
   }
 
   const filter: Record<string, unknown> = {};
@@ -321,7 +323,7 @@ export async function listProjectLogs(req: Request, res: Response) {
     };
   });
 
-  return res.json({
+  return c.json({
     logs,
     page,
     total,
