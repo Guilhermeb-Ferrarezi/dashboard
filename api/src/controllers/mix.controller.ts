@@ -183,6 +183,146 @@ export async function minhasInscricoes(c: Context<AppEnv>): Promise<Response> {
   }
 }
 
+// ── Admin: CRUD de sessões ────────────────────────────────────────────────────
+
+export async function listSessoeAdmin(c: Context<AppEnv>): Promise<Response> {
+  try {
+    const db = getCheckoutDb();
+
+    const sessoes = await db
+      .select()
+      .from(schema.mixSessoes)
+      .orderBy(schema.mixSessoes.dataPrevista, schema.mixSessoes.id);
+
+    // Conta inscrições confirmadas por sessão
+    const contagens = await db
+      .select({
+        sessaoId: schema.mixInscricoes.sessaoId,
+        total: count()
+      })
+      .from(schema.mixInscricoes)
+      .where(eq(schema.mixInscricoes.status, "confirmado"))
+      .groupBy(schema.mixInscricoes.sessaoId);
+
+    const vagasMap = new Map(contagens.map(r => [r.sessaoId, r.total]));
+
+    return c.json({
+      sessoes: sessoes.map(s => ({
+        id: s.id,
+        jogo: s.jogo,
+        dataPrevista: s.dataPrevista,
+        horario: s.horario,
+        modalidade: s.modalidade,
+        totalVagas: s.totalVagas,
+        vagasPreenchidas: vagasMap.get(s.id) ?? 0,
+        status: s.status,
+        precoCents: s.precoCents,
+        observacoes: s.observacoes,
+        createdAt: s.createdAt.toISOString(),
+        updatedAt: s.updatedAt.toISOString(),
+      }))
+    });
+  } catch (error) {
+    console.error("[mix] listSessoesAdmin error:", error);
+    return c.json({ message: "Erro ao listar sessões." }, 500);
+  }
+}
+
+export async function createSessao(c: Context<AppEnv>): Promise<Response> {
+  try {
+    const body = await c.req.json() as {
+      jogo?: string;
+      dataPrevista?: string;
+      horario?: string;
+      modalidade?: string;
+      totalVagas?: number;
+      status?: string;
+      precoCents?: number;
+      observacoes?: string;
+    };
+
+    const { jogo, dataPrevista, horario, modalidade, totalVagas, status, precoCents, observacoes } = body;
+
+    if (!jogo || !["cs2","valorant","lol"].includes(jogo)) {
+      return c.json({ message: "jogo inválido." }, 400);
+    }
+    if (!dataPrevista || !/^\d{4}-\d{2}-\d{2}$/.test(dataPrevista)) {
+      return c.json({ message: "dataPrevista inválida (YYYY-MM-DD)." }, 400);
+    }
+    if (!horario || !/^\d{2}:\d{2}$/.test(horario)) {
+      return c.json({ message: "horario inválido (HH:MM)." }, 400);
+    }
+
+    const db = getCheckoutDb();
+    const [sessao] = await db
+      .insert(schema.mixSessoes)
+      .values({
+        jogo: jogo as "cs2" | "valorant" | "lol",
+        dataPrevista,
+        horario,
+        modalidade: (modalidade === "online" ? "online" : "presencial") as "presencial" | "online",
+        totalVagas: Number(totalVagas) || 10,
+        status: (["confirmando","confirmado","realizado","cancelado"].includes(status ?? "") ? status : "confirmando") as "confirmando" | "confirmado" | "realizado" | "cancelado",
+        precoCents: Number(precoCents) || 0,
+        observacoes: observacoes?.trim() || null,
+      })
+      .returning();
+
+    return c.json({ sessao: { ...sessao!, vagasPreenchidas: 0 } }, 201);
+  } catch (error) {
+    console.error("[mix] createSessao error:", error);
+    return c.json({ message: "Erro ao criar sessão." }, 500);
+  }
+}
+
+export async function updateSessao(c: Context<AppEnv>): Promise<Response> {
+  try {
+    const id = Number(c.req.param("id"));
+    if (!id || isNaN(id)) return c.json({ message: "ID inválido." }, 400);
+
+    const body = await c.req.json() as Record<string, unknown>;
+    const db = getCheckoutDb();
+
+    const updates: Partial<typeof schema.mixSessoes.$inferInsert> = { updatedAt: new Date() };
+
+    if (body.jogo !== undefined) updates.jogo = body.jogo as "cs2" | "valorant" | "lol";
+    if (body.dataPrevista !== undefined) updates.dataPrevista = String(body.dataPrevista);
+    if (body.horario !== undefined) updates.horario = String(body.horario);
+    if (body.modalidade !== undefined) updates.modalidade = body.modalidade as "presencial" | "online";
+    if (body.totalVagas !== undefined) updates.totalVagas = Number(body.totalVagas);
+    if (body.status !== undefined) updates.status = body.status as "confirmando" | "confirmado" | "realizado" | "cancelado";
+    if (body.precoCents !== undefined) updates.precoCents = Number(body.precoCents);
+    if (body.observacoes !== undefined) updates.observacoes = body.observacoes ? String(body.observacoes) : null;
+
+    const [sessao] = await db
+      .update(schema.mixSessoes)
+      .set(updates)
+      .where(eq(schema.mixSessoes.id, id))
+      .returning();
+
+    if (!sessao) return c.json({ message: "Sessão não encontrada." }, 404);
+
+    return c.json({ sessao });
+  } catch (error) {
+    console.error("[mix] updateSessao error:", error);
+    return c.json({ message: "Erro ao atualizar sessão." }, 500);
+  }
+}
+
+export async function deleteSessao(c: Context<AppEnv>): Promise<Response> {
+  try {
+    const id = Number(c.req.param("id"));
+    if (!id || isNaN(id)) return c.json({ message: "ID inválido." }, 400);
+
+    const db = getCheckoutDb();
+    await db.delete(schema.mixSessoes).where(eq(schema.mixSessoes.id, id));
+    return c.json({ message: "Sessão removida." });
+  } catch (error) {
+    console.error("[mix] deleteSessao error:", error);
+    return c.json({ message: "Erro ao remover sessão." }, 500);
+  }
+}
+
 export async function confirmarPagamento(c: Context<AppEnv>): Promise<Response> {
   try {
     const secret = c.req.header("x-internal-secret");

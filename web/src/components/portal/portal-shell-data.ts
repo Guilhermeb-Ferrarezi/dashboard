@@ -20,6 +20,7 @@ import {
   TagsIcon,
   UserRoundIcon,
   UsersIcon,
+  ZapIcon,
 } from "@/components/ui/icons";
 
 export type PortalSidebarItem = {
@@ -141,6 +142,24 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               icon: UsersIcon,
               kind: "resource",
               keywords: ["colaboradores", "corujao", "vendedor", "metodo 4", "atribuicao"],
+            }),
+          ],
+        }),
+        portalItem({
+          href: "/mix/sessoes",
+          label: "Mix",
+          description: "Sessões de Mix — CS2, Valorant e LoL",
+          icon: ZapIcon,
+          kind: "page",
+          keywords: ["mix", "sessoes", "grupo", "cs2", "valorant", "lol"],
+          children: [
+            portalItem({
+              href: "/mix/sessoes",
+              label: "Sessões",
+              description: "Mixes em aberto — datas, vagas e status",
+              icon: ZapIcon,
+              kind: "resource",
+              keywords: ["sessoes", "mix", "vagas", "datas", "calendario"],
             }),
           ],
         }),
