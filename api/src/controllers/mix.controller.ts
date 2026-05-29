@@ -36,38 +36,6 @@ export async function inscrever(c: Context<AppEnv>): Promise<Response> {
       return c.json({ message: "Sessão não disponível para inscrição." }, 409);
     }
 
-    // Conta vagas preenchidas
-    const [{ total: vagasOcupadas }] = await db
-      .select({ total: count() })
-      .from(schema.mixInscricoes)
-      .where(
-        and(
-          eq(schema.mixInscricoes.sessaoId, sessaoId),
-          eq(schema.mixInscricoes.status, "confirmado")
-        )
-      );
-
-    if (vagasOcupadas >= sessao.totalVagas) {
-      return c.json({ message: "Sessão lotada." }, 409);
-    }
-
-    // Verifica se o usuário já tem inscrição confirmada nesta sessão
-    const [existente] = await db
-      .select({ id: schema.mixInscricoes.id })
-      .from(schema.mixInscricoes)
-      .where(
-        and(
-          eq(schema.mixInscricoes.sessaoId, sessaoId),
-          eq(schema.mixInscricoes.checkoutUserId, userId),
-          eq(schema.mixInscricoes.status, "confirmado")
-        )
-      )
-      .limit(1);
-
-    if (existente) {
-      return c.json({ message: "Você já tem uma vaga confirmada nesta sessão." }, 409);
-    }
-
     // Garante que checkout_customer existe
     const [customer] = await db
       .select({ userId: schema.checkoutCustomers.userId })
@@ -79,15 +47,54 @@ export async function inscrever(c: Context<AppEnv>): Promise<Response> {
       return c.json({ message: "Cadastro de checkout não encontrado. Complete seu perfil antes de comprar." }, 422);
     }
 
-    // Cria inscrição pendente
-    const [inscricao] = await db
-      .insert(schema.mixInscricoes)
-      .values({
-        sessaoId,
-        checkoutUserId: userId,
-        status: "pendente"
-      })
-      .returning();
+    // Inscreve dentro de transação para evitar overbooking
+    let inscricao: typeof schema.mixInscricoes.$inferSelect;
+
+    try {
+      inscricao = await db.transaction(async (tx) => {
+        const [{ vagasOcupadas }] = await tx
+          .select({ vagasOcupadas: count() })
+          .from(schema.mixInscricoes)
+          .where(
+            and(
+              eq(schema.mixInscricoes.sessaoId, sessaoId),
+              eq(schema.mixInscricoes.status, "confirmado")
+            )
+          );
+
+        if (vagasOcupadas >= sessao.totalVagas) {
+          throw Object.assign(new Error("Sessão lotada."), { statusCode: 409 });
+        }
+
+        const [existente] = await tx
+          .select({ id: schema.mixInscricoes.id })
+          .from(schema.mixInscricoes)
+          .where(
+            and(
+              eq(schema.mixInscricoes.sessaoId, sessaoId),
+              eq(schema.mixInscricoes.checkoutUserId, userId),
+              eq(schema.mixInscricoes.status, "confirmado")
+            )
+          )
+          .limit(1);
+
+        if (existente) {
+          throw Object.assign(new Error("Você já tem uma vaga confirmada nesta sessão."), { statusCode: 409 });
+        }
+
+        const [novaInscricao] = await tx
+          .insert(schema.mixInscricoes)
+          .values({ sessaoId, checkoutUserId: userId, status: "pendente" })
+          .returning();
+
+        return novaInscricao!;
+      });
+    } catch (txError: any) {
+      if (txError?.statusCode === 409) {
+        return c.json({ message: txError.message }, 409);
+      }
+      throw txError; // re-throw para o outer catch
+    }
 
     const checkoutUrl = MIX_DOTFY_SLUG
       ? `${DOTFY_BASE_URL}/checkout/${MIX_DOTFY_SLUG}?ref=mix-${inscricao!.id}`
@@ -100,7 +107,11 @@ export async function inscrever(c: Context<AppEnv>): Promise<Response> {
         ? "Inscrição criada. Finalize o pagamento para garantir a vaga."
         : "Inscrição criada. Entre em contato para finalizar o pagamento."
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Unique constraint violation = usuário já tem inscrição nesta sessão
+    if (error?.code === "23505" || String(error?.message).includes("unique")) {
+      return c.json({ message: "Você já tem uma inscrição nesta sessão." }, 409);
+    }
     console.error("[mix] inscrever error:", error);
     return c.json({ message: "Erro ao criar inscrição." }, 500);
   }
@@ -172,6 +183,30 @@ export async function confirmarPagamento(c: Context<AppEnv>): Promise<Response> 
 
     if (inscricao.status === "confirmado") {
       return c.json({ message: "Inscrição já confirmada.", inscricaoId });
+    }
+
+    // Re-verifica capacidade antes de confirmar
+    const sessao = await db
+      .select({ totalVagas: schema.mixSessoes.totalVagas })
+      .from(schema.mixSessoes)
+      .where(eq(schema.mixSessoes.id, inscricao.sessaoId))
+      .limit(1)
+      .then(r => r[0]);
+
+    if (sessao) {
+      const [{ vagasOcupadas }] = await db
+        .select({ vagasOcupadas: count() })
+        .from(schema.mixInscricoes)
+        .where(
+          and(
+            eq(schema.mixInscricoes.sessaoId, inscricao.sessaoId),
+            eq(schema.mixInscricoes.status, "confirmado")
+          )
+        );
+
+      if (vagasOcupadas >= sessao.totalVagas) {
+        return c.json({ message: "Sessão já está lotada. Não é possível confirmar.", inscricaoId }, 409);
+      }
     }
 
     await db

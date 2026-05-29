@@ -82,6 +82,8 @@ const envSchema = z.object({
 
   // Corujao
   CORUJAO_INTERNAL_SECRET: z.string().optional(),
+  MIX_INTERNAL_SECRET: z.string().optional(),
+  MIX_DOTFY_SLUG: z.string().optional(),
 
   // Misc
   BASIC_AUTH_PASS: z.string().optional(),
