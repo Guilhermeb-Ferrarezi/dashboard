@@ -212,6 +212,41 @@ export const corujaoVendas = pgTable("corujao_vendas", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 });
 
+// ── Mix ──────────────────────────────────────────────────────────────────────
+
+export const mixSessoes = pgTable("mix_sessoes", {
+  id: serial("id").primaryKey(),
+  jogo: text("jogo", { enum: ["cs2", "valorant", "lol"] }).notNull(),
+  dataPrevista: date("data_prevista", { mode: "string" }).notNull(),
+  horario: text("horario").notNull(),
+  modalidade: text("modalidade", { enum: ["presencial", "online"] }).notNull().default("presencial"),
+  totalVagas: integer("total_vagas").notNull().default(10),
+  status: text("status", {
+    enum: ["confirmando", "confirmado", "realizado", "cancelado"]
+  }).notNull().default("confirmando"),
+  precoCents: integer("preco_cents").notNull().default(0),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
+export const mixInscricoes = pgTable("mix_inscricoes", {
+  id: serial("id").primaryKey(),
+  sessaoId: integer("sessao_id")
+    .notNull()
+    .references(() => mixSessoes.id, { onDelete: "cascade" }),
+  checkoutUserId: integer("checkout_user_id")
+    .notNull()
+    .references(() => checkoutCustomers.userId, { onDelete: "cascade" }),
+  checkoutOrderId: integer("checkout_order_id")
+    .references(() => checkoutOrders.id, { onDelete: "set null" }),
+  status: text("status", {
+    enum: ["pendente", "confirmado", "cancelado"]
+  }).notNull().default("pendente"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+});
+
 // ── Relations ─────────────────────────────────────────────────────────────────
 
 export const colaboradoresRelations = relations(colaboradores, ({ many }) => ({
@@ -281,5 +316,20 @@ export const corujaoVendasRelations = relations(corujaoVendas, ({ one }) => ({
   sessao: one(corujaoSessoes, {
     fields: [corujaoVendas.sessaoId],
     references: [corujaoSessoes.id]
+  })
+}));
+
+export const mixSessoesRelations = relations(mixSessoes, ({ many }) => ({
+  inscricoes: many(mixInscricoes)
+}));
+
+export const mixInscricoesRelations = relations(mixInscricoes, ({ one }) => ({
+  sessao: one(mixSessoes, {
+    fields: [mixInscricoes.sessaoId],
+    references: [mixSessoes.id]
+  }),
+  checkoutOrder: one(checkoutOrders, {
+    fields: [mixInscricoes.checkoutOrderId],
+    references: [checkoutOrders.id]
   })
 }));

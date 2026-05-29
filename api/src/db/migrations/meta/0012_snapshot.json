@@ -1,6 +1,6 @@
 {
-  "id": "5a861da0-feb2-4f17-90cf-84794dc88ff4",
-  "prevId": "0988f450-99dd-46e5-a9c2-430669920117",
+  "id": "f18b49d2-d32a-441b-a561-7238df4a3898",
+  "prevId": "a5577797-b766-4026-9390-2108ab9ac508",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -404,6 +404,25 @@
           "primaryKey": false,
           "notNull": false
         },
+        "is_corujao": {
+          "name": "is_corujao",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "dotfy_product_id": {
+          "name": "dotfy_product_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dotfy_slug": {
+          "name": "dotfy_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -753,6 +772,20 @@
           "primaryKey": false,
           "notNull": false
         },
+        "jogos": {
+          "name": "jogos",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "servicos": {
+          "name": "servicos",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -791,6 +824,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "telefone"
+          ]
+        },
+        "corujao_contatos_email_unique": {
+          "name": "corujao_contatos_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
           ]
         }
       },
@@ -1128,6 +1168,189 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mix_inscricoes": {
+      "name": "mix_inscricoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sessao_id": {
+          "name": "sessao_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkout_user_id": {
+          "name": "checkout_user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkout_order_id": {
+          "name": "checkout_order_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "mix_inscricoes_sessao_id_mix_sessoes_id_fk": {
+          "name": "mix_inscricoes_sessao_id_mix_sessoes_id_fk",
+          "tableFrom": "mix_inscricoes",
+          "tableTo": "mix_sessoes",
+          "columnsFrom": [
+            "sessao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mix_inscricoes_checkout_user_id_checkout_customers_user_id_fk": {
+          "name": "mix_inscricoes_checkout_user_id_checkout_customers_user_id_fk",
+          "tableFrom": "mix_inscricoes",
+          "tableTo": "checkout_customers",
+          "columnsFrom": [
+            "checkout_user_id"
+          ],
+          "columnsTo": [
+            "user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mix_inscricoes_checkout_order_id_checkout_orders_id_fk": {
+          "name": "mix_inscricoes_checkout_order_id_checkout_orders_id_fk",
+          "tableFrom": "mix_inscricoes",
+          "tableTo": "checkout_orders",
+          "columnsFrom": [
+            "checkout_order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.mix_sessoes": {
+      "name": "mix_sessoes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "jogo": {
+          "name": "jogo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_prevista": {
+          "name": "data_prevista",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "horario": {
+          "name": "horario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "modalidade": {
+          "name": "modalidade",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'presencial'"
+        },
+        "total_vagas": {
+          "name": "total_vagas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 10
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'confirmando'"
+        },
+        "preco_cents": {
+          "name": "preco_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
