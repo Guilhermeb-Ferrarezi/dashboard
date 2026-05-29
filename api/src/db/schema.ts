@@ -245,7 +245,9 @@ export const mixInscricoes = pgTable("mix_inscricoes", {
   }).notNull().default("pendente"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
-});
+}, (t) => [
+  unique().on(t.sessaoId, t.checkoutUserId)
+]);
 
 // ── Relations ─────────────────────────────────────────────────────────────────
 

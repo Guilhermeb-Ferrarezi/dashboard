@@ -1,0 +1,1 @@
+ALTER TABLE "mix_inscricoes" ADD CONSTRAINT "mix_inscricoes_sessao_id_checkout_user_id_unique" UNIQUE("sessao_id","checkout_user_id");
