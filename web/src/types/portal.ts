@@ -112,6 +112,7 @@ export interface CheckoutProductSummary {
   discountPercent: number | null;
   active: boolean;
   isCorujao: boolean;
+  isMix: boolean;
   imageKey: string | null;
   imageUrl: string | null;
   createdAt: string;

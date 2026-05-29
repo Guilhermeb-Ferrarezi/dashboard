@@ -519,6 +519,19 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
     }
   }
 
+  async function handleToggleMix(produto: CheckoutProductSummary) {
+    try {
+      const { produto: updated } = await clientApi<{ produto: CheckoutProductSummary }>(
+        `/checkout/produtos/${produto.id}`,
+        { method: "PUT", body: JSON.stringify({ isMix: !produto.isMix }) }
+      );
+      setProdutos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      toast.success(updated.isMix ? "Produto marcado como Mix." : "Produto desmarcado do Mix.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao alterar produto.");
+    }
+  }
+
   async function handleDuplicate(produto: CheckoutProductSummary) {
     setPending(true);
     try {
@@ -733,6 +746,7 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                     </TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Corujão</TableHead>
+                    <TableHead>Mix</TableHead>
                     <TableHead>
                       <SortButton k="date" label="Criado em" />
                     </TableHead>
@@ -793,6 +807,13 @@ export function CheckoutProdutosPanel({ initialProdutos }: CheckoutProdutosPanel
                           checked={produto.isCorujao}
                           onCheckedChange={() => handleToggleCorujao(produto)}
                           label={produto.isCorujao ? "Remover do Corujão" : "Marcar como Corujão"}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={produto.isMix}
+                          onCheckedChange={() => handleToggleMix(produto)}
+                          label={produto.isMix ? "Remover do Mix" : "Marcar como Mix"}
                         />
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">

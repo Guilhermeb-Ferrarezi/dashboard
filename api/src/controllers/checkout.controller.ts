@@ -19,6 +19,7 @@ function serializeProduct(row: typeof schema.checkoutProducts.$inferSelect) {
     imageKey: row.imageKey ?? null,
     imageUrl: row.imageUrl ?? null,
     isCorujao: row.isCorujao,
+    isMix: row.isMix,
     createdAt: row.createdAt.toISOString()
   };
 }
@@ -627,7 +628,7 @@ export async function updateProduto(c: Context<AppEnv>): Promise<Response> {
     if (isNaN(id)) return c.json({ message: "ID inválido." }, 400);
 
     const body = await c.req.json();
-    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao } = body as {
+    const { name, description, amountCents, discountPercent, active, features, imageKey, imageUrl, isCorujao, isMix } = body as {
       name?: string;
       description?: string;
       amountCents?: unknown;
@@ -637,6 +638,7 @@ export async function updateProduto(c: Context<AppEnv>): Promise<Response> {
       imageKey?: string | null;
       imageUrl?: string | null;
       isCorujao?: unknown;
+      isMix?: unknown;
     };
 
     const db = getCheckoutDb();
@@ -671,6 +673,7 @@ export async function updateProduto(c: Context<AppEnv>): Promise<Response> {
     }
     if (active !== undefined) updates.active = Boolean(active);
     if (isCorujao !== undefined) updates.isCorujao = Boolean(isCorujao);
+    if (isMix !== undefined) updates.isMix = Boolean(isMix);
     if (imageKey !== undefined) updates.imageKey = imageKey?.trim() || null;
     if (imageUrl !== undefined) updates.imageUrl = imageUrl?.trim() || null;
 
