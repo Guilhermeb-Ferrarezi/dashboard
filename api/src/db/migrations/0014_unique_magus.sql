@@ -1,0 +1,1 @@
+ALTER TABLE "checkout_products" ADD COLUMN "is_mix" boolean DEFAULT false NOT NULL;

@@ -14,6 +14,7 @@ export const checkoutProducts = pgTable("checkout_products", {
   imageKey: text("image_key"),
   imageUrl: text("image_url"),
   isCorujao: boolean("is_corujao").notNull().default(false),
+  isMix: boolean("is_mix").notNull().default(false),
   dotfyProductId: text("dotfy_product_id"),
   dotfySlug: text("dotfy_slug"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
