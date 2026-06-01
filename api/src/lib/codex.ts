@@ -184,6 +184,25 @@ const CODEX_USE_EXEC_WORKFLOW =
 let appServerProcess: ReturnType<typeof spawn> | null = null;
 let appServerStartPromise: Promise<void> | null = null;
 
+// ── Instrumentação de memória ──────────────────────────────────────────────
+// Rastreia os processos `codex` vivos (exec session + app-server) para
+// diagnóstico de vazamento de memória. Consumido por lib/memory-metrics.ts.
+const activeCodexChildren = new Set<ReturnType<typeof spawn>>();
+
+export function getActiveCodexChildCount(): number {
+  return activeCodexChildren.size;
+}
+
+export function trackCodexChild(child: ReturnType<typeof spawn>): void {
+  activeCodexChildren.add(child);
+  const drop = () => {
+    activeCodexChildren.delete(child);
+  };
+  child.once("close", drop);
+  child.once("exit", drop);
+  child.once("error", drop);
+}
+
 function createClientWebSocket(url: string) {
   return new WebSocket(url);
 }
@@ -802,6 +821,8 @@ async function runCodexExecSession(params: {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
+  trackCodexChild(child);
+
   const jsonLines = readline.createInterface({
     input: child.stdout,
     crlfDelay: Infinity,
@@ -952,6 +973,7 @@ async function startCodexAppServer() {
   );
 
   appServerProcess = child;
+  trackCodexChild(child);
   let appServerReady = false;
 
   child.stdout.on("data", (chunk) => {

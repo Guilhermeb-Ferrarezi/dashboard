@@ -36,6 +36,7 @@ import ssoRoutes from "./routes/sso.routes";
 
 import { startPortalRecentsFlushLoop, stopPortalRecentsFlushLoop } from "./lib/portal-recents-store";
 import { startHealthBroadcast, stopHealthBroadcast, addHealthClient } from "./lib/health-sse";
+import { startMemoryMetrics, stopMemoryMetrics } from "./lib/memory-metrics";
 import { addClient as addVagasClient } from "./lib/vagas-sse";
 import {
   getCurrentUser,
@@ -62,6 +63,12 @@ process.on("uncaughtException", (err) => console.error("[process] uncaughtExcept
 process.on("unhandledRejection", (reason) => console.error("[process] unhandledRejection:", reason));
 
 const isProduction = process.env.NODE_ENV === "production";
+
+// Kill switch do Codex: desligue tudo (rotas + WS) com CODEX_ENABLED=false.
+// Default ligado — sem mudança de comportamento até você setar a env.
+const codexEnabled = !/^(0|false|no)$/i.test(
+  process.env.CODEX_ENABLED?.trim() || "",
+);
 const baseAllowedOrigins =
   process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? [];
 const allowedOrigins = isProduction
@@ -131,7 +138,11 @@ app.route("/api/projects", projectRoutes);
 app.route("/api/logs", logsRoutes);
 app.route("/api/valorant-account", valorantRoutes);
 app.route("/api/vct", vctRoutes);
-app.route("/api/codex", codexRoutes);
+if (codexEnabled) {
+  app.route("/api/codex", codexRoutes);
+} else {
+  console.warn("⚠️  Codex desabilitado (CODEX_ENABLED=false) — rotas /api/codex não montadas.");
+}
 app.route("/api/portal", portalRoutes);
 app.route("/api/checkout", checkoutRoutes);
 app.route("/api/corujao/public", corujaoPublicRoutes);
@@ -259,13 +270,15 @@ async function start() {
   let serverRef: ReturnType<typeof Bun.serve>;
 
   // Rota de upgrade WS do Codex (requer admin auth — aplicado antes de montar)
-  const codexWsUpgrade = createCodexWsUpgradeHandler(() => serverRef);
-  app.get(
-    "/api/codex/ws",
-    verifyJWTOrCodexServiceToken,
-    requireRole("admin"),
-    codexWsUpgrade,
-  );
+  if (codexEnabled) {
+    const codexWsUpgrade = createCodexWsUpgradeHandler(() => serverRef);
+    app.get(
+      "/api/codex/ws",
+      verifyJWTOrCodexServiceToken,
+      requireRole("admin"),
+      codexWsUpgrade,
+    );
+  }
 
   serverRef = Bun.serve({
     port,
@@ -280,11 +293,13 @@ async function start() {
   console.log(`Backend rodando: http://localhost:${port}`);
   startPortalRecentsFlushLoop();
   startHealthBroadcast();
+  startMemoryMetrics();
 
   function shutdown() {
     console.log("Shutting down…");
     stopPortalRecentsFlushLoop();
     stopHealthBroadcast();
+    stopMemoryMetrics();
     serverRef.stop();
     setTimeout(() => process.exit(1), 5000);
   }
