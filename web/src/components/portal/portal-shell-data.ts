@@ -2,6 +2,7 @@ import type { LucideIcon } from "@/components/ui/icons";
 import {
   ActivityIcon,
   BadgeCheckIcon,
+  CalendarIcon,
   CrosshairIcon,
   ImageIcon,
   LayoutDashboardIcon,
@@ -11,6 +12,7 @@ import {
   MoonIcon,
   PackageIcon,
   PhoneIcon,
+  Rows3Icon,
   ShoppingCartIcon,
   StorefrontIcon,
   StrategyIcon,
@@ -65,6 +67,7 @@ export const portalIconMap = {
   cart: ShoppingCartIcon,
   package: PackageIcon,
   clients: UsersIcon,
+  calendar: CalendarIcon,
 } as const;
 
 function normalizeText(value: string) {
@@ -279,6 +282,55 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
               icon: StrategyIcon,
               kind: "resource",
               keywords: ["inscricoes", "players", "registros"],
+            }),
+          ],
+        }),
+      ],
+    },
+    // Social — calendário editorial do Gabriel (gestor de redes sociais).
+    {
+      label: "Social",
+      iconKey: "calendar",
+      items: [
+        portalItem({
+          href: "/social/resumo",
+          label: "Calendário Editorial",
+          description: "Planejamento e acompanhamento de posts nas redes sociais",
+          icon: CalendarIcon,
+          kind: "page",
+          keywords: ["social", "redes sociais", "calendario", "editorial", "instagram", "tiktok", "linkedin"],
+          children: [
+            portalItem({
+              href: "/social/resumo",
+              label: "Resumo",
+              description: "Visão geral do mês — status e métricas",
+              icon: LayoutDashboardIcon,
+              kind: "resource",
+              keywords: ["resumo", "dashboard", "kpi", "metricas", "social"],
+            }),
+            portalItem({
+              href: "/social/calendario",
+              label: "Calendário",
+              description: "Vista mensal dos posts por data",
+              icon: CalendarIcon,
+              kind: "resource",
+              keywords: ["calendario", "data", "agendamento", "mes"],
+            }),
+            portalItem({
+              href: "/social/kanban",
+              label: "Kanban",
+              description: "Posts organizados por status do fluxo",
+              icon: ZapIcon,
+              kind: "resource",
+              keywords: ["kanban", "status", "fluxo", "producao", "revisao"],
+            }),
+            portalItem({
+              href: "/social/lista",
+              label: "Lista",
+              description: "Todos os posts com filtros",
+              icon: Rows3Icon,
+              kind: "resource",
+              keywords: ["lista", "filtros", "plataforma", "pilar"],
             }),
           ],
         }),
