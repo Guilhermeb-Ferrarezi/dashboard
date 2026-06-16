@@ -15,7 +15,6 @@ export default async function SocialKanbanPage() {
       eyebrow="Social"
       title="Kanban"
       description="Posts organizados por status do fluxo editorial."
-      lockViewport
     >
       <SocialKanban />
     </AppShell>
