@@ -13,6 +13,7 @@ import {
   BookOpenText,
   CalendarBlank,
   CaretDown,
+  CaretLeft,
   CaretRight,
   CaretUp,
   ChatCircleText,
@@ -107,6 +108,7 @@ export const CalendarIcon = CalendarBlank;
 export const MessageIcon = ChatCircleText;
 export const CheckIcon = Check;
 export const ChevronDownIcon = CaretDown;
+export const ChevronLeftIcon = CaretLeft;
 export const ChevronRightIcon = CaretRight;
 export const ChevronUpIcon = CaretUp;
 export const CircleCheckIcon = CheckCircle;
