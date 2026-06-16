@@ -42,8 +42,8 @@ export function SocialKanban() {
     <div>
       <SocialNav />
 
-      <div className="overflow-x-auto -mx-[var(--card-padding-x)]">
-        <div className="flex gap-3 px-[var(--card-padding-x)] pb-2 min-w-max">
+      <div className="overflow-x-auto">
+        <div className="flex gap-3 pb-2 min-w-max">
           {columns.map(({ status, posts }) => (
             <div key={status} className="w-60 shrink-0 flex flex-col gap-2">
               {/* Column header */}
