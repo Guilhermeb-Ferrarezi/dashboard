@@ -1,0 +1,91 @@
+/* Reskin do FullCalendar pro Design System Onix — usa os tokens de tema em
+   vez de cores fixas do FullCalendar, pra acompanhar dark/light/onix sem
+   duplicar paleta. */
+.aulas-calendario .fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--muted);
+  --fc-neutral-text-color: var(--muted-foreground);
+  --fc-today-bg-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  --fc-button-bg-color: var(--secondary);
+  --fc-button-border-color: var(--border);
+  --fc-button-text-color: var(--foreground);
+  --fc-button-hover-bg-color: var(--muted);
+  --fc-button-hover-border-color: var(--border);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-text-color: var(--primary-foreground);
+  --fc-button-active-border-color: var(--primary);
+  --fc-event-border-color: transparent;
+  --fc-list-event-hover-bg-color: var(--muted);
+  --fc-now-indicator-color: var(--destructive);
+  font-family: inherit;
+  color: var(--foreground);
+}
+
+.aulas-calendario .fc .fc-toolbar {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.aulas-calendario .fc .fc-toolbar-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+
+.aulas-calendario .fc .fc-button {
+  border-radius: var(--radius-sm);
+  text-transform: none;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  box-shadow: none;
+}
+
+.aulas-calendario .fc .fc-button:focus,
+.aulas-calendario .fc .fc-button-primary:focus {
+  box-shadow: 0 0 0 3px var(--ring) / 20%;
+}
+
+.aulas-calendario .fc-daygrid-day.fc-day-today,
+.aulas-calendario .fc-timegrid-col.fc-day-today {
+  background: var(--fc-today-bg-color);
+}
+
+.aulas-calendario .fc-event {
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 0.72rem;
+  border: none;
+}
+
+.aulas-calendario .fc-event.aula-cancelada {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.aulas-calendario .fc-col-header-cell-cushion,
+.aulas-calendario .fc-daygrid-day-number {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+
+.aulas-calendario .fc-scrollgrid {
+  border-color: var(--border);
+}
+
+.aulas-calendario .fc-list-day-cushion {
+  background: var(--muted);
+}
+
+.aulas-calendario .fc-list-event:hover td {
+  background: var(--muted);
+}
+
+.aulas-calendario .fc-timegrid-slot-label-cushion,
+.aulas-calendario .fc-timegrid-axis-cushion {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}

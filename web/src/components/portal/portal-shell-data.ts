@@ -2,6 +2,7 @@ import type { LucideIcon } from "@/components/ui/icons";
 import {
   ActivityIcon,
   BadgeCheckIcon,
+  CalendarIcon,
   CrosshairIcon,
   ImageIcon,
   LayoutDashboardIcon,
@@ -65,6 +66,7 @@ export const portalIconMap = {
   cart: ShoppingCartIcon,
   package: PackageIcon,
   clients: UsersIcon,
+  calendar: CalendarIcon,
 } as const;
 
 function normalizeText(value: string) {
@@ -95,6 +97,14 @@ export function buildPortalSidebarGroups(logsHref: string): PortalSidebarGroup[]
       label: "Negocio",
       iconKey: "cart",
       items: [
+        portalItem({
+          href: "/aulas",
+          label: "Aulas",
+          description: "Calendário de turmas recorrentes e aulas avulsas",
+          icon: CalendarIcon,
+          kind: "page",
+          keywords: ["aulas", "calendario", "turmas", "professor", "horario", "agenda", "escola"],
+        }),
         portalItem({
           href: "/corujao/painel",
           label: "Corujão",
@@ -463,7 +473,9 @@ export function resolvePortalRecentItem(
                   ? "images"
                   : sidebarItem.icon === BadgeCheckIcon
                     ? "admin"
-                    : "sparkles",
+                    : sidebarItem.icon === CalendarIcon
+                      ? "calendar"
+                      : "sparkles",
     kind: sidebarItem.kind,
   };
 }
