@@ -31,6 +31,7 @@ import corujaoPublicRoutes from "./routes/corujao-public.routes";
 import mixPublicRoutes from "./routes/mix-public.routes";
 import mixRoutes from "./routes/mix.routes";
 import emailRoutes from "./routes/email.routes";
+import aulasRoutes from "./routes/aulas.routes";
 import analyticsRoutes from "./routes/analytics.routes";
 import ssoRoutes from "./routes/sso.routes";
 
@@ -150,6 +151,7 @@ app.route("/api/mix/public", mixPublicRoutes);
 app.route("/api/mix", mixRoutes);
 app.route("/api/corujao", corujaoRoutes);
 app.route("/api/email", emailRoutes);
+app.route("/api/aulas", aulasRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/sso", ssoRoutes);
 
